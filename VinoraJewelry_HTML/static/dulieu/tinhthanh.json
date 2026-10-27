@@ -1,0 +1,41 @@
+{
+  "ghiChu": "34 đơn vị hành chính cấp tỉnh sau sắp xếp năm 2025; địa chỉ nhận hàng gồm tỉnh/thành phố và phường/xã.",
+  "thanhPho": [
+    "Thành phố Hà Nội",
+    "Thành phố Hồ Chí Minh",
+    "Thành phố Huế",
+    "Thành phố Đà Nẵng",
+    "Thành phố Cần Thơ",
+    "Thành phố Hải Phòng"
+  ],
+  "tinh": [
+    "Tỉnh Lai Châu",
+    "Tỉnh Điện Biên",
+    "Tỉnh Sơn La",
+    "Tỉnh Lạng Sơn",
+    "Tỉnh Quảng Ninh",
+    "Tỉnh Thanh Hóa",
+    "Tỉnh Nghệ An",
+    "Tỉnh Hà Tĩnh",
+    "Tỉnh Cao Bằng",
+    "Tỉnh Tuyên Quang",
+    "Tỉnh Lào Cai",
+    "Tỉnh Thái Nguyên",
+    "Tỉnh Phú Thọ",
+    "Tỉnh Bắc Ninh",
+    "Tỉnh Hưng Yên",
+    "Tỉnh Ninh Bình",
+    "Tỉnh Quảng Trị",
+    "Tỉnh Quảng Ngãi",
+    "Tỉnh Gia Lai",
+    "Tỉnh Khánh Hòa",
+    "Tỉnh Lâm Đồng",
+    "Tỉnh Đắk Lắk",
+    "Tỉnh Đồng Nai",
+    "Tỉnh Tây Ninh",
+    "Tỉnh Vĩnh Long",
+    "Tỉnh Đồng Tháp",
+    "Tỉnh Cà Mau",
+    "Tỉnh An Giang"
+  ]
+}

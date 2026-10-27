@@ -1,0 +1,84 @@
+{
+  "danhMuc": [
+    {
+      "id": 1,
+      "ten": "Nhẫn cầu hôn",
+      "nhom": "Nhẫn",
+      "duongDan": "nhan-cau-hon",
+      "moTa": "Nhẫn đính hôn gắn viên chủ kim cương tự nhiên, kim cương lab-grown, moissanite hoặc đá CZ",
+      "soLuong": 138
+    },
+    {
+      "id": 2,
+      "ten": "Nhẫn cưới",
+      "nhom": "Nhẫn",
+      "duongDan": "nhan-cuoi",
+      "moTa": "Nhẫn cưới, nhẫn đôi dành cho cặp đôi",
+      "soLuong": 34
+    },
+    {
+      "id": 3,
+      "ten": "Nhẫn thời trang",
+      "nhom": "Nhẫn",
+      "duongDan": "nhan-thoi-trang",
+      "moTa": "Nhẫn nữ đeo hằng ngày",
+      "soLuong": 28
+    },
+    {
+      "id": 4,
+      "ten": "Bông tai",
+      "nhom": "Bông tai",
+      "duongDan": "bong-tai",
+      "moTa": "Bông tai, khuyên tai các loại",
+      "soLuong": 69
+    },
+    {
+      "id": 5,
+      "ten": "Dây chuyền",
+      "nhom": "Dây chuyền",
+      "duongDan": "day-chuyen",
+      "moTa": "Dây chuyền, vòng cổ (có thể kèm mặt)",
+      "soLuong": 45
+    },
+    {
+      "id": 6,
+      "ten": "Mặt dây chuyền",
+      "nhom": "Mặt dây chuyền",
+      "duongDan": "mat-day-chuyen",
+      "moTa": "Mặt dây bán rời, phối với dây chuyền",
+      "soLuong": 61
+    },
+    {
+      "id": 7,
+      "ten": "Lắc tay",
+      "nhom": "Lắc tay",
+      "duongDan": "lac-tay",
+      "moTa": "Lắc tay, vòng tay",
+      "soLuong": 6
+    },
+    {
+      "id": 8,
+      "ten": "Charm",
+      "nhom": "Charm",
+      "duongDan": "charm",
+      "moTa": "Charm xỏ vòng/lắc, bán lẻ hoặc theo bộ phối sẵn",
+      "soLuong": 47
+    },
+    {
+      "id": 9,
+      "ten": "Bộ trang sức",
+      "nhom": "Bộ trang sức",
+      "duongDan": "bo-trang-suc",
+      "moTa": "Bộ trang sức và combo nhiều món",
+      "soLuong": 7
+    },
+    {
+      "id": 10,
+      "ten": "Vàng lưu niệm",
+      "nhom": "Vàng lưu niệm",
+      "duongDan": "vang-luu-niem",
+      "moTa": "Vàng 24K lưu niệm, phonesticker, quà tài lộc",
+      "soLuong": 8
+    }
+  ]
+}

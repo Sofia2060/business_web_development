@@ -1,0 +1,61 @@
+/* =====================================================================
+   VINORA JEWELRY — THẺ SẢN PHẨM & LƯỚI SẢN PHẨM (dùng chung nhiều trang)
+   ===================================================================== */
+.luoi-sp { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--k-7) var(--k-5); }
+.luoi-sp--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 1100px) { .luoi-sp, .luoi-sp--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 760px) { .luoi-sp, .luoi-sp--3 { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--k-6) 12px; } }
+
+/* Dải trượt ngang (trang chủ, gợi ý) */
+.dai-truot { display: grid; grid-auto-flow: column; grid-auto-columns: calc((100% - 3 * 24px) / 4); gap: 24px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; padding-bottom: 4px; }
+.dai-truot::-webkit-scrollbar { display: none; }
+.dai-truot > * { scroll-snap-align: start; }
+@media (max-width: 1100px) { .dai-truot { grid-auto-columns: calc((100% - 2 * 20px) / 3); gap: 20px; } }
+@media (max-width: 760px) { .dai-truot { grid-auto-columns: 62%; gap: 12px; } }
+.dieu-khien-truot { display: flex; gap: 8px; }
+.dieu-khien-truot .nut-bt { border: 1px solid var(--vien-dam); border-radius: 0; }
+.dieu-khien-truot .nut-bt:disabled { opacity: .35; cursor: default; }
+
+.the-sp { position: relative; min-width: 0; }
+.the-sp__lien-ket { display: grid; gap: 16px; height: 100%; }
+.the-sp__anh { position: relative; aspect-ratio: 1 / 1; background: var(--nen-chim); overflow: hidden; }
+.the-sp__anh img {
+  position: absolute; inset: 0; width: 100%; height: 100%; padding: 4%;
+  object-fit: contain; mix-blend-mode: multiply; transition: transform var(--cham) var(--nhip), opacity var(--cham) var(--nhip);
+}
+.the-sp__anh img.la-anh-chup { padding: 0; object-fit: cover; mix-blend-mode: normal; }
+.the-sp__anh-phu { opacity: 0; }
+.the-sp__lien-ket:hover .the-sp__anh-chinh, .the-sp__lien-ket:focus-visible .the-sp__anh-chinh { transform: scale(1.045); }
+.the-sp__lien-ket:hover .the-sp__anh.co-anh-phu .the-sp__anh-chinh,
+.the-sp__lien-ket:focus-visible .the-sp__anh.co-anh-phu .the-sp__anh-chinh { opacity: 0; }
+.the-sp__lien-ket:hover .the-sp__anh-phu, .the-sp__lien-ket:focus-visible .the-sp__anh-phu { opacity: 1; }
+.the-sp__nhan { position: absolute; top: 12px; left: 12px; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; z-index: 1; }
+.the-sp__than { display: grid; gap: 4px; justify-items: center; text-align: center; padding-inline: 4px; }
+.the-sp__bst { font-size: 10.5px; letter-spacing: .2em; }
+.the-sp__ten {
+  font-family: var(--font-tieu-de); font-size: 18px; line-height: 1.32; font-weight: 500; margin: 2px 0 0;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 2.64em;
+}
+.the-sp__phu { font-size: 12.5px; line-height: 1.5; color: var(--chu-phu); }
+.the-sp__duoi { display: grid; justify-items: center; gap: 8px; margin-top: 6px; }
+.the-sp__gia .gia { justify-content: center; font-size: 15px; }
+.the-sp__gia .gia del { font-size: 12.5px; }
+.the-sp__gia-cong { font-size: 13px; color: var(--chu-phu); }
+.the-sp__gia-cong strong { color: var(--chu); font-weight: 500; }
+.the-sp__mau { display: flex; gap: 6px; }
+.the-sp__mau .cham-mau { width: 12px; height: 12px; }
+@media (max-width: 760px) {
+  .the-sp__ten { font-size: 16px; }
+  .the-sp__phu { font-size: 11.5px; }
+  .the-sp__nhan { top: 8px; left: 8px; }
+  .the-sp__nhan .nhan { font-size: 9.5px; padding: 3px 7px; letter-spacing: .08em; }
+}
+
+/* Thẻ khung xương khi chờ tải dữ liệu */
+.the-sp--xuong .the-sp__anh { background: none; }
+.the-sp--xuong .the-sp__anh, .the-sp--xuong .xuong-dong {
+  background: linear-gradient(100deg, var(--nen-chim) 30%, #F6F1E9 50%, var(--nen-chim) 70%);
+  background-size: 300% 100%; animation: lung-linh 1.4s ease-in-out infinite;
+}
+.the-sp--xuong .xuong-dong { height: 12px; margin: 6px auto 0; width: 70%; }
+.the-sp--xuong .xuong-dong:nth-child(2) { width: 50%; }

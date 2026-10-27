@@ -1,0 +1,123 @@
+{
+  "ghiChu": "Quy ước phổ biến tại Việt Nam: ni (size) = chu vi ngón tay (mm) − 40; đường kính trong = chu vi ÷ 3,14. Size Mỹ là giá trị quy đổi gần đúng.",
+  "bangSize": [
+    {
+      "size": 6,
+      "chuVi": 46,
+      "duongKinh": 14.6,
+      "sizeMy": 3.5
+    },
+    {
+      "size": 7,
+      "chuVi": 47,
+      "duongKinh": 15.0,
+      "sizeMy": 4.0
+    },
+    {
+      "size": 8,
+      "chuVi": 48,
+      "duongKinh": 15.3,
+      "sizeMy": 4.5
+    },
+    {
+      "size": 9,
+      "chuVi": 49,
+      "duongKinh": 15.6,
+      "sizeMy": 5.0
+    },
+    {
+      "size": 10,
+      "chuVi": 50,
+      "duongKinh": 15.9,
+      "sizeMy": 5.5
+    },
+    {
+      "size": 11,
+      "chuVi": 51,
+      "duongKinh": 16.2,
+      "sizeMy": 5.5
+    },
+    {
+      "size": 12,
+      "chuVi": 52,
+      "duongKinh": 16.6,
+      "sizeMy": 6.0
+    },
+    {
+      "size": 13,
+      "chuVi": 53,
+      "duongKinh": 16.9,
+      "sizeMy": 6.5
+    },
+    {
+      "size": 14,
+      "chuVi": 54,
+      "duongKinh": 17.2,
+      "sizeMy": 7.0
+    },
+    {
+      "size": 15,
+      "chuVi": 55,
+      "duongKinh": 17.5,
+      "sizeMy": 7.0
+    },
+    {
+      "size": 16,
+      "chuVi": 56,
+      "duongKinh": 17.8,
+      "sizeMy": 7.5
+    },
+    {
+      "size": 17,
+      "chuVi": 57,
+      "duongKinh": 18.1,
+      "sizeMy": 8.0
+    },
+    {
+      "size": 18,
+      "chuVi": 58,
+      "duongKinh": 18.5,
+      "sizeMy": 8.5
+    },
+    {
+      "size": 19,
+      "chuVi": 59,
+      "duongKinh": 18.8,
+      "sizeMy": 9.0
+    },
+    {
+      "size": 20,
+      "chuVi": 60,
+      "duongKinh": 19.1,
+      "sizeMy": 9.0
+    },
+    {
+      "size": 21,
+      "chuVi": 61,
+      "duongKinh": 19.4,
+      "sizeMy": 9.5
+    },
+    {
+      "size": 22,
+      "chuVi": 62,
+      "duongKinh": 19.7,
+      "sizeMy": 10.0
+    },
+    {
+      "size": 23,
+      "chuVi": 63,
+      "duongKinh": 20.1,
+      "sizeMy": 10.5
+    },
+    {
+      "size": 24,
+      "chuVi": 64,
+      "duongKinh": 20.4,
+      "sizeMy": 11.0
+    }
+  ],
+  "goiYSize": {
+    "nu": "Phần lớn nữ đeo size 8 – 14",
+    "nam": "Phần lớn nam đeo size 16 – 22"
+  }
+}

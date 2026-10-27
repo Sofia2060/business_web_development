@@ -1,0 +1,361 @@
+{
+  "boSuuTap": [
+    {
+      "id": 1,
+      "ten": "Evermore",
+      "duongDan": "evermore",
+      "soLuong": 87,
+      "loaiSanPham": [
+        "Nhẫn cầu hôn",
+        "Nhẫn cưới"
+      ],
+      "chatLieu": [
+        "14K",
+        "18K",
+        "10K"
+      ],
+      "anhDaiDien": "cdn|shares/01upload/1713754063/ndino131ldia7_1716448926.png"
+    },
+    {
+      "id": 2,
+      "ten": "Starlight",
+      "duongDan": "starlight",
+      "soLuong": 75,
+      "loaiSanPham": [
+        "Nhẫn thời trang",
+        "Mặt dây chuyền",
+        "Bông tai"
+      ],
+      "chatLieu": [
+        "14K",
+        "10K",
+        "BAC925"
+      ],
+      "anhDaiDien": "cdn|shares/01upload/1713754270/nlf4247_1715827300.png"
+    },
+    {
+      "id": 3,
+      "ten": "Promis",
+      "duongDan": "promis",
+      "soLuong": 43,
+      "loaiSanPham": [
+        "Nhẫn cầu hôn",
+        "Nhẫn cưới"
+      ],
+      "chatLieu": [
+        "14K",
+        "10K"
+      ],
+      "anhDaiDien": "cdn|shares/01upload/1713754032/ndino163-vv-1_1727492162.png"
+    },
+    {
+      "id": 4,
+      "ten": "Gloria",
+      "duongDan": "gloria",
+      "soLuong": 27,
+      "loaiSanPham": [
+        "Bông tai",
+        "Dây chuyền",
+        "Mặt dây chuyền"
+      ],
+      "chatLieu": [
+        "14K",
+        "10K",
+        "BAC925"
+      ],
+      "anhDaiDien": "cdn|shares/01upload/1713754099/bt4116-1_1715919377.png"
+    },
+    {
+      "id": 5,
+      "ten": "Beyond",
+      "duongDan": "beyond",
+      "soLuong": 24,
+      "loaiSanPham": [
+        "Nhẫn cầu hôn"
+      ],
+      "chatLieu": [
+        "14K"
+      ],
+      "anhDaiDien": "cdn|shares/01upload/1713754036/ndino206mo-vh-1_1728008849.png"
+    },
+    {
+      "id": 6,
+      "ten": "Thần Tài Đại Cát",
+      "duongDan": "than-tai-dai-cat",
+      "soLuong": 23,
+      "loaiSanPham": [
+        "Charm"
+      ],
+      "chatLieu": [
+        "14K"
+      ],
+      "anhDaiDien": "cdn|shares/01upload/1713754399/llf2167_1715674779.png"
+    },
+    {
+      "id": 7,
+      "ten": "Bunnie",
+      "duongDan": "bunnie",
+      "soLuong": 19,
+      "loaiSanPham": [
+        "Bông tai",
+        "Dây chuyền"
+      ],
+      "chatLieu": [
+        "BAC925"
+      ],
+      "anhDaiDien": "cdn|shares/01upload/1790216604/btbac01vv1_1790235317.png"
+    },
+    {
+      "id": 8,
+      "ten": "Perlina",
+      "duongDan": "perlina",
+      "soLuong": 19,
+      "loaiSanPham": [
+        "Dây chuyền",
+        "Bông tai",
+        "Bộ trang sức"
+      ],
+      "chatLieu": [
+        "14K",
+        "10K"
+      ],
+      "anhDaiDien": "cdn|shares/01upload/1713754457/nbtcc904_1715653737.png"
+    },
+    {
+      "id": 9,
+      "ten": "The Empress",
+      "duongDan": "the-empress",
+      "soLuong": 19,
+      "loaiSanPham": [
+        "Mặt dây chuyền",
+        "Bông tai"
+      ],
+      "chatLieu": [
+        "24K"
+      ],
+      "anhDaiDien": "cdn|shares/01upload/1766714196/btbz03022k1_1766903172.png"
+    },
+    {
+      "id": 10,
+      "ten": "Eternal",
+      "duongDan": "eternal",
+      "soLuong": 17,
+      "loaiSanPham": [
+        "Nhẫn cầu hôn",
+        "Nhẫn cưới"
+      ],
+      "chatLieu": [
+        "14K",
+        "18K"
+      ],
+      "anhDaiDien": "cdn|shares/01upload/1722852061/ndino172kc7_1723024751.png"
+    },
+    {
+      "id": 11,
+      "ten": "Rabbit Tales",
+      "duongDan": "rabbit-tales",
+      "soLuong": 16,
+      "loaiSanPham": [
+        "Dây chuyền",
+        "Bông tai"
+      ],
+      "chatLieu": [
+        "10K"
+      ],
+      "anhDaiDien": "cdn|shares/01upload/1762766169/btbtcc112vh1_1763104601.png"
+    },
+    {
+      "id": 12,
+      "ten": "Lucky U",
+      "duongDan": "lucky-u",
+      "soLuong": 15,
+      "loaiSanPham": [
+        "Bông tai",
+        "Dây chuyền",
+        "Mặt dây chuyền"
+      ],
+      "chatLieu": [
+        "10K",
+        "14K"
+      ],
+      "anhDaiDien": "cdn|shares/01upload/1766713141/btbkc033vh1_1766889559.png"
+    },
+    {
+      "id": 13,
+      "ten": "12 Con Giáp",
+      "duongDan": "12-con-giap",
+      "soLuong": 12,
+      "loaiSanPham": [
+        "Charm"
+      ],
+      "chatLieu": [
+        "24K"
+      ],
+      "anhDaiDien": "cdn|shares/01upload/1768804428575/cvz01324k1_1768894311.png"
+    },
+    {
+      "id": 14,
+      "ten": "Lasting Moment",
+      "duongDan": "lasting-moment",
+      "soLuong": 10,
+      "loaiSanPham": [
+        "Charm"
+      ],
+      "chatLieu": [
+        "14K"
+      ],
+      "anhDaiDien": "cdn|shares/01upload/1713754397/llf21210_1715674585.png"
+    },
+    {
+      "id": 15,
+      "ten": "Moonlight",
+      "duongDan": "moonlight",
+      "soLuong": 9,
+      "loaiSanPham": [
+        "Mặt dây chuyền",
+        "Dây chuyền",
+        "Bông tai"
+      ],
+      "chatLieu": [
+        "10K",
+        "14K"
+      ],
+      "anhDaiDien": "cdn|shares/01upload/1766713738/btam140vv1_1766894473.png"
+    },
+    {
+      "id": 16,
+      "ten": "Haven Crystal",
+      "duongDan": "haven-crystal",
+      "soLuong": 7,
+      "loaiSanPham": [
+        "Mặt dây chuyền",
+        "Dây chuyền"
+      ],
+      "chatLieu": [
+        "10K",
+        "14K"
+      ],
+      "anhDaiDien": "cdn|shares/product/dcmamd827/vv/dcmamd827_vv_1.png"
+    },
+    {
+      "id": 17,
+      "ten": "Phonesticker",
+      "duongDan": "phonesticker",
+      "soLuong": 5,
+      "loaiSanPham": [
+        "Vàng lưu niệm"
+      ],
+      "chatLieu": [
+        "24K",
+        "10K"
+      ],
+      "anhDaiDien": "cdn|shares/01upload/1768201138/lnpsmeothantai24k1_1768214778.jpg"
+    },
+    {
+      "id": 18,
+      "ten": "Lumiere",
+      "duongDan": "lumiere",
+      "soLuong": 3,
+      "loaiSanPham": [
+        "Mặt dây chuyền",
+        "Dây chuyền"
+      ],
+      "chatLieu": [
+        "14K"
+      ],
+      "anhDaiDien": "cdn|shares/01upload/1764662897/dcz086ldiavv11_1764850641.png"
+    },
+    {
+      "id": 19,
+      "ten": "Vàng Lưu Niệm Tài Lộc",
+      "duongDan": "vang-luu-niem-tai-loc",
+      "soLuong": 3,
+      "loaiSanPham": [
+        "Vàng lưu niệm"
+      ],
+      "chatLieu": [
+        "24K"
+      ],
+      "anhDaiDien": "cdn|shares/01upload/1768201018/binhngokimchibao24k4_1769058054.png"
+    },
+    {
+      "id": 20,
+      "ten": "Cát Trường",
+      "duongDan": "cat-truong",
+      "soLuong": 2,
+      "loaiSanPham": [
+        "Mặt dây chuyền"
+      ],
+      "chatLieu": [
+        "14K"
+      ],
+      "anhDaiDien": "cdn|shares/01upload/1735284906/mdmamd7791-1_1735895536.png"
+    },
+    {
+      "id": 21,
+      "ten": "Kim Tiền",
+      "duongDan": "kim-tien",
+      "soLuong": 2,
+      "loaiSanPham": [
+        "Nhẫn thời trang"
+      ],
+      "chatLieu": [
+        "10K"
+      ],
+      "anhDaiDien": "cdn|shares/01upload/1768201445/nptb423vv1_1768206240.png"
+    },
+    {
+      "id": 22,
+      "ten": "Lucena",
+      "duongDan": "lucena",
+      "soLuong": 2,
+      "loaiSanPham": [
+        "Nhẫn thời trang",
+        "Mặt dây chuyền"
+      ],
+      "chatLieu": [
+        "14K"
+      ],
+      "anhDaiDien": "cdn|shares/01upload/1734341178/nlf457611728968242_1785639258.webp"
+    },
+    {
+      "id": 23,
+      "ten": "Vàng 22K",
+      "duongDan": "vang-22k",
+      "soLuong": 2,
+      "loaiSanPham": [
+        "Mặt dây chuyền"
+      ],
+      "chatLieu": [
+        "22K"
+      ],
+      "anhDaiDien": "cdn|shares/01upload/1749026072/mdz08122k1_1749030193.png"
+    },
+    {
+      "id": 24,
+      "ten": "Soobin's Queen",
+      "duongDan": "soobin-s-queen",
+      "soLuong": 1,
+      "loaiSanPham": [
+        "Dây chuyền"
+      ],
+      "chatLieu": [
+        "10K"
+      ],
+      "anhDaiDien": "cloud|uploads/dcbz033vv1_1753419981.png"
+    },
+    {
+      "id": 25,
+      "ten": "Together",
+      "duongDan": "together",
+      "soLuong": 1,
+      "loaiSanPham": [
+        "Nhẫn cưới"
+      ],
+      "chatLieu": [
+        "BAC925"
+      ],
+      "anhDaiDien": "cdn|shares/01upload/1750299516/nc433bac9251_1750418704.jpg"
+    }
+  ]
+}

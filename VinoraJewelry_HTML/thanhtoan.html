@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Thanh toán – Vinora Jewelry</title>
+  <meta name="description" content="Thanh toán đơn hàng Vinora Jewelry: thông tin người nhận, phương thức giao hàng có bảo hiểm và thanh toán COD, VietQR, VNPay, MoMo.">
+  <meta name="theme-color" content="#1A1714">
+  <script>document.documentElement.classList.add('co-js');</script>
+  <link rel="icon" href="static/hinh/logo/favicon.svg" type="image/svg+xml">
+
+  
+  <link rel="preload" href="static/thuvien/fonts/be-vietnam-pro-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="static/thuvien/fonts/cormorant-garamond-latin-500-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preconnect" href="https://cdn.huythanhjewelry.vn" crossorigin>
+  <link rel="stylesheet" href="static/thuvien/fonts/fonts.css">
+
+  
+  <link rel="stylesheet" href="static/css/chung/bienmau.css">
+  <link rel="stylesheet" href="static/css/chung/khung.css">
+  <link rel="stylesheet" href="static/css/chung/dautrang_chantrang.css">
+  <link rel="stylesheet" href="static/css/chung/thesanpham.css">
+  
+<link rel="stylesheet" href="static/css/chung/khutaikhoan.css">
+<link rel="stylesheet" href="static/css/khachhang/giohang.css">
+
+
+  
+  <script id="duong-dan" type="application/json">{
+    "trangChu": "index.html",
+    "sanPham": "danhsachsanpham.html",
+    "chiTiet": "chitietsanpham.html?ma=__MA__",
+    "daXem": "sanphamdaxem.html",
+    "gioHang": "giohang.html",
+    "thanhToan": "thanhtoan.html",
+    "ketQuaDatHang": "dathangthanhcong.html",
+    "taiKhoan": "taikhoan.html",
+    "donHang": "quanlydonhang.html",
+    "kichHoatBaoHanh": "kichhoatbaohanh.html",
+    "congBaoHanh": "congbaohanh.html",
+    "lienHe": "lienhe.html",
+    "huongDanSize": "huongdanchonsize.html",
+    "chinhSachBaoHanh": "chinhsachbaohanh.html",
+    "duLieu": "static/dulieu/",
+    "hinh": "static/hinh/"
+  }</script>
+</head>
+<body class="" data-trang="thanh-toan">
+  
+<svg xmlns="http://www.w3.org/2000/svg" class="bo-bieu-tuong" aria-hidden="true" focusable="false" style="position:absolute;width:0;height:0;overflow:hidden"><symbol id="i-tim-kiem" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></symbol><symbol id="i-tai-khoan" viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.75"/><path d="M4.5 20c.8-3.6 3.8-5.5 7.5-5.5s6.7 1.9 7.5 5.5"/></symbol><symbol id="i-tui" viewBox="0 0 24 24"><path d="M5 8.5h14l-1 12H6z"/><path d="M9 8.5V7a3 3 0 0 1 6 0v1.5"/></symbol><symbol id="i-dong" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol><symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 8h16M4 16h16"/></symbol><symbol id="i-xuong" viewBox="0 0 24 24"><path d="M6 9.5l6 6 6-6"/></symbol><symbol id="i-phai" viewBox="0 0 24 24"><path d="M9.5 6l6 6-6 6"/></symbol><symbol id="i-trai" viewBox="0 0 24 24"><path d="M14.5 6l-6 6 6 6"/></symbol><symbol id="i-mui-ten" viewBox="0 0 24 24"><path d="M4.5 12h15M14 6.5l5.5 5.5-5.5 5.5"/></symbol><symbol id="i-mui-ten-trai" viewBox="0 0 24 24"><path d="M19.5 12h-15M10 6.5L4.5 12l5.5 5.5"/></symbol><symbol id="i-cong" viewBox="0 0 24 24"><path d="M12 5.5v13M5.5 12h13"/></symbol><symbol id="i-tru" viewBox="0 0 24 24"><path d="M5.5 12h13"/></symbol><symbol id="i-dau-tich" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol><symbol id="i-thung-rac" viewBox="0 0 24 24"><path d="M5 7h14M10 4.5h4M7 7l.8 12.5h8.4L17 7M10.5 10.5v6M13.5 10.5v6"/></symbol><symbol id="i-khien" viewBox="0 0 24 24"><path d="M12 3.5l7 2.5v5.5c0 4.5-3 7.6-7 9-4-1.4-7-4.5-7-9V6z"/><path d="M9 12l2.2 2.2L15.5 10"/></symbol><symbol id="i-xe-giao" viewBox="0 0 24 24"><path d="M2.5 6.5h11.5V16H2.5z"/><path d="M14 9.5h3.8l3.2 3.6V16H14"/><circle cx="6.5" cy="17.5" r="1.8"/><circle cx="17" cy="17.5" r="1.8"/></symbol><symbol id="i-kim-cuong" viewBox="0 0 24 24"><path d="M7 4.5h10l3.5 4.5L12 20 3.5 9z"/><path d="M3.5 9h17M9.5 4.5L8 9l4 11 4-11-1.5-4.5"/></symbol><symbol id="i-hop-hang" viewBox="0 0 24 24"><path d="M4 7.5l8-4 8 4v9l-8 4-8-4z"/><path d="M4 7.5l8 4 8-4M12 11.5v9"/></symbol><symbol id="i-thong-tin" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5M12 7.8v.4"/></symbol><symbol id="i-canh-bao" viewBox="0 0 24 24"><path d="M12 4l9 16H3z"/><path d="M12 10v4.5M12 17.2v.4"/></symbol><symbol id="i-dong-ho" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></symbol><symbol id="i-mat" viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></symbol><symbol id="i-lich" viewBox="0 0 24 24"><path d="M4.5 6.5h15v13h-15z"/><path d="M4.5 10.5h15M8.5 4v4M15.5 4v4"/></symbol><symbol id="i-ghim" viewBox="0 0 24 24"><path d="M12 21s-6.5-6-6.5-11a6.5 6.5 0 0 1 13 0c0 5-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.3"/></symbol><symbol id="i-dien-thoai" viewBox="0 0 24 24"><path d="M6.5 3.5h3l1.5 4.5-2 1.3a11 11 0 0 0 5.7 5.7l1.3-2 4.5 1.5v3a2 2 0 0 1-2 2C11.3 19.5 4.5 12.7 4.5 5.5a2 2 0 0 1 2-2z"/></symbol><symbol id="i-thu" viewBox="0 0 24 24"><path d="M3.5 6h17v12h-17z"/><path d="M3.5 6.5l8.5 6.5 8.5-6.5"/></symbol><symbol id="i-sao" viewBox="0 0 24 24"><path d="M12 3.8l2.5 5.2 5.7.8-4.1 4 1 5.6L12 16.7l-5.1 2.7 1-5.6-4.1-4 5.7-.8z"/></symbol><symbol id="i-thuoc" viewBox="0 0 24 24"><path d="M3 15.5L15.5 3 21 8.5 8.5 21z"/><path d="M7 11.5l1.8 1.8M9.5 9l2.5 2.5M12 6.5l1.8 1.8M14.5 4l2.5 2.5"/></symbol><symbol id="i-but" viewBox="0 0 24 24"><path d="M15.5 4.5l4 4L9 19H5v-4z"/><path d="M13.5 6.5l4 4"/></symbol><symbol id="i-qua" viewBox="0 0 24 24"><path d="M4 9.5h16v3H4zM5.5 12.5h13V20h-13zM12 9.5V20"/><path d="M12 9.5S10.5 5 8.3 5.4C6.6 5.7 7 8.6 12 9.5zM12 9.5s1.5-4.5 3.7-4.1c1.7.3 1.3 3.2-3.7 4.1z"/></symbol><symbol id="i-doi-tra" viewBox="0 0 24 24"><path d="M4.5 10a7.5 7.5 0 0 1 13.4-3.5L20 9M19.5 14a7.5 7.5 0 0 1-13.4 3.5L4 15"/><path d="M20 4.5V9h-4.5M4 19.5V15h4.5"/></symbol><symbol id="i-khoa" viewBox="0 0 24 24"><path d="M5.5 10.5h13v9.5h-13z"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/></symbol><symbol id="i-the" viewBox="0 0 24 24"><path d="M3 6h18v12H3z"/><path d="M3 10h18M6.5 14.5h4"/></symbol><symbol id="i-qr" viewBox="0 0 24 24"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4z"/><path d="M14 14h2.5v2.5H14zM17.5 17.5H20V20h-2.5zM17.5 14H20M14 20h1.5"/></symbol><symbol id="i-trang-chu" viewBox="0 0 24 24"><path d="M4 11l8-6.5 8 6.5V20h-5.5v-5.5h-5V20H4z"/></symbol><symbol id="i-bo-loc" viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></symbol><symbol id="i-dang-xuat" viewBox="0 0 24 24"><path d="M14 4.5h4.5v15H14"/><path d="M10 8l-4 4 4 4M6 12h10"/></symbol><symbol id="i-lap-lanh" viewBox="0 0 24 24"><path d="M12 3.5l1.6 4.9 4.9 1.6-4.9 1.6L12 16.5l-1.6-4.9L5.5 10l4.9-1.6z"/><path d="M18.5 15.5l.7 2.1 2.1.7-2.1.7-.7 2.1-.7-2.1-2.1-.7 2.1-.7z"/></symbol><symbol id="i-phong-to" viewBox="0 0 24 24"><path d="M14.5 4.5h5v5M9.5 19.5h-5v-5M19.5 4.5L14 10M4.5 19.5L10 14"/></symbol><symbol id="i-tai-len" viewBox="0 0 24 24"><path d="M12 15.5V4.5M7.5 9L12 4.5 16.5 9"/><path d="M4.5 15v4.5h15V15"/></symbol><symbol id="i-cua-hang" viewBox="0 0 24 24"><path d="M4 9.5L5.5 4.5h13L20 9.5"/><path d="M4 9.5c0 1.5 1.2 2.5 2.7 2.5S9.3 11 9.3 9.5c0 1.5 1.2 2.5 2.7 2.5s2.7-1 2.7-2.5c0 1.5 1.2 2.5 2.6 2.5S20 11 20 9.5M5.5 12v8h13v-8M10 20v-4.5h4V20"/></symbol><symbol id="i-chung-nhan" viewBox="0 0 24 24"><circle cx="12" cy="9.5" r="5.5"/><path d="M9 14l-1.5 6.5L12 18l4.5 2.5L15 14"/><path d="M9.8 9.5l1.5 1.5 3-3"/></symbol><symbol id="i-nhan-ma" viewBox="0 0 24 24"><path d="M3.5 12.5l8.8-8.8H20v7.7l-8.8 8.8z"/><circle cx="15.8" cy="8" r="1.4"/></symbol><symbol id="i-chinh-sua" viewBox="0 0 24 24"><path d="M4.5 19.5h15"/><path d="M14.5 5l3 3-8 8H6.5v-3z"/></symbol><symbol id="i-bao-ve" viewBox="0 0 24 24"><path d="M12 3.5l7 2.5v5.5c0 4.5-3 7.6-7 9-4-1.4-7-4.5-7-9V6z"/></symbol><symbol id="i-nhan-nhan" viewBox="0 0 24 24"><circle cx="12" cy="14" r="6"/><path d="M9.5 8.5L12 4l2.5 4.5"/><path d="M10 4h4"/></symbol><symbol id="i-huy" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M8.8 8.8l6.4 6.4M15.2 8.8l-6.4 6.4"/></symbol><symbol id="i-xac-nhan" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M8 12.3l2.8 2.8L16.2 9.6"/></symbol><symbol id="i-tro-giup" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M9.6 9.5a2.5 2.5 0 1 1 3.4 2.3c-.6.3-1 .8-1 1.5v.7M12 16.6v.4"/></symbol><symbol id="i-luoi" viewBox="0 0 24 24"><path d="M4.5 4.5h6v6h-6zM13.5 4.5h6v6h-6zM4.5 13.5h6v6h-6zM13.5 13.5h6v6h-6z"/></symbol><symbol id="i-chia-se" viewBox="0 0 24 24"><circle cx="6.5" cy="12" r="2.3"/><circle cx="17.5" cy="6" r="2.3"/><circle cx="17.5" cy="18" r="2.3"/><path d="M8.6 10.9l6.8-3.7M8.6 13.1l6.8 3.7"/></symbol><symbol id="i-in" viewBox="0 0 24 24"><path d="M7 8.5V4h10v4.5M7 16H4.5V9h15v7H17"/><path d="M7 13.5h10V20H7z"/></symbol><symbol id="i-sao-chep" viewBox="0 0 24 24"><path d="M8.5 8.5h11v11h-11z"/><path d="M15.5 8.5v-4h-11v11h4"/></symbol><symbol id="i-chat" viewBox="0 0 24 24"><path d="M4.5 5.5h15v10h-8l-4.5 3.5v-3.5H4.5z"/></symbol></svg>
+  <a class="bo-qua" href="#noi-dung">Bỏ qua, đến nội dung chính</a>
+
+  
+
+
+<div class="thanh-thong-bao khong-in" role="region" aria-label="Thông tin ưu đãi">
+  <div class="khung thanh-thong-bao__khung">
+    <p class="thanh-thong-bao__chu" data-chu-xoay>
+      <span class="dang-hien">Miễn phí giao hàng có bảo hiểm cho đơn từ 2.000.000 ₫</span>
+      <span>Khắc tên laser miễn phí trên nhẫn – xem trước ngay trên trang sản phẩm</span>
+      <span>Kích hoạt thẻ bảo hành điện tử trọn đời khi xác nhận đã nhận hàng</span>
+    </p>
+    <div class="thanh-thong-bao__phai">
+      <a href="congbaohanh.html">Cổng bảo hành</a>
+      <span aria-hidden="true">·</span>
+      <a href="lienhe.html">Hotline 1900 0000</a>
+    </div>
+  </div>
+</div>
+
+<header class="dau-trang khong-in" id="dau-trang">
+  <div class="khung dau-trang__hang">
+    <div class="dau-trang__trai">
+      <button class="nut-bt dau-trang__nut-menu" type="button" aria-label="Mở menu" aria-controls="menu-di-dong" data-mo-menu>
+        <svg class="bt"><use href="#i-menu"></use></svg>
+      </button>
+      <form class="o-tim" id="o-tim" role="search" action="danhsachsanpham.html" method="get" autocomplete="off">
+        <label class="an-chu" for="o-tim-nhap">Tìm kiếm sản phẩm</label>
+        <svg class="bt o-tim__bt" aria-hidden="true"><use href="#i-tim-kiem"></use></svg>
+        <input class="o-tim__nhap" id="o-tim-nhap" name="q" type="search" placeholder="Tìm nhẫn, bông tai, mã sản phẩm…"
+               aria-controls="goi-y-tim" aria-expanded="false" aria-autocomplete="list" maxlength="80">
+        <div class="goi-y-tim" id="goi-y-tim" role="listbox" aria-label="Gợi ý tìm kiếm" hidden></div>
+      </form>
+      <button class="nut-bt dau-trang__nut-tim" type="button" aria-label="Tìm kiếm" data-mo-tim>
+        <svg class="bt"><use href="#i-tim-kiem"></use></svg>
+      </button>
+    </div>
+
+    <a class="dau-trang__logo" href="index.html" aria-label="Vinora Jewelry – về trang chủ">
+      <img src="static/hinh/logo/logo-vinora.svg" alt="Vinora Jewelry" width="176" height="50">
+    </a>
+
+    <div class="dau-trang__phai">
+      <a class="nut-bt dau-trang__an-nho" href="sanphamdaxem.html" aria-label="Sản phẩm đã xem" title="Sản phẩm đã xem">
+        <svg class="bt"><use href="#i-dong-ho"></use></svg>
+      </a>
+      <a class="nut-bt" href="taikhoan.html" aria-label="Tài khoản" title="Tài khoản" data-nut-tai-khoan>
+        <svg class="bt"><use href="#i-tai-khoan"></use></svg>
+        <span class="dau-trang__ten-tk" data-ten-tai-khoan></span>
+      </a>
+      <button class="nut-bt" type="button" aria-label="Giỏ hàng" title="Giỏ hàng" data-mo-gio aria-controls="gio-mini">
+        <svg class="bt"><use href="#i-tui"></use></svg>
+        <span class="so-dem" data-so-gio hidden>0</span>
+      </button>
+    </div>
+  </div>
+
+  <nav class="menu-chinh" aria-label="Danh mục chính">
+    <ul class="khung menu-chinh__ds">
+      
+      <li class="menu-chinh__muc co-menu-con" data-nhom-menu="nhan">
+        <a class="menu-chinh__lien-ket" href="danhsachsanpham.html?nhom=nhan" aria-haspopup="true" aria-expanded="false">Nhẫn</a>
+        <div class="menu-con" role="region" aria-label="Nhẫn">
+          <div class="khung menu-con__khung">
+            
+            <div class="menu-con__cot">
+              <p class="nhan-tren">Theo loại</p>
+              <ul>
+                <li><a href="danhsachsanpham.html?danhmuc=1">Nhẫn cầu hôn</a></li><li><a href="danhsachsanpham.html?danhmuc=2">Nhẫn cưới</a></li><li><a href="danhsachsanpham.html?danhmuc=3">Nhẫn thời trang</a></li><li><a href="danhsachsanpham.html?nhom=nhan">Tất cả nhẫn</a></li>
+              </ul>
+            </div>
+            
+            <div class="menu-con__cot">
+              <p class="nhan-tren">Bộ sưu tập nhẫn</p>
+              <ul>
+                <li><a href="danhsachsanpham.html?bst=1">Evermore</a></li><li><a href="danhsachsanpham.html?bst=3">Promis</a></li><li><a href="danhsachsanpham.html?bst=5">Beyond</a></li><li><a href="danhsachsanpham.html?bst=10">Eternal</a></li>
+              </ul>
+            </div>
+            
+            <div class="menu-con__cot">
+              <p class="nhan-tren">Chọn nhẫn an tâm</p>
+              <ul>
+                <li><a href="huongdanchonsize.html">Hướng dẫn đo size nhẫn</a></li><li><a href="chinhsachbaohanh.html">Chỉnh size trọn đời</a></li><li><a href="danhsachsanpham.html?nhom=nhan&amp;uudai=1">Nhẫn có ưu đãi</a></li>
+              </ul>
+            </div>
+            
+            <a class="menu-con__noi-bat" href="danhsachsanpham.html?nhom=nhan">
+              <span class="menu-con__anh"><img data-anh-ma="NDINO356LDIA" alt="" width="320" height="320" loading="lazy"></span>
+              <span class="menu-con__chu">Nhẫn cầu hôn, nhẫn cưới và nhẫn thời trang – chọn size dễ dàng, khắc tên laser miễn phí.</span>
+              <span class="nut nut--chu">Khám phá nhẫn</span>
+            </a>
+          </div>
+        </div>
+      </li>
+      
+      <li class="menu-chinh__muc co-menu-con" data-nhom-menu="trang-suc">
+        <a class="menu-chinh__lien-ket" href="danhsachsanpham.html" aria-haspopup="true" aria-expanded="false">Trang sức</a>
+        <div class="menu-con" role="region" aria-label="Trang sức">
+          <div class="khung menu-con__khung">
+            
+            <div class="menu-con__cot">
+              <p class="nhan-tren">Theo loại</p>
+              <ul>
+                <li><a href="danhsachsanpham.html?danhmuc=4">Bông tai</a></li><li><a href="danhsachsanpham.html?danhmuc=5">Dây chuyền</a></li><li><a href="danhsachsanpham.html?danhmuc=6">Mặt dây chuyền</a></li><li><a href="danhsachsanpham.html?danhmuc=7">Lắc tay</a></li><li><a href="danhsachsanpham.html?danhmuc=8">Charm</a></li><li><a href="danhsachsanpham.html?danhmuc=9">Bộ trang sức</a></li>
+              </ul>
+            </div>
+            
+            <div class="menu-con__cot">
+              <p class="nhan-tren">Theo chất liệu</p>
+              <ul>
+                <li><a href="danhsachsanpham.html?chatlieu=10K">Vàng 10K</a></li><li><a href="danhsachsanpham.html?chatlieu=14K">Vàng 14K</a></li><li><a href="danhsachsanpham.html?chatlieu=18K">Vàng 18K</a></li><li><a href="danhsachsanpham.html?chatlieu=24K">Vàng 24K</a></li><li><a href="danhsachsanpham.html?chatlieu=BAC925">Bạc 925</a></li>
+              </ul>
+            </div>
+            
+            <div class="menu-con__cot">
+              <p class="nhan-tren">Gợi ý</p>
+              <ul>
+                <li><a href="danhsachsanpham.html?sapxep=moi">Sản phẩm mới về</a></li><li><a href="danhsachsanpham.html?uudai=1">Đang có ưu đãi</a></li><li><a href="danhsachsanpham.html">Tất cả sản phẩm</a></li>
+              </ul>
+            </div>
+            
+            <a class="menu-con__noi-bat" href="danhsachsanpham.html">
+              <span class="menu-con__anh"><img data-anh-ma="BT408" alt="" width="320" height="320" loading="lazy"></span>
+              <span class="menu-con__chu">Bông tai, dây chuyền, mặt dây và lắc tay – minh bạch tuổi vàng trên từng sản phẩm.</span>
+              <span class="nut nut--chu">Khám phá trang sức</span>
+            </a>
+          </div>
+        </div>
+      </li>
+      
+      <li class="menu-chinh__muc co-menu-con" data-nhom-menu="bo-suu-tap">
+        <a class="menu-chinh__lien-ket" href="danhsachsanpham.html?bst=2" aria-haspopup="true" aria-expanded="false">Bộ sưu tập</a>
+        <div class="menu-con" role="region" aria-label="Bộ sưu tập">
+          <div class="khung menu-con__khung">
+            
+            <div class="menu-con__cot">
+              <p class="nhan-tren">Cưới hỏi</p>
+              <ul>
+                <li><a href="danhsachsanpham.html?bst=1">Evermore</a></li><li><a href="danhsachsanpham.html?bst=3">Promis</a></li><li><a href="danhsachsanpham.html?bst=5">Beyond</a></li><li><a href="danhsachsanpham.html?bst=10">Eternal</a></li>
+              </ul>
+            </div>
+            
+            <div class="menu-con__cot">
+              <p class="nhan-tren">Thời trang</p>
+              <ul>
+                <li><a href="danhsachsanpham.html?bst=2">Starlight</a></li><li><a href="danhsachsanpham.html?bst=4">Gloria</a></li><li><a href="danhsachsanpham.html?bst=8">Perlina</a></li><li><a href="danhsachsanpham.html?bst=15">Moonlight</a></li><li><a href="danhsachsanpham.html?bst=12">Lucky U</a></li>
+              </ul>
+            </div>
+            
+            <div class="menu-con__cot">
+              <p class="nhan-tren">Vàng 24K &amp; tài lộc</p>
+              <ul>
+                <li><a href="danhsachsanpham.html?bst=9">The Empress</a></li><li><a href="danhsachsanpham.html?bst=6">Thần Tài Đại Cát</a></li><li><a href="danhsachsanpham.html?bst=13">12 Con Giáp</a></li><li><a href="danhsachsanpham.html?bst=7">Bunnie (Bạc 925)</a></li><li><a href="danhsachsanpham.html?bst=11">Rabbit Tales</a></li>
+              </ul>
+            </div>
+            
+            <a class="menu-con__noi-bat" href="danhsachsanpham.html?bst=2">
+              <span class="menu-con__anh"><img data-anh-ma="NCZ113" alt="" width="320" height="320" loading="lazy"></span>
+              <span class="menu-con__chu">Mỗi bộ sưu tập là một câu chuyện – từ lời hứa Evermore đến ánh sao Starlight.</span>
+              <span class="nut nut--chu">Khám phá bộ sưu tập</span>
+            </a>
+          </div>
+        </div>
+      </li>
+      
+      <li class="menu-chinh__muc co-menu-con" data-nhom-menu="qua-tang">
+        <a class="menu-chinh__lien-ket" href="danhsachsanpham.html?gia=0-5000000" aria-haspopup="true" aria-expanded="false">Quà tặng</a>
+        <div class="menu-con" role="region" aria-label="Quà tặng">
+          <div class="khung menu-con__khung">
+            
+            <div class="menu-con__cot">
+              <p class="nhan-tren">Theo ngân sách</p>
+              <ul>
+                <li><a href="danhsachsanpham.html?gia=0-2000000">Dưới 2 triệu</a></li><li><a href="danhsachsanpham.html?gia=2000000-5000000">Từ 2 – 5 triệu</a></li><li><a href="danhsachsanpham.html?gia=5000000-10000000">Từ 5 – 10 triệu</a></li><li><a href="danhsachsanpham.html?gia=10000000-">Trên 10 triệu</a></li>
+              </ul>
+            </div>
+            
+            <div class="menu-con__cot">
+              <p class="nhan-tren">Quà tài lộc</p>
+              <ul>
+                <li><a href="danhsachsanpham.html?danhmuc=10">Vàng lưu niệm</a></li><li><a href="danhsachsanpham.html?bst=13">Charm 12 Con Giáp</a></li><li><a href="danhsachsanpham.html?bst=6">Thần Tài Đại Cát</a></li>
+              </ul>
+            </div>
+            
+            <div class="menu-con__cot">
+              <p class="nhan-tren">Cho người thương</p>
+              <ul>
+                <li><a href="danhsachsanpham.html?danhmuc=2">Nhẫn đôi, nhẫn cưới</a></li><li><a href="danhsachsanpham.html?danhmuc=4">Bông tai</a></li><li><a href="danhsachsanpham.html?danhmuc=9">Bộ trang sức</a></li>
+              </ul>
+            </div>
+            
+            <a class="menu-con__noi-bat" href="danhsachsanpham.html?gia=0-5000000">
+              <span class="menu-con__anh"><img data-anh-ma="CVZ013" alt="" width="320" height="320" loading="lazy"></span>
+              <span class="menu-con__chu">Món quà mang dấu ấn riêng – khắc tên miễn phí, gói quà sang trọng.</span>
+              <span class="nut nut--chu">Khám phá quà tặng</span>
+            </a>
+          </div>
+        </div>
+      </li>
+      
+      <li class="menu-chinh__muc"><a class="menu-chinh__lien-ket menu-chinh__lien-ket--do" href="danhsachsanpham.html?uudai=1">Ưu đãi</a></li>
+      <li class="menu-chinh__muc"><a class="menu-chinh__lien-ket" href="congbaohanh.html">Bảo hành điện tử</a></li>
+    </ul>
+  </nav>
+</header>
+
+
+<dialog class="ngan-keo ngan-keo--trai menu-di-dong" id="menu-di-dong" aria-label="Menu">
+  <div class="ngan-keo__dau">
+    <img src="static/hinh/logo/logo-vinora.svg" alt="Vinora Jewelry" width="130" height="37">
+    <button class="nut-bt" type="button" aria-label="Đóng menu" data-dong-ngan-keo><svg class="bt"><use href="#i-dong"></use></svg></button>
+  </div>
+  <div class="ngan-keo__than">
+    <form class="menu-di-dong__tim" action="danhsachsanpham.html" method="get" role="search">
+      <label class="an-chu" for="tim-di-dong">Tìm kiếm</label>
+      <input class="o-nhap" id="tim-di-dong" name="q" type="search" placeholder="Bạn đang tìm gì?">
+      <button class="nut nut--chinh nut--nho" type="submit" aria-label="Tìm"><svg class="bt"><use href="#i-tim-kiem"></use></svg></button>
+    </form>
+    
+    <details class="mo-rong">
+      <summary>Nhẫn <svg class="bt bt--nho"><use href="#i-xuong"></use></svg></summary>
+      <div class="mo-rong__noi-dung menu-di-dong__nhom">
+        
+        <p class="nhan-tren">Theo loại</p>
+        <ul><li><a href="danhsachsanpham.html?danhmuc=1">Nhẫn cầu hôn</a></li><li><a href="danhsachsanpham.html?danhmuc=2">Nhẫn cưới</a></li><li><a href="danhsachsanpham.html?danhmuc=3">Nhẫn thời trang</a></li><li><a href="danhsachsanpham.html?nhom=nhan">Tất cả nhẫn</a></li></ul>
+        
+        <p class="nhan-tren">Bộ sưu tập nhẫn</p>
+        <ul><li><a href="danhsachsanpham.html?bst=1">Evermore</a></li><li><a href="danhsachsanpham.html?bst=3">Promis</a></li><li><a href="danhsachsanpham.html?bst=5">Beyond</a></li><li><a href="danhsachsanpham.html?bst=10">Eternal</a></li></ul>
+        
+        <p class="nhan-tren">Chọn nhẫn an tâm</p>
+        <ul><li><a href="huongdanchonsize.html">Hướng dẫn đo size nhẫn</a></li><li><a href="chinhsachbaohanh.html">Chỉnh size trọn đời</a></li><li><a href="danhsachsanpham.html?nhom=nhan&amp;uudai=1">Nhẫn có ưu đãi</a></li></ul>
+        
+      </div>
+    </details>
+    
+    <details class="mo-rong">
+      <summary>Trang sức <svg class="bt bt--nho"><use href="#i-xuong"></use></svg></summary>
+      <div class="mo-rong__noi-dung menu-di-dong__nhom">
+        
+        <p class="nhan-tren">Theo loại</p>
+        <ul><li><a href="danhsachsanpham.html?danhmuc=4">Bông tai</a></li><li><a href="danhsachsanpham.html?danhmuc=5">Dây chuyền</a></li><li><a href="danhsachsanpham.html?danhmuc=6">Mặt dây chuyền</a></li><li><a href="danhsachsanpham.html?danhmuc=7">Lắc tay</a></li><li><a href="danhsachsanpham.html?danhmuc=8">Charm</a></li><li><a href="danhsachsanpham.html?danhmuc=9">Bộ trang sức</a></li></ul>
+        
+        <p class="nhan-tren">Theo chất liệu</p>
+        <ul><li><a href="danhsachsanpham.html?chatlieu=10K">Vàng 10K</a></li><li><a href="danhsachsanpham.html?chatlieu=14K">Vàng 14K</a></li><li><a href="danhsachsanpham.html?chatlieu=18K">Vàng 18K</a></li><li><a href="danhsachsanpham.html?chatlieu=24K">Vàng 24K</a></li><li><a href="danhsachsanpham.html?chatlieu=BAC925">Bạc 925</a></li></ul>
+        
+        <p class="nhan-tren">Gợi ý</p>
+        <ul><li><a href="danhsachsanpham.html?sapxep=moi">Sản phẩm mới về</a></li><li><a href="danhsachsanpham.html?uudai=1">Đang có ưu đãi</a></li><li><a href="danhsachsanpham.html">Tất cả sản phẩm</a></li></ul>
+        
+      </div>
+    </details>
+    
+    <details class="mo-rong">
+      <summary>Bộ sưu tập <svg class="bt bt--nho"><use href="#i-xuong"></use></svg></summary>
+      <div class="mo-rong__noi-dung menu-di-dong__nhom">
+        
+        <p class="nhan-tren">Cưới hỏi</p>
+        <ul><li><a href="danhsachsanpham.html?bst=1">Evermore</a></li><li><a href="danhsachsanpham.html?bst=3">Promis</a></li><li><a href="danhsachsanpham.html?bst=5">Beyond</a></li><li><a href="danhsachsanpham.html?bst=10">Eternal</a></li></ul>
+        
+        <p class="nhan-tren">Thời trang</p>
+        <ul><li><a href="danhsachsanpham.html?bst=2">Starlight</a></li><li><a href="danhsachsanpham.html?bst=4">Gloria</a></li><li><a href="danhsachsanpham.html?bst=8">Perlina</a></li><li><a href="danhsachsanpham.html?bst=15">Moonlight</a></li><li><a href="danhsachsanpham.html?bst=12">Lucky U</a></li></ul>
+        
+        <p class="nhan-tren">Vàng 24K &amp; tài lộc</p>
+        <ul><li><a href="danhsachsanpham.html?bst=9">The Empress</a></li><li><a href="danhsachsanpham.html?bst=6">Thần Tài Đại Cát</a></li><li><a href="danhsachsanpham.html?bst=13">12 Con Giáp</a></li><li><a href="danhsachsanpham.html?bst=7">Bunnie (Bạc 925)</a></li><li><a href="danhsachsanpham.html?bst=11">Rabbit Tales</a></li></ul>
+        
+      </div>
+    </details>
+    
+    <details class="mo-rong">
+      <summary>Quà tặng <svg class="bt bt--nho"><use href="#i-xuong"></use></svg></summary>
+      <div class="mo-rong__noi-dung menu-di-dong__nhom">
+        
+        <p class="nhan-tren">Theo ngân sách</p>
+        <ul><li><a href="danhsachsanpham.html?gia=0-2000000">Dưới 2 triệu</a></li><li><a href="danhsachsanpham.html?gia=2000000-5000000">Từ 2 – 5 triệu</a></li><li><a href="danhsachsanpham.html?gia=5000000-10000000">Từ 5 – 10 triệu</a></li><li><a href="danhsachsanpham.html?gia=10000000-">Trên 10 triệu</a></li></ul>
+        
+        <p class="nhan-tren">Quà tài lộc</p>
+        <ul><li><a href="danhsachsanpham.html?danhmuc=10">Vàng lưu niệm</a></li><li><a href="danhsachsanpham.html?bst=13">Charm 12 Con Giáp</a></li><li><a href="danhsachsanpham.html?bst=6">Thần Tài Đại Cát</a></li></ul>
+        
+        <p class="nhan-tren">Cho người thương</p>
+        <ul><li><a href="danhsachsanpham.html?danhmuc=2">Nhẫn đôi, nhẫn cưới</a></li><li><a href="danhsachsanpham.html?danhmuc=4">Bông tai</a></li><li><a href="danhsachsanpham.html?danhmuc=9">Bộ trang sức</a></li></ul>
+        
+      </div>
+    </details>
+    
+    <ul class="menu-di-dong__lien-ket">
+      <li><a href="danhsachsanpham.html?uudai=1">Ưu đãi</a></li>
+      <li><a href="congbaohanh.html">Bảo hành điện tử & đặt lịch</a></li>
+      <li><a href="quanlydonhang.html">Đơn hàng của tôi</a></li>
+      <li><a href="sanphamdaxem.html">Sản phẩm đã xem</a></li>
+      <li><a href="huongdanchonsize.html">Hướng dẫn chọn size</a></li>
+      <li><a href="lienhe.html">Liên hệ</a></li>
+    </ul>
+  </div>
+  <div class="ngan-keo__chan">
+    <a class="nut nut--vien nut--rong" href="taikhoan.html" data-nut-tai-khoan-di-dong>Đăng nhập / Đăng ký</a>
+  </div>
+</dialog>
+
+
+<dialog class="ngan-keo gio-mini" id="gio-mini" aria-labelledby="gio-mini-tieu-de">
+  <div class="ngan-keo__dau">
+    <h2 class="t-4" id="gio-mini-tieu-de">Giỏ hàng <span class="chu-phu" data-gio-mini-dem></span></h2>
+    <button class="nut-bt" type="button" aria-label="Đóng giỏ hàng" data-dong-ngan-keo><svg class="bt"><use href="#i-dong"></use></svg></button>
+  </div>
+  <div class="ngan-keo__than" data-gio-mini-than></div>
+  <div class="ngan-keo__chan" data-gio-mini-chan>
+    <div class="gio-mini__mien-phi" data-gio-mini-mien-phi></div>
+    <div class="hang hang--deu"><span>Tạm tính</span><strong class="so-deu" data-gio-mini-tong>0 ₫</strong></div>
+    <a class="nut nut--chinh nut--rong" href="thanhtoan.html">Thanh toán</a>
+    <a class="nut nut--vien nut--rong" href="giohang.html">Xem giỏ hàng</a>
+  </div>
+</dialog>
+
+  <main id="noi-dung" tabindex="-1">
+    
+<section class="dau-mua">
+  <div class="khung dau-mua__khung">
+    <div class="dau-mua__chu">
+      <nav aria-label="Đường dẫn"><ol class="duong-dan"><li><a href="index.html">Trang chủ</a></li><li><a href="giohang.html">Giỏ hàng</a></li><li aria-current="page">Thanh toán</li></ol></nav>
+      <h1>Thanh toán</h1>
+    </div>
+    
+<ol class="buoc-mua" aria-label="Các bước đặt hàng">
+  
+  <li class="buoc-mua__muc da-xong">
+    <span class="buoc-mua__so"><svg class="bt bt--nho"><use href="#i-dau-tich"></use></svg></span>
+    <span class="buoc-mua__ten">Giỏ hàng</span>
+  </li>
+  
+  <li class="buoc-mua__muc dang-o" aria-current="step">
+    <span class="buoc-mua__so">2</span>
+    <span class="buoc-mua__ten">Thông tin &amp; thanh toán</span>
+  </li>
+  
+  <li class="buoc-mua__muc">
+    <span class="buoc-mua__so">3</span>
+    <span class="buoc-mua__ten">Hoàn tất</span>
+  </li>
+  
+</ol>
+  </div>
+</section>
+
+<form class="khung trang-mua trang-tt" id="form-thanh-toan" novalidate aria-busy="true">
+  <div class="trang-mua__chinh">
+    <p class="hop-bao hop-bao--do" id="tt-loi-chung" role="alert" hidden></p>
+
+    
+    <section class="khoi-tt" aria-labelledby="td-nguoi-nhan">
+      <div class="khoi-tt__dau"><span class="khoi-tt__so">1</span><div><h2 id="td-nguoi-nhan">Thông tin nhận hàng</h2><p>Địa chỉ 2 cấp theo 34 tỉnh, thành sau sắp xếp năm 2025.</p></div></div>
+      <fieldset class="ds-dia-chi-tt" id="tt-so-dia-chi" hidden>
+        <legend class="nhan-truong">Giao đến</legend>
+        <div class="ds-dia-chi-tt__luoi" id="tt-ds-dia-chi"></div>
+      </fieldset>
+      <div class="luoi-truong" id="tt-dia-chi-moi">
+        <div class="truong"><label class="nhan-truong" for="tt-ho-ten">Họ tên người nhận <span class="bat-buoc">*</span></label><input class="o-nhap" id="tt-ho-ten" name="hoTen" autocomplete="name" required></div>
+        <div class="truong"><label class="nhan-truong" for="tt-sdt">Số điện thoại <span class="bat-buoc">*</span></label><input class="o-nhap" id="tt-sdt" name="sdt" type="tel" inputmode="tel" autocomplete="tel" required></div>
+        <div class="truong ca-hang"><label class="nhan-truong" for="tt-email">Email nhận thông báo đơn hàng <span class="bat-buoc">*</span></label><input class="o-nhap" id="tt-email" name="email" type="email" inputmode="email" autocomplete="email" required></div>
+        <div class="truong"><label class="nhan-truong" for="tt-tinh">Tỉnh / Thành phố <span class="bat-buoc">*</span></label><select class="o-chon" id="tt-tinh" name="tinh" required></select></div>
+        <div class="truong"><label class="nhan-truong" for="tt-phuong">Phường / Xã <span class="bat-buoc">*</span></label><input class="o-nhap" id="tt-phuong" name="phuongXa" placeholder="Ví dụ: Phường Linh Xuân" required></div>
+        <div class="truong ca-hang"><label class="nhan-truong" for="tt-dia-chi">Số nhà, tên đường <span class="bat-buoc">*</span></label><input class="o-nhap" id="tt-dia-chi" name="diaChi" autocomplete="address-line1" placeholder="Ví dụ: 669 Quốc lộ 1" required></div>
+        <label class="lua-chon ca-hang" id="tt-luu-dc-nhan"><input type="checkbox" name="luuDiaChi" checked> <span>Lưu địa chỉ này vào sổ địa chỉ</span></label>
+      </div>
+    </section>
+
+    
+    <section class="khoi-tt" aria-labelledby="td-giao-hang">
+      <div class="khoi-tt__dau"><span class="khoi-tt__so">2</span><div><h2 id="td-giao-hang">Phương thức giao hàng</h2><p>Mọi đơn đều được đóng gói niêm phong và bảo hiểm toàn bộ giá trị.</p></div></div>
+      <fieldset class="ds-the-chon" id="tt-ds-giao"><legend class="an-chu">Chọn phương thức giao hàng</legend></fieldset>
+    </section>
+
+    
+    <section class="khoi-tt" aria-labelledby="td-thanh-toan">
+      <div class="khoi-tt__dau"><span class="khoi-tt__so">3</span><div><h2 id="td-thanh-toan">Phương thức thanh toán</h2><p>Thanh toán trực tuyến chạy trên môi trường thử nghiệm (Sandbox), không trừ tiền thật.</p></div></div>
+      <fieldset class="ds-the-chon" id="tt-ds-thanh-toan"><legend class="an-chu">Chọn phương thức thanh toán</legend></fieldset>
+      <p class="loi-truong" id="tt-loi-thanh-toan" role="alert"></p>
+    </section>
+
+    
+    <section class="khoi-tt" aria-labelledby="td-ghi-chu">
+      <div class="khoi-tt__dau"><span class="khoi-tt__so">4</span><div><h2 id="td-ghi-chu">Quà tặng &amp; ghi chú</h2><p>Vinora gói quà miễn phí và viết thiệp tay theo lời nhắn của bạn.</p></div></div>
+      <label class="lua-chon"><input type="checkbox" name="goiQua" id="tt-goi-qua"> <span>Gói quà trong hộp nhung kèm túi giấy Vinora <strong class="chu-vang">Miễn phí</strong><small>Hóa đơn không đặt trong hộp quà để giữ trọn bất ngờ.</small></span></label>
+      <div class="truong">
+        <div class="hang hang--deu"><label class="nhan-truong" for="tt-loi-nhan">Lời nhắn trên thiệp</label><span class="chu-rat-nho chu-phu so-deu" id="tt-dem-loi-nhan">0/150</span></div>
+        <textarea class="o-van-ban" id="tt-loi-nhan" name="loiNhan" maxlength="150" rows="2" placeholder="Ví dụ: Gửi em – kỷ niệm 3 năm bên nhau."></textarea>
+      </div>
+      <div class="truong">
+        <label class="nhan-truong" for="tt-ghi-chu">Ghi chú cho người giao hàng</label>
+        <textarea class="o-van-ban" id="tt-ghi-chu" name="ghiChu" maxlength="200" rows="2" placeholder="Ví dụ: Gọi trước 30 phút, giao giờ hành chính."></textarea>
+      </div>
+    </section>
+  </div>
+
+  <aside class="tom-tat" aria-labelledby="td-don-tt">
+    <div class="tom-tat__khung">
+      <div class="hang hang--deu"><h2 class="tom-tat__tieu-de" id="td-don-tt">Đơn hàng <span class="chu-phu" id="tt-so-sp"></span></h2><a class="nut nut--chu" href="giohang.html">Sửa giỏ hàng</a></div>
+      <ul class="ds-tt-sp" id="tt-ds-sp"></ul>
+
+      <div class="ma-uu-dai">
+        <div class="truong">
+          <label class="nhan-truong" for="tt-ma">Mã ưu đãi</label>
+          <div class="o-nhap-kem-nut">
+            <input class="o-nhap" id="tt-ma" autocomplete="off" spellcheck="false" placeholder="Nhập mã ưu đãi" maxlength="20">
+            <button class="nut nut--vien nut--nho" type="button" id="tt-ap-ma">Áp dụng</button>
+          </div>
+          <p class="loi-truong" id="tt-loi-ma" role="alert"></p>
+        </div>
+      </div>
+
+      <dl class="dong-tien" id="tt-tien"></dl>
+
+      <div class="truong">
+        <label class="lua-chon tt-dong-y"><input type="checkbox" name="dongY" id="tt-dong-y" required> <span>Tôi đã kiểm tra size, chữ khắc và đồng ý với <a class="lien-ket" href="chinhsachgiaohang.html" target="_blank" rel="noopener">chính sách giao hàng</a> &amp; <a class="lien-ket" href="chinhsachbaohanh.html" target="_blank" rel="noopener">bảo hành</a>.</span></label>
+      </div>
+      <button class="nut nut--chinh nut--rong nut-dat-hang" type="submit" id="nut-dat-hang">Đặt hàng</button>
+      <p class="tom-tat__ghi-chu chu-rat-nho chu-phu"><svg class="bt bt--nho"><use href="#i-khoa"></use></svg> Giá và khả năng bán được kiểm tra lại ngay trước khi tạo đơn. Bạn có thể tự hủy đơn khi đơn còn chờ xử lý.</p>
+    </div>
+  </aside>
+</form>
+
+
+<dialog class="hop-thoai cong-tt" id="cong-tt" aria-labelledby="cong-tt-td">
+  <div class="cong-tt__khung">
+    <header class="cong-tt__dau">
+      <div class="cong-tt__nha">
+        <span class="cong-tt__logo" data-ct-logo aria-hidden="true">VP</span>
+        <div><h2 class="cong-tt__ten" id="cong-tt-td" data-ct-ten>Cổng VNPay</h2><span class="nhan nhan--cam nhan--tron">Sandbox · mô phỏng</span></div>
+      </div>
+      <p class="cong-tt__dong-ho">Giao dịch hết hạn sau<strong class="so-deu" data-ct-dem>15:00</strong></p>
+    </header>
+
+    <dl class="cong-tt__don">
+      <div><dt>Đơn vị nhận</dt><dd>Vinora Jewelry</dd></div>
+      <div><dt>Mã đơn hàng</dt><dd class="so-deu" data-ct-ma>—</dd></div>
+      <div class="cong-tt__so-tien"><dt>Số tiền thanh toán</dt><dd class="so-deu" data-ct-tien>0 ₫</dd></div>
+    </dl>
+
+    
+    <form class="cong-tt__buoc" data-ct-buoc="the" novalidate>
+      <p class="cong-tt__huong-dan">Thẻ thử nghiệm đã được điền sẵn. Bấm <strong>Tiếp tục</strong> để nhận mã OTP.</p>
+      <div class="luoi-truong">
+        <div class="truong ca-hang"><label class="nhan-truong" for="ct-so-the">Số thẻ</label><input class="o-nhap so-deu" id="ct-so-the" name="soThe" inputmode="numeric" autocomplete="off" value="9704 1985 2619 1432 198"></div>
+        <div class="truong"><label class="nhan-truong" for="ct-chu-the">Tên chủ thẻ</label><input class="o-nhap" id="ct-chu-the" name="chuThe" autocomplete="off" value="NGUYEN VAN A"></div>
+        <div class="truong"><label class="nhan-truong" for="ct-ngay">Ngày phát hành</label><input class="o-nhap so-deu" id="ct-ngay" name="ngay" autocomplete="off" value="07/15"></div>
+      </div>
+      <button class="nut nut--chinh nut--rong" type="submit">Tiếp tục</button>
+    </form>
+
+    
+    <form class="cong-tt__buoc" data-ct-buoc="otp" novalidate hidden>
+      <p class="cong-tt__huong-dan">Nhập mã OTP gửi tới số điện thoại đăng ký thẻ. Mã thử nghiệm: <strong>123456</strong>.</p>
+      <div class="truong"><label class="nhan-truong" for="ct-otp">Mã OTP</label><input class="o-nhap o-otp so-deu" id="ct-otp" name="otp" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="••••••"></div>
+      <button class="nut nut--chinh nut--rong" type="submit">Xác nhận thanh toán</button>
+    </form>
+
+    
+    <div class="cong-tt__buoc cong-tt__qr" data-ct-buoc="qr" hidden>
+      <div class="cong-tt__qr-anh" data-ct-qr aria-label="Mã QR minh họa" role="img"></div>
+      <div class="cong-tt__qr-chu">
+        <p>Mở ứng dụng MoMo, chọn <strong>Quét mã</strong> và xác nhận thanh toán.</p>
+        <p class="chu-rat-nho chu-phu">Mã QR chỉ mang tính minh họa trong môi trường thử nghiệm.</p>
+        <button class="nut nut--chinh nut--rong" type="button" data-ct-xac-nhan-qr>Mô phỏng: đã thanh toán trên ứng dụng</button>
+      </div>
+    </div>
+
+    <div class="cong-tt__buoc cong-tt__xu-ly" data-ct-buoc="xu-ly" hidden>
+      <span class="cong-tt__vong" aria-hidden="true"></span>
+      <p>Đang xử lý giao dịch, vui lòng không đóng cửa sổ…</p>
+    </div>
+
+    <footer class="cong-tt__chan">
+      <button class="nut nut--chu" type="button" data-ct-huy>Hủy giao dịch</button>
+      <p><svg class="bt bt--nho"><use href="#i-khoa"></use></svg> Môi trường thử nghiệm – không trừ tiền thật.</p>
+    </footer>
+  </div>
+</dialog>
+
+  </main>
+
+  
+<footer class="chan-trang nen-toi khong-in">
+  <div class="chan-trang__cam-ket">
+    <ul class="khung chan-trang__cam-ket-ds">
+      <li><svg class="bt"><use href="#i-chung-nhan"></use></svg><span><strong>100% vàng đúng tuổi</strong>Hàm lượng niêm yết rõ trên từng sản phẩm</span></li>
+      <li><svg class="bt"><use href="#i-but"></use></svg><span><strong>Khắc tên laser miễn phí</strong>Xem trước chữ khắc trước khi đặt</span></li>
+      <li><svg class="bt"><use href="#i-khien"></use></svg><span><strong>Bảo hành điện tử trọn đời</strong>Kích hoạt ngay khi xác nhận nhận hàng</span></li>
+      <li><svg class="bt"><use href="#i-xe-giao"></use></svg><span><strong>Giao hàng có bảo hiểm</strong>Miễn phí cho đơn từ 2.000.000 ₫</span></li>
+    </ul>
+  </div>
+
+  <div class="khung chan-trang__than">
+    <div class="chan-trang__thuong-hieu">
+      <a href="index.html" aria-label="Vinora Jewelry – trang chủ">
+        <img src="static/hinh/logo/logo-vinora-sang.svg" alt="Vinora Jewelry" width="200" height="57" loading="lazy">
+      </a>
+      <p>Trang sức thiết kế cao cấp và quà tặng cá nhân hóa. Minh bạch thông số vàng – đá, đồng hành cùng bạn sau mỗi món trang sức bằng dịch vụ hậu mãi số hóa.</p>
+      <form class="chan-trang__nhan-tin" id="form-nhan-tin" novalidate>
+        <label class="nhan-tren" for="email-nhan-tin">Nhận tin bộ sưu tập mới</label>
+        <div class="o-nhap-kem-nut">
+          <input class="o-nhap" id="email-nhan-tin" name="email" type="email" placeholder="Email của bạn" required autocomplete="email">
+          <button class="nut nut--vang nut--nho" type="submit">Đăng ký</button>
+        </div>
+        <p class="loi-truong" data-loi-nhan-tin role="alert"></p>
+      </form>
+    </div>
+
+    <nav class="chan-trang__cot" aria-label="Mua sắm">
+      <p class="nhan-tren">Mua sắm</p>
+      <ul>
+        <li><a href="danhsachsanpham.html?danhmuc=1">Nhẫn cầu hôn</a></li>
+        <li><a href="danhsachsanpham.html?danhmuc=2">Nhẫn cưới</a></li>
+        <li><a href="danhsachsanpham.html?danhmuc=4">Bông tai</a></li>
+        <li><a href="danhsachsanpham.html?danhmuc=5">Dây chuyền</a></li>
+        <li><a href="danhsachsanpham.html?danhmuc=10">Quà tặng tài lộc</a></li>
+        <li><a href="danhsachsanpham.html?uudai=1">Ưu đãi</a></li>
+      </ul>
+    </nav>
+    <nav class="chan-trang__cot" aria-label="Hỗ trợ khách hàng">
+      <p class="nhan-tren">Hỗ trợ</p>
+      <ul>
+        <li><a href="huongdanchonsize.html">Hướng dẫn chọn size</a></li>
+        <li><a href="chinhsachgiaohang.html">Chính sách giao hàng</a></li>
+        <li><a href="chinhsachbaohanh.html">Chính sách bảo hành</a></li>
+        <li><a href="congbaohanh.html">Cổng bảo hành điện tử</a></li>
+        <li><a href="lienhe.html">Liên hệ & showroom</a></li>
+      </ul>
+    </nav>
+    <nav class="chan-trang__cot" aria-label="Tài khoản">
+      <p class="nhan-tren">Tài khoản</p>
+      <ul>
+        <li><a href="taikhoan.html">Đăng nhập / Đăng ký</a></li>
+        <li><a href="quanlydonhang.html">Đơn hàng của tôi</a></li>
+        <li><a href="congbaohanh.html">Thẻ bảo hành & lịch hẹn</a></li>
+        <li><a href="sanphamdaxem.html">Sản phẩm đã xem</a></li>
+        <li><a href="gioithieu.html">Về Vinora</a></li>
+      </ul>
+    </nav>
+  </div>
+
+  <div class="khung chan-trang__day">
+    <p>© 2026 Vinora Jewelry · Đồ án môn Phát triển Web kinh doanh – Trường Đại học Kinh tế – Luật.</p>
+    <ul class="chan-trang__thanh-toan" aria-label="Phương thức thanh toán">
+      <li>COD</li><li>VietQR</li><li>VNPay</li><li>MoMo</li>
+    </ul>
+  </div>
+</footer>
+  
+<template id="mau-the-san-pham">
+  <article class="the-sp">
+    <a class="the-sp__lien-ket" href="#">
+      <div class="the-sp__anh">
+        <img class="the-sp__anh-chinh" src="" alt="" width="600" height="600" loading="lazy" decoding="async">
+        <img class="the-sp__anh-phu" src="" alt="" width="600" height="600" loading="lazy" decoding="async" aria-hidden="true">
+        <div class="the-sp__nhan"></div>
+      </div>
+      <div class="the-sp__than">
+        <p class="nhan-tren the-sp__bst"></p>
+        <h3 class="the-sp__ten"></h3>
+        <p class="the-sp__phu"></p>
+        <div class="the-sp__duoi">
+          <div class="the-sp__gia"></div>
+          <div class="the-sp__mau" aria-label="Màu vàng có sẵn"></div>
+        </div>
+      </div>
+    </a>
+  </article>
+</template>
+
+  <div class="vung-thong-bao" id="vung-thong-bao" aria-live="polite" aria-atomic="false"></div>
+
+  
+  <dialog class="hop-thoai" id="hop-xac-nhan" aria-labelledby="hop-xac-nhan-tieu-de">
+    <form method="dialog" class="hop-thoai__than">
+      <button class="nut-bt hop-thoai__dong" value="huy" aria-label="Đóng"><svg class="bt"><use href="#i-dong"></use></svg></button>
+      <div class="hop-thoai__dau">
+        <p class="nhan-tren" data-xn="nhan"></p>
+        <h2 class="hop-thoai__tieu-de" id="hop-xac-nhan-tieu-de" data-xn="tieu-de"></h2>
+      </div>
+      <div class="chu-phu" data-xn="noi-dung"></div>
+      <div class="hop-thoai__hanh-dong">
+        <button class="nut nut--vien nut--nho" value="huy" data-xn="nut-huy">Quay lại</button>
+        <button class="nut nut--chinh nut--nho" value="dong-y" data-xn="nut-dong-y">Đồng ý</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="static/js/chung/chung.js" defer></script>
+  
+<script src="static/js/khachhang/congthanhtoan.js" defer></script>
+<script src="static/js/khachhang/thanhtoan.js" defer></script>
+
+</body>
+</html>

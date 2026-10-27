@@ -1,0 +1,75 @@
+/* =====================================================================
+   VINORA JEWELRY — BIẾN MÀU & PHÔNG CHỮ NHẬN DIỆN THƯƠNG HIỆU
+   Khai báo một lần, mọi tệp CSS khác chỉ dùng lại qua var(--ten-bien).
+   Đổi màu thương hiệu: chỉ cần sửa tệp này.
+   ===================================================================== */
+:root {
+  /* ---- Nền ---- */
+  --nen: #F7F3EC;            /* Ngà – nền trang (~60% bề mặt) */
+  --nen-noi: #FFFFFF;        /* Thẻ, hộp thoại, ô nhập */
+  --nen-chim: #EFE9DF;       /* Nền ảnh sản phẩm, khối tóm tắt */
+  --nen-nhan: #F3EEE5;       /* Nền nhấn rất nhẹ (hover dòng bảng) */
+  --nen-toi: #1A1714;        /* Onyx – chân trang, khối nổi bật */
+  --nen-toi-2: #26221E;      /* Onyx nâng – thẻ trên nền tối */
+  --phu-mo: rgba(18, 17, 16, .56); /* Lớp phủ sau hộp thoại */
+
+  /* ---- Chữ ---- */
+  --chu: #1A1714;            /* Chữ chính (16:1 trên nền ngà) */
+  --chu-phu: #5F574F;        /* Chữ phụ, mô tả (6,4:1) */
+  --chu-tren-toi: #F7F3EC;   /* Chữ trên nền onyx */
+  --chu-phu-tren-toi: #B9AFA4;
+
+  /* ---- Đường viền ---- */
+  --vien: #DED5C6;           /* Đường kẻ mảnh trang trí */
+  --vien-dam: #8C806E;       /* Viền ô nhập, nút viền (≥3:1) */
+  --vien-tren-toi: #3A342E;
+
+  /* ---- Màu thương hiệu ---- */
+  --vang: #B08D57;           /* Vàng champagne – chỉ dùng trang trí */
+  --vang-chu: #7A5B27;       /* Vàng dùng làm chữ (5,6:1) */
+  --vang-nhat: #F2E8D5;      /* Nền nhạt sau chữ vàng */
+  --vang-sang: #D8BA84;      /* Vàng trên nền tối */
+  --ngoc: #1F4D43;           /* Ngọc bích – nhấn phụ, trạng thái tốt */
+  --ngoc-nhat: #E2EDE8;
+  --hong-ngoc: #9B2C26;      /* Hồng ngọc – lỗi, hủy, giá ưu đãi */
+  --hong-ngoc-nhat: #F6E3E0;
+  --ho-phach: #835A12;       /* Hổ phách – chờ xử lý, cảnh báo */
+  --ho-phach-nhat: #F6EBD3;
+  --xanh-dem: #2C4466;       /* Đang giao */
+  --xanh-dem-nhat: #E3E9F2;
+
+  /* ---- Ánh kim mô phỏng màu vàng (khắc chữ, thẻ bảo hành) ---- */
+  --kim-vang: linear-gradient(135deg, #8E6A2E 0%, #E7CD8E 42%, #B48A43 62%, #F3E2B3 100%);
+  --kim-trang: linear-gradient(135deg, #8B8F96 0%, #EEF0F2 42%, #A9ADB4 64%, #F7F8F9 100%);
+  --kim-hong: linear-gradient(135deg, #9C6355 0%, #F0C9B8 42%, #B97C69 64%, #F8DED3 100%);
+
+  /* ---- Phông chữ ---- */
+  --font-tieu-de: 'Cormorant Garamond', 'Times New Roman', serif;
+  --font-than: 'Be Vietnam Pro', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --font-viet-tay: 'Great Vibes', 'Brush Script MT', cursive;
+
+  /* ---- Khoảng cách (bội số 4) ---- */
+  --k-1: 4px;  --k-2: 8px;  --k-3: 12px; --k-4: 16px; --k-5: 24px;
+  --k-6: 32px; --k-7: 48px; --k-8: 64px; --k-9: 96px; --k-10: 128px;
+
+  /* ---- Bố cục ---- */
+  --rong-toi-da: 1320px;
+  --rong-doc: 760px;
+  --le-trang: 24px;
+  --cao-dau-trang: 72px;
+
+  /* ---- Góc, bóng, chuyển động ---- */
+  --bo-goc: 0;               /* Góc vuông như mặt cắt viên đá */
+  --bo-goc-nho: 2px;
+  --bo-tron: 999px;
+  --bong-noi: 0 12px 32px -12px rgba(26, 23, 20, .20);
+  --bong-hop-thoai: 0 32px 80px -24px rgba(26, 23, 20, .36);
+  --nhip: cubic-bezier(.2, .7, .2, 1);
+  --nhanh: .18s;
+  --vua: .32s;
+  --cham: .6s;
+}
+
+@media (max-width: 720px) {
+  :root { --le-trang: 16px; --cao-dau-trang: 60px; }
+}

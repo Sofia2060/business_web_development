@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Danh sách showroom Vinora Jewelry. Dữ liệu minh họa cho đồ án môn Phát triển Web kinh doanh. -->
+<danhsachcuahang>
+  <cuahang ma="HCM-LX">
+    <ten>Vinora Linh Xuân</ten>
+    <diachi>669 Quốc lộ 1, phường Linh Xuân, Thành phố Hồ Chí Minh</diachi>
+    <khuvuc>Thành phố Hồ Chí Minh</khuvuc>
+    <dienthoai>1900 0000 (nhánh 1)</dienthoai>
+    <giomocua>09:00 – 21:00</giomocua>
+    <bando>669 Quốc lộ 1, Linh Xuân, Thủ Đức, Hồ Chí Minh</bando>
+  </cuahang>
+  <cuahang ma="HCM-SG">
+    <ten>Vinora Đồng Khởi</ten>
+    <diachi>Đường Đồng Khởi, phường Sài Gòn, Thành phố Hồ Chí Minh</diachi>
+    <khuvuc>Thành phố Hồ Chí Minh</khuvuc>
+    <dienthoai>1900 0000 (nhánh 2)</dienthoai>
+    <giomocua>09:00 – 21:30</giomocua>
+    <bando>Đồng Khởi, Quận 1, Hồ Chí Minh</bando>
+  </cuahang>
+  <cuahang ma="HN-HK">
+    <ten>Vinora Tràng Tiền</ten>
+    <diachi>Phố Tràng Tiền, phường Hoàn Kiếm, Thành phố Hà Nội</diachi>
+    <khuvuc>Thành phố Hà Nội</khuvuc>
+    <dienthoai>1900 0000 (nhánh 3)</dienthoai>
+    <giomocua>09:00 – 21:00</giomocua>
+    <bando>Tràng Tiền, Hoàn Kiếm, Hà Nội</bando>
+  </cuahang>
+</danhsachcuahang>
