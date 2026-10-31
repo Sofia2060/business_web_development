@@ -1,5 +1,5 @@
 ﻿/* =====================================================================
-   VINORA JEWELRY – SINH DỮ LIỆU GIẢ LẬP (chạy SAU file 01_init_schema.sql)
+   VINORA JEWELRY – SINH DỮ LIỆU GIẢ LẬP (chạy SAU file 01_VinoraJewelry_SQLServer.sql)
    ---------------------------------------------------------------------
    - Thông tin tự do (họ tên, số điện thoại, địa chỉ, ngày giờ...) được sinh
      ngẫu nhiên từ các danh sách gợi ý.
@@ -7,14 +7,18 @@
      thanh toán, loại dịch vụ...) được chọn ngẫu nhiên trong miền giá trị hợp
      lệ hoặc lấy từ dữ liệu đã có (sản phẩm, biến thể) để nhất quán.
    - Đơn hàng đi qua đúng quy trình trạng thái nên trigger tự tạo thẻ bảo hành
-     và nhật ký; số tiền, thanh toán, ưu đãi giữ chân, đánh giá đều khớp nhau.
+     và nhật ký; số tiền, thanh toán, yêu cầu hủy, đánh giá đều khớp nhau.
+   - Quy tắc hủy đơn: đơn có tổng thanh toán <= 5 triệu được hủy trên web (qua
+     popup nhắc nhở mất voucher); đơn trên 5 triệu chỉ hủy được qua hotline
+     (admin hủy, không có yêu cầu hủy trên web).
    Số dòng sinh thêm:
      100: Users, Customers, CustomerAddresses, ProductCertificates, GoldPrices,
           Vouchers, CartItems, RecentlyViewedProducts, OrderCancellationRequests,
           CustomerFeedbacks, FeedbackAspects, AfterSalesServices
      300: Orders (cần >= 100 đơn đã nhận để có 100 đánh giá, và 100 đơn có
-          yêu cầu hủy); OrderItems, Payments, WarrantyRecords, AuditLogs sinh
-          theo đơn hàng.
+          yêu cầu hủy trên web: 30 xác nhận hủy + 70 giữ đơn sau popup;
+          thêm 15 đơn trên 5 triệu hủy qua hotline); OrderItems, Payments,
+          WarrantyRecords, AuditLogs sinh theo đơn hàng.
    Script chạy trong một transaction: lỗi ở bất kỳ bước nào sẽ hoàn tác toàn bộ.
    ===================================================================== */
 USE VinoraJewelry;
@@ -24,7 +28,7 @@ SET XACT_ABORT ON;
 
 IF EXISTS (SELECT 1 FROM dbo.Orders WHERE OrderCode LIKE 'VN______F%')
 BEGIN
-    RAISERROR(N'Dữ liệu giả lập đã tồn tại. Hãy chạy lại file 01_init_schema.sql trước khi sinh lại.', 16, 1);
+    RAISERROR(N'Dữ liệu giả lập đã tồn tại. Hãy chạy lại file 01_VinoraJewelry_SQLServer.sql trước khi sinh lại.', 16, 1);
     RETURN;
 END
 
@@ -89,7 +93,7 @@ INSERT INTO @Tpl VALUES
 (15,3,N'Đóng gói đẹp, tuy nhiên size hơi chật một chút.','Positive',N'Đóng gói','Positive');
 
 DECLARE @AdminID INT = (SELECT TOP (1) UserID FROM dbo.Users WHERE Role = 'Admin' ORDER BY UserID);
-DECLARE @RetentionVoucherID INT = (SELECT VoucherID FROM dbo.Vouchers WHERE VoucherCode = 'GIUDON30');
+DECLARE @CancelLimit DECIMAL(15,0) = dbo.fn_OnlineCancelLimit();
 DECLARE @Now DATETIME2(0) = SYSDATETIME();
 DECLARE @Today DATETIME2(0) = CAST(CAST(SYSDATETIME() AS DATE) AS DATETIME2(0));
 
@@ -102,8 +106,6 @@ BEGIN TRY
         VALUES ('admin', N'Quản trị viên Vinora', 'admin@vinora.vn', '$2b$12$DemoHashAdmin.OnlyForSampleData.xxxxxxxxxxxxxxxxxxxxxxxx', 'Admin');
         SET @AdminID = SCOPE_IDENTITY();
     END
-    IF @RetentionVoucherID IS NULL
-        THROW 51000, N'Không tìm thấy voucher GIUDON30 – hãy chạy file 01_init_schema.sql trước.', 1;
 
     /* =================================================================
        1. GoldPrices – 100 dòng: 20 mốc giá (2 tuần/lần) x 5 tuổi vàng
@@ -123,10 +125,10 @@ BEGIN TRY
     FROM @GD g CROSS JOIN @Mat m;
 
     /* =================================================================
-       2. Vouchers – 100 dòng (90 khuyến mãi, 10 giữ chân)
+       2. Vouchers – 100 mã khuyến mãi
        ================================================================= */
     DECLARE @Vc TABLE (n INT PRIMARY KEY, r1 INT, r2 INT, r3 INT, r4 INT, r5 INT, r6 INT, r7 INT, r8 INT, r9 INT,
-                       VType VARCHAR(15), DType VARCHAR(10), DValue DECIMAL(15,0), DMax DECIMAL(15,0), MinOrder DECIMAL(15,0),
+                       DType VARCHAR(10), DValue DECIMAL(15,0), DMax DECIMAL(15,0), MinOrder DECIMAL(15,0),
                        StartAt DATETIME2(0), EndAt DATETIME2(0), UsageLimit INT, UsedCount INT, IsActive BIT, VName NVARCHAR(150));
     INSERT INTO @Vc (n, r1, r2, r3, r4, r5, r6, r7, r8, r9)
     SELECT TOP (100) ROW_NUMBER() OVER (ORDER BY (SELECT NULL)),
@@ -135,8 +137,7 @@ BEGIN TRY
            CHECKSUM(NEWID()) & 2147483647, CHECKSUM(NEWID()) & 2147483647, CHECKSUM(NEWID()) & 2147483647
     FROM sys.all_objects;
 
-    UPDATE @Vc SET VType = CASE WHEN n % 10 = 0 THEN 'Retention' ELSE 'Promotion' END;
-    UPDATE @Vc SET DType = CASE WHEN VType = 'Retention' OR r1 % 2 = 0 THEN 'Percent' ELSE 'Amount' END;
+    UPDATE @Vc SET DType = CASE WHEN r1 % 2 = 0 THEN 'Percent' ELSE 'Amount' END;
     UPDATE @Vc SET
         DValue   = CASE WHEN DType = 'Percent' THEN CHOOSE(r2 % 5 + 1, 5, 8, 10, 15, 20)
                         ELSE CHOOSE(r2 % 5 + 1, 100000, 200000, 300000, 500000, 1000000) END,
@@ -145,19 +146,17 @@ BEGIN TRY
         UsageLimit = CHOOSE(r7 % 5 + 1, 50, 100, 200, 500, NULL),
         IsActive = CASE WHEN r9 % 10 = 0 THEN 0 ELSE 1 END;
     UPDATE @Vc SET
-        MinOrder = CASE WHEN VType = 'Retention' THEN 5000000
-                        WHEN DType = 'Amount' THEN DValue * 10
+        MinOrder = CASE WHEN DType = 'Amount' THEN DValue * 10
                         ELSE CHOOSE(r4 % 4 + 1, 0, 1000000, 2000000, 5000000) END,
         EndAt    = DATEADD(DAY, 60 + r6 % 300, StartAt),
         UsedCount = CASE WHEN UsageLimit IS NULL THEN r8 % 100 ELSE r8 % (UsageLimit / 2) END;
     UPDATE @Vc SET VName = CASE
-        WHEN VType = 'Retention' THEN CONCAT(N'Ưu đãi giữ đơn – giảm thêm ', DValue, N'%')
         WHEN DType = 'Percent'   THEN CONCAT(N'Giảm ', DValue, N'% (tối đa ', FORMAT(DMax, 'N0', 'vi-VN'), N'đ) – tháng ', MONTH(StartAt))
         ELSE CONCAT(N'Giảm ', FORMAT(DValue, 'N0', 'vi-VN'), N'đ cho đơn từ ', FORMAT(MinOrder, 'N0', 'vi-VN'), N'đ') END;
 
-    INSERT INTO dbo.Vouchers (VoucherCode, VoucherName, VoucherType, DiscountType, DiscountValue, MaxDiscountAmount,
+    INSERT INTO dbo.Vouchers (VoucherCode, VoucherName, DiscountType, DiscountValue, MaxDiscountAmount,
                               MinOrderValue, StartAt, EndAt, UsageLimit, UsedCount, IsActive)
-    SELECT CONCAT('VNR', RIGHT(CONCAT('000', n), 3)), VName, VType, DType, DValue, DMax, MinOrder, StartAt, EndAt, UsageLimit, UsedCount, IsActive
+    SELECT CONCAT('VNR', RIGHT(CONCAT('000', n), 3)), VName, DType, DValue, DMax, MinOrder, StartAt, EndAt, UsageLimit, UsedCount, IsActive
     FROM @Vc;
 
     /* =================================================================
@@ -247,6 +246,17 @@ BEGIN TRY
     WHERE v.IsActive = 1 AND p.Status = 'Active' AND dbo.fn_GetCurrentPrice(p.ProductID) IS NOT NULL;
     DECLARE @nV INT = (SELECT COUNT(*) FROM @V);
 
+    -- Nhóm biến thể giá thấp (<= 2,3 triệu): đơn 1–2 món luôn <= 5 triệu -> được hủy trên web
+    DECLARE @VLow TABLE (rn INT IDENTITY(1,1) PRIMARY KEY, VariantID INT, ProductID INT, RingSize TINYINT);
+    INSERT INTO @VLow (VariantID, ProductID, RingSize)
+    SELECT VariantID, ProductID, RingSize FROM @V WHERE dbo.fn_GetCurrentPrice(ProductID) <= 2300000;
+    DECLARE @nVLow INT = (SELECT COUNT(*) FROM @VLow);
+    -- Nhóm biến thể giá cao (>= 6 triệu): đơn trên 5 triệu -> chỉ hủy được qua hotline
+    DECLARE @VHigh TABLE (rn INT IDENTITY(1,1) PRIMARY KEY, VariantID INT, ProductID INT, RingSize TINYINT);
+    INSERT INTO @VHigh (VariantID, ProductID, RingSize)
+    SELECT VariantID, ProductID, RingSize FROM @V WHERE dbo.fn_GetCurrentPrice(ProductID) >= 6000000;
+    DECLARE @nVHigh INT = (SELECT COUNT(*) FROM @VHigh);
+
     /* =================================================================
        5. CartItems – 100 dòng (khách hàng, biến thể không trùng)
        ================================================================= */
@@ -295,13 +305,15 @@ BEGIN TRY
        7. Orders (300) + OrderItems
           Phân bố trạng thái: 210 Delivered, 15 Shipping, 15 Confirmed,
           15 Pending, 45 Cancelled
+          Luồng hủy: 30 đơn hủy trên web (<= 5 triệu), 15 đơn hủy qua hotline
+          (> 5 triệu), 70 đơn bấm hủy nhưng chọn giữ đơn sau popup (<= 5 triệu)
        ================================================================= */
     DECLARE @O TABLE (n INT PRIMARY KEY, CustomerID INT,
                       r1 INT, r2 INT, r3 INT, r4 INT, r5 INT, r6 INT, r7 INT, r8 INT, r9 INT, r10 INT,
                       PlanStatus VARCHAR(15), LineCount INT, PayMethod VARCHAR(20), CancelFromConfirmed BIT,
                       CreatedAt DATETIME2(0), ConfirmedAt DATETIME2(0), ShippedAt DATETIME2(0), DeliveredAt DATETIME2(0), CancelledAt DATETIME2(0),
                       Subtotal DECIMAL(15,0), VoucherID INT, DType VARCHAR(10), DValue DECIMAL(15,0), DMax DECIMAL(15,0),
-                      Discount DECIMAL(15,0) DEFAULT 0, IsRetention BIT DEFAULT 0, RetentionAmt DECIMAL(15,0) DEFAULT 0,
+                      Discount DECIMAL(15,0) DEFAULT 0, Flow VARCHAR(10), IsRetention BIT DEFAULT 0,
                       ShipFee DECIMAL(15,0), OrderID INT, OrderCode VARCHAR(20));
     INSERT INTO @O (n, r1, r2, r3, r4, r5, r6, r7, r8, r9, r10)
     SELECT TOP (300) ROW_NUMBER() OVER (ORDER BY (SELECT NULL)),
@@ -318,8 +330,16 @@ BEGIN TRY
                                    WHEN s.k <= 240 THEN 'Confirmed' WHEN s.k <= 255 THEN 'Pending' ELSE 'Cancelled' END
     FROM @O o JOIN s ON s.n = o.n;
 
+    -- Phân luồng hủy đơn
+    ;WITH c AS (SELECT n, ROW_NUMBER() OVER (ORDER BY r9) AS k FROM @O WHERE PlanStatus = 'Cancelled')
+    UPDATE o SET Flow = CASE WHEN c.k <= 30 THEN 'WebCancel' ELSE 'Hotline' END FROM @O o JOIN c ON c.n = o.n;
+    ;WITH k AS (SELECT n, ROW_NUMBER() OVER (ORDER BY r10) AS k FROM @O WHERE PlanStatus <> 'Cancelled')
+    UPDATE o SET Flow = 'Kept', IsRetention = 1 FROM @O o JOIN k ON k.n = o.n WHERE k.k <= 70;
+
     UPDATE @O SET
-        LineCount = CASE WHEN r8 % 100 < 65 THEN 1 WHEN r8 % 100 < 92 THEN 2 ELSE 3 END,
+        LineCount = CASE WHEN Flow = 'Hotline' THEN 1
+                         WHEN Flow IN ('WebCancel', 'Kept') THEN 1 + r8 % 2
+                         WHEN r8 % 100 < 65 THEN 1 WHEN r8 % 100 < 92 THEN 2 ELSE 3 END,
         PayMethod = CASE WHEN r7 % 100 < 40 THEN 'COD' WHEN r7 % 100 < 65 THEN 'VNPay' WHEN r7 % 100 < 85 THEN 'MoMo' ELSE 'BankTransfer' END,
         CancelFromConfirmed = CASE WHEN PlanStatus = 'Cancelled' AND r9 % 2 = 0 THEN 1 ELSE 0 END;
 
@@ -343,9 +363,15 @@ BEGIN TRY
     FROM @O o JOIN (VALUES (1), (2), (3)) k(k) ON k.k <= o.LineCount;
 
     UPDATE i SET VariantID = v.VariantID, ProductID = v.ProductID,
-                 Quantity = CASE WHEN i.r2 % 10 = 0 THEN 2 ELSE 1 END,
+                 Quantity = CASE WHEN o.Flow IS NULL AND i.r2 % 10 = 0 THEN 2 ELSE 1 END,
                  Engraving = CASE WHEN v.RingSize IS NOT NULL AND i.r3 % 10 < 3 THEN e.v END
-    FROM @I i JOIN @V v ON v.rn = i.r1 % @nV + 1
+    FROM @I i
+    JOIN @O o ON o.n = i.n
+    CROSS APPLY (SELECT VariantID, ProductID, RingSize FROM @V    WHERE o.Flow IS NULL AND rn = i.r1 % @nV + 1
+                 UNION ALL
+                 SELECT VariantID, ProductID, RingSize FROM @VLow WHERE o.Flow IN ('WebCancel', 'Kept') AND rn = i.r1 % @nVLow + 1
+                 UNION ALL
+                 SELECT VariantID, ProductID, RingSize FROM @VHigh WHERE o.Flow = 'Hotline' AND rn = i.r1 % @nVHigh + 1) v
     JOIN @Engrave e ON e.i = i.r4 % 10 + 1;
     UPDATE @I SET UnitPrice = dbo.fn_GetCurrentPrice(ProductID);
 
@@ -357,28 +383,25 @@ BEGIN TRY
     FROM @O o
     CROSS APPLY (SELECT TOP (1) v.VoucherID, v.DiscountType, v.DiscountValue, v.MaxDiscountAmount
                  FROM dbo.Vouchers v
-                 WHERE v.VoucherType = 'Promotion' AND v.IsActive = 1
+                 WHERE v.IsActive = 1
                    AND o.CreatedAt BETWEEN v.StartAt AND v.EndAt AND v.MinOrderValue <= o.Subtotal
                  ORDER BY CHECKSUM(v.VoucherID, o.n, o.r10)) vc
-    WHERE o.r5 % 100 < 30;
+    WHERE o.r5 % 100 < 30 AND ISNULL(o.Flow, '') <> 'Hotline';   -- đơn hotline giữ nguyên > 5 triệu
     UPDATE @O SET Discount = CASE WHEN DType = 'Percent' THEN ROUND(Subtotal * DValue / 100, -3) ELSE DValue END WHERE VoucherID IS NOT NULL;
     UPDATE @O SET Discount = DMax WHERE DMax IS NOT NULL AND Discount > DMax;
     UPDATE @O SET Discount = Subtotal WHERE Discount > Subtotal;
 
-    -- 55 đơn (không bị hủy, tiền hàng >= 5 triệu) đã chấp nhận ưu đãi giữ chân GIUDON30
-    ;WITH r AS (SELECT TOP (55) n FROM @O
-                WHERE PlanStatus <> 'Cancelled' AND Subtotal - Discount >= 5000000 ORDER BY r10)
-    UPDATE o SET IsRetention = 1,
-                 RetentionAmt = CASE WHEN ROUND((o.Subtotal - o.Discount) * 30 / 100, -3) > 3000000 THEN 3000000
-                                     ELSE ROUND((o.Subtotal - o.Discount) * 30 / 100, -3) END
-    FROM @O o JOIN r ON r.n = o.n;
+    -- Kiểm tra luồng hủy khớp quy tắc 5 triệu
+    IF EXISTS (SELECT 1 FROM @O WHERE Flow IN ('WebCancel', 'Kept') AND Subtotal - Discount + ShipFee > @CancelLimit)
+       OR EXISTS (SELECT 1 FROM @O WHERE Flow = 'Hotline' AND Subtotal - Discount + ShipFee <= @CancelLimit)
+        THROW 51001, N'Dữ liệu giả lập không khớp quy tắc hủy đơn 5 triệu.', 1;
 
     UPDATE @O SET OrderCode = CONCAT('VN', FORMAT(CreatedAt, 'yyMMdd'), 'F', RIGHT(CONCAT('0000', n), 4));
 
     INSERT INTO dbo.Orders (OrderCode, CustomerID, ShipRecipientName, ShipPhone, ShipAddress, Subtotal, VoucherID, DiscountAmount,
-                            IsRetentionApplied, RetentionDiscountAmount, ShippingFee, OrderStatus, CheckoutToken, Note, CreatedAt, UpdatedAt)
+                            IsRetentionApplied, ShippingFee, OrderStatus, CheckoutToken, Note, CreatedAt, UpdatedAt)
     SELECT o.OrderCode, o.CustomerID, a.RecipientName, a.Phone, CONCAT(a.AddressLine, N', ', a.Ward, N', ', a.Province),
-           o.Subtotal, o.VoucherID, o.Discount, o.IsRetention, o.RetentionAmt, o.ShipFee, 'Pending', NEWID(),
+           o.Subtotal, o.VoucherID, o.Discount, o.IsRetention, o.ShipFee, 'Pending', NEWID(),
            CASE WHEN o.r9 % 4 = 0 THEN nt.v END, o.CreatedAt, o.CreatedAt
     FROM @O o
     JOIN dbo.CustomerAddresses a ON a.CustomerID = o.CustomerID AND a.IsDefault = 1
@@ -404,7 +427,8 @@ BEGIN TRY
     UPDATE d SET OrderStatus = 'Delivered', DeliveredAt = o.DeliveredAt, UpdatedAt = o.DeliveredAt
     FROM dbo.Orders d JOIN @O o ON o.OrderID = d.OrderID
     WHERE o.PlanStatus = 'Delivered';
-    UPDATE d SET OrderStatus = 'Cancelled', CancelledAt = o.CancelledAt, CancelReason = rs.v, UpdatedAt = o.CancelledAt
+    UPDATE d SET OrderStatus = 'Cancelled', CancelledAt = o.CancelledAt, UpdatedAt = o.CancelledAt,
+                 CancelReason = CASE WHEN o.Flow = 'Hotline' THEN CONCAT(N'Khách gọi hotline yêu cầu hủy: ', rs.v) ELSE rs.v END
     FROM dbo.Orders d JOIN @O o ON o.OrderID = d.OrderID
     JOIN @Reason rs ON rs.i = o.r4 % 7 + 1
     WHERE o.PlanStatus = 'Cancelled';
@@ -451,29 +475,24 @@ BEGIN TRY
         ELSE 'Pending' END AS Status) x;
 
     /* =================================================================
-       9. OrderCancellationRequests – 100 dòng
-          45 đơn bị hủy (ConfirmedCancel) + 55 đơn được giữ lại (AcceptedOffer)
+       9. OrderCancellationRequests – 100 yêu cầu hủy trên web
+          30 xác nhận hủy sau popup + 70 chọn giữ đơn sau popup.
+          15 đơn trên 5 triệu hủy qua hotline nên không có yêu cầu trên web.
        ================================================================= */
-    INSERT INTO dbo.OrderCancellationRequests (OrderID, Reason, RequestedAt, OfferShown, OfferVoucherID, OfferDiscountAmount, Decision, DecidedAt)
-    SELECT o.OrderID, rs.v, DATEADD(MINUTE, -8, o.CancelledAt),
-           CASE WHEN o.Subtotal - o.Discount >= 5000000 THEN 1 ELSE 0 END,
-           CASE WHEN o.Subtotal - o.Discount >= 5000000 THEN @RetentionVoucherID END,
-           CASE WHEN o.Subtotal - o.Discount >= 5000000 THEN
-                CASE WHEN ROUND((o.Subtotal - o.Discount) * 30 / 100, -3) > 3000000 THEN 3000000
-                     ELSE ROUND((o.Subtotal - o.Discount) * 30 / 100, -3) END END,
-           'ConfirmedCancel', o.CancelledAt
+    INSERT INTO dbo.OrderCancellationRequests (OrderID, Reason, RequestedAt, Decision, DecidedAt)
+    SELECT o.OrderID, rs.v, DATEADD(MINUTE, -3, o.CancelledAt), 'ConfirmedCancel', o.CancelledAt
     FROM @O o JOIN @Reason rs ON rs.i = o.r4 % 7 + 1
-    WHERE o.PlanStatus = 'Cancelled';
+    WHERE o.Flow = 'WebCancel';
 
-    INSERT INTO dbo.OrderCancellationRequests (OrderID, Reason, RequestedAt, OfferShown, OfferVoucherID, OfferDiscountAmount, Decision, DecidedAt)
-    SELECT o.OrderID, rs.v, DATEADD(MINUTE, 5 + o.r5 % 20, o.CreatedAt), 1, @RetentionVoucherID, o.RetentionAmt,
-           'AcceptedOffer', DATEADD(MINUTE, 7 + o.r5 % 20, o.CreatedAt)
+    INSERT INTO dbo.OrderCancellationRequests (OrderID, Reason, RequestedAt, Decision, DecidedAt)
+    SELECT o.OrderID, rs.v, t.ReqAt, 'KeptOrder', DATEADD(MINUTE, 1, t.ReqAt)
     FROM @O o JOIN @Reason rs ON rs.i = o.r4 % 7 + 1
-    WHERE o.IsRetention = 1;
+    -- khách bấm hủy vài phút sau khi đặt (khi đơn còn Pending); không vượt quá thời điểm hiện tại
+    CROSS APPLY (SELECT CASE WHEN DATEADD(MINUTE, 3 + o.r5 % 20, o.CreatedAt) > DATEADD(MINUTE, -2, @Now)
+                             THEN DATEADD(MINUTE, -2, @Now) ELSE DATEADD(MINUTE, 3 + o.r5 % 20, o.CreatedAt) END AS ReqAt) t
+    WHERE o.Flow = 'Kept';
 
-    UPDATE dbo.Vouchers SET UsedCount = UsedCount + (SELECT COUNT(*) FROM @O WHERE IsRetention = 1)
-    WHERE VoucherID = @RetentionVoucherID;
-
+    -- Mã khuyến mãi đã dùng (kể cả đơn bị hủy: khách hủy là mất voucher)
     UPDATE v SET UsedCount = CASE WHEN v.UsageLimit IS NULL OR v.UsedCount + c.Cnt <= v.UsageLimit THEN v.UsedCount + c.Cnt ELSE v.UsageLimit END
     FROM dbo.Vouchers v JOIN (SELECT VoucherID, COUNT(*) AS Cnt FROM @O WHERE VoucherID IS NOT NULL GROUP BY VoucherID) c ON c.VoucherID = v.VoucherID;
 
