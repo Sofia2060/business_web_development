@@ -54,7 +54,7 @@ business_web_development/
 │   │   ├── config.py
 │   │   ├── models/            # User, Customer, Product, Order, Warranty...
 │   │   ├── routes/            # auth, products, cart, orders, warranty, admin
-│   │   ├── services/          # nghiệp vụ: giữ đơn, kích hoạt bảo hành, phí giao hàng
+│   │   ├── services/          # nghiệp vụ: hủy đơn, kích hoạt bảo hành, phí giao hàng
 │   │   ├── schemas/           # kiểm tra dữ liệu vào/ra
 │   │   ├── templates/         # Jinja templates (nếu dùng server-side render)
 │   │   └── utils/
@@ -64,8 +64,8 @@ business_web_development/
 │   └── run.py
 │
 ├── database/
-│   ├── 01_init_schema.sql     # tạo DB, 26 bảng, trigger, procedure, view, dữ liệu sản phẩm
-│   ├── 02_seed_fake_data.sql  # dữ liệu giả lập cho dev/demo
+│   ├── 01_VinoraJewelry_SQLServer.sql  # tạo DB, 26 bảng, trigger, procedure, view, dữ liệu sản phẩm
+│   ├── 02_VinoraJewelry_FakeData.sql   # dữ liệu giả lập cho dev/demo
 │   └── README.md
 │
 ├── scripts/                   # script tiện ích (import dữ liệu, build...)
@@ -100,7 +100,7 @@ Kết nối SQL Server cần ODBC Driver 18 (máy hiện tại đã có). Sao ch
 
 ### Chạy API sản phẩm
 
-Cần đã chạy `database/01_init_schema.sql`. Mở terminal ở gốc repo:
+Cần đã chạy `database/01_VinoraJewelry_SQLServer.sql`. Mở terminal ở gốc repo:
 
 ```bash
 uv run python backend/run.py
@@ -141,7 +141,43 @@ Giới hạn đầu vào: tên tối đa 100 ký tự, email chỉ gồm ký t�
 
 Chưa làm: giới hạn số lần đăng nhập sai, cờ `Secure` cho cookie khi chạy HTTPS, hết hạn phiên phía server. Cần bổ sung trước khi đưa lên mạng thật.
 
-Test nằm ở `backend/tests/test_auth.py`. Test tạo tài khoản có email dạng `pytest-*@example.test` và tự xóa sau khi chạy.
+Test nằm ở `backend/tests/test_auth.py`.
+
+### Giỏ hàng, địa chỉ và đơn hàng
+
+Các API này cần đăng nhập bằng tài khoản khách (`Customer`). Tài khoản `Admin` gọi vào trả 403. Quy tắc nghiệp vụ nằm trong stored procedure của SQL Server. Back-end chỉ kiểm tra đầu vào, gọi thủ tục, và đổi lỗi của thủ tục thành mã HTTP. Thông báo lỗi là câu tiếng Việt viết sẵn trong thủ tục.
+
+| Địa chỉ | Việc làm |
+|---|---|
+| `GET /api/addresses`, `POST /api/addresses` | Sổ địa chỉ. Địa chỉ đầu tiên tự là mặc định. `isDefault: true` đổi mặc định sang địa chỉ mới |
+| `GET /api/cart` | Giỏ hàng kèm `subtotal`, `shippingFee`, `total` |
+| `POST /api/cart` | Thêm biến thể: `variantSku`, `quantity` (1 đến 10), `engravingText` (khắc tên, tối đa 30 ký tự). Thêm lại cùng biến thể và cùng chữ khắc thì cộng dồn số lượng. Quá tồn kho trả 409 |
+| `PATCH /api/cart/<id>`, `DELETE /api/cart/<id>` | Đổi số lượng, xóa dòng |
+| `POST /api/orders` | Đặt hàng từ giỏ (`sp_PlaceOrder`). Body: `addressId`, `paymentMethod` (`COD`, `BankTransfer`, `VNPay`, `MoMo`), `checkoutToken`, `voucherCode`, `note`. Trả 201 |
+| `GET /api/orders`, `GET /api/orders/<mã đơn>` | Đơn của chính khách. Đơn của người khác trả 404 |
+| `POST /api/orders/<mã đơn>/cancel` | Khách bấm "Hủy đơn" (`sp_RequestCancelOrder`). Chưa hủy ngay: trả `RequestID`, `VoucherCode`, `VoucherDiscount` để hiện popup nhắc "hủy sẽ mất voucher". Đơn trên 5.000.000 đ trả 403, khách phải gọi hotline |
+| `POST /api/orders/<mã đơn>/cancel/respond` | Khách chọn trong popup (`sp_RespondCancelPopup`): `keepOrder: true` giữ đơn, `keepOrder: false` hủy đơn, trả tồn kho, mất voucher |
+| `POST /api/orders/<mã đơn>/confirm-received` | Xác nhận đã nhận hàng (`sp_ConfirmOrderReceived`). Chỉ khi đơn đang giao. Database tự tạo thẻ bảo hành |
+| `GET /api/admin/orders` | Admin xem mọi đơn. Tham số `status`, `page`, `limit` |
+| `POST /api/admin/orders/<mã đơn>/status` | Admin đổi trạng thái (`sp_UpdateOrderStatus`): `Confirmed`, `Shipping`, `Delivered`, `Cancelled`. Nhảy bước trả 409 |
+
+Điểm cần nhớ:
+- `checkoutToken` là một UUID do trình duyệt tạo cho mỗi lần thanh toán. Gửi lại cùng token (bấm đúp, mạng chậm) thì nhận lại đúng đơn cũ với mã 200, không tạo đơn thứ hai.
+- Phí giao hàng do server tính, không nhận từ trình duyệt: 30.000 đ, miễn phí khi tiền hàng từ 2.000.000 đ (tính trước khi giảm giá). Hằng số nằm ở `backend/app/config.py`.
+- Hủy đơn có hai bước. Bước 1 (`/cancel`) chỉ tạo yêu cầu và cho biết voucher sẽ mất. Bước 2 (`/cancel/respond`) mới giữ hoặc hủy. Cột `CancelChannel` trong danh sách đơn cho biết trang nên hiện nút hủy (`Web`), dòng "gọi hotline" (`Hotline`) hay không hiện gì (`null`). Admin hủy đơn qua `POST /api/admin/orders/<mã đơn>/status` với `Cancelled`.
+- Gửi lại cùng token cho kết quả giống hệt lần đầu (cùng khóa `OrderCode`, `TotalAmount`, `ShippingFee`), chỉ khác mã 200 thay vì 201.
+- Địa chỉ đầy đủ (đường, phường, tỉnh) tối đa 400 ký tự, vì đơn hàng chép địa chỉ vào một cột 400 ký tự.
+- Khắc tên: database coi chữ hoa và chữ thường là một, và bỏ qua dấu thanh ("Mai" bằng "Mại"). Thêm một chữ khắc chỉ khác kiểu đó vào giỏ trả 409. Các chữ khác nhau thật như "Năm" và "Nam" là hai dòng riêng.
+- Hai yêu cầu chạy cùng lúc gây xung đột (trùng dòng giỏ hàng, mã ưu đãi vừa hết lượt) trả 409 để thử lại. Lỗi database khác trả 500 với câu chung, không lộ nội dung SQL.
+- Chưa làm: cổng thanh toán (ghi nhận kết quả VNPay hoặc MoMo, `sp_RecordPaymentResult`), bảo hành và lịch hẹn hậu mãi, đánh giá. Đơn trả trước hiện ở trạng thái thanh toán `Pending`.
+
+### Chạy test
+
+```bash
+uv run pytest
+```
+
+Test không đụng vào dữ liệu thật. Mỗi lần chạy, `backend/tests/conftest.py` dựng lại một database riêng tên `VinoraJewelry_Test` từ file `database/01_*.sql` (mất khoảng 5 giây). Cần quyền tạo database trên SQL Server. Nếu không kết nối được, các test bị bỏ qua và pytest in lý do.
 
 ## Quy ước
 

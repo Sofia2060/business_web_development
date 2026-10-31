@@ -2,6 +2,7 @@
 from flask import Blueprint, jsonify, request
 
 from ..db import query
+from ..validation import page_number
 
 bp = Blueprint("products", __name__, url_prefix="/api/products")
 
@@ -9,23 +10,13 @@ DEFAULT_LIMIT = 24
 MAX_LIMIT = 100
 
 
-def _int_arg(name: str, default: int, minimum: int = 1):
-    """Read a positive integer from the query string. Returns None when invalid."""
-    raw = request.args.get(name)
-    if raw is None:
-        return default
-    if not raw.isdigit() or int(raw) < minimum:
-        return None
-    return int(raw)
-
-
 @bp.get("")
 def list_products():
     """List active products. Query: category (id), q (name search), page, limit."""
-    page = _int_arg("page", 1)
-    limit = _int_arg("limit", DEFAULT_LIMIT)
-    category = _int_arg("category", None)
-    if page is None or limit is None or (request.args.get("category") and category is None):
+    page = page_number(request.args.get("page"), 1)
+    limit = page_number(request.args.get("limit"), DEFAULT_LIMIT)
+    category = page_number(request.args.get("category"), None)
+    if not page or not limit or (request.args.get("category") is not None and not category):
         return jsonify(error="Invalid query parameter"), 400
     limit = min(limit, MAX_LIMIT)
 
