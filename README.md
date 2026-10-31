@@ -79,11 +79,23 @@ business_web_development/
 > `backend/`, `database/`, `src/pages/admin/` và `src/partials/` mới là khung rỗng, chưa có mã.
 > Chi tiết các trang client xem [frontend/README.md](frontend/README.md).
 
-## Chạy front-end
+## Chạy cả website (giao diện và API)
 
-1. Mở thư mục `frontend` bằng VS Code.
-2. Cài tiện ích **Live Server**, chuột phải `frontend/index.html` → *Open with Live Server*.
-3. Không mở file `.html` trực tiếp (`file://`), vì trình duyệt chặn đọc JSON/XML.
+Flask phục vụ luôn thư mục `frontend/`, nên trang web và API nằm cùng một địa chỉ. Nhờ vậy cookie đăng nhập hoạt động và không cần cấu hình CORS (CORS là chính sách của trình duyệt chặn trang ở địa chỉ này gọi API ở địa chỉ khác).
+
+```bash
+uv run python backend/run.py
+```
+
+Mở `http://127.0.0.1:5000/`. Cần đã tạo file `.env` (xem mục Python bên dưới) và đã chạy file SQL 01.
+
+- Trang khách: `http://127.0.0.1:5000/src/pages/client/index.html`
+- Trang quản trị: `http://127.0.0.1:5000/src/pages/admin/dashboard.html`
+- API: `http://127.0.0.1:5000/api/...`
+
+Chỉ ba thư mục được phục vụ ra ngoài: `src/`, `public/`, `mock-data/` (cùng trang gốc `/`). Các file khác trong `frontend/` như `README.md` không truy cập được qua web. Lỗi dưới `/api/` luôn trả JSON.
+
+Cách cũ vẫn dùng được nếu chỉ muốn xem giao diện giả lập, không cần database: mở thư mục `frontend` bằng Live Server rồi chuột phải `frontend/index.html` chọn *Open with Live Server*. Cách này không có API.
 
 ## Môi trường Python (back-end)
 

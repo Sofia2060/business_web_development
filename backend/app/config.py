@@ -1,5 +1,9 @@
 """Settings read from environment variables (see .env.example)."""
 import os
+from pathlib import Path
+
+# The web pages. Flask serves this folder, so pages and API share one address.
+FRONTEND_DIR = Path(__file__).resolve().parents[2] / "frontend"
 
 
 def db_connection_string() -> str:

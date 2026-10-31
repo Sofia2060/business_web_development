@@ -4,6 +4,9 @@ Không cần Python/Flask. Chỉ gồm HTML + CSS + JavaScript + dữ liệu JSO
 Các trang không dùng `<!DOCTYPE html>` và thẻ `<meta>` (khung nhìn điện thoại được thêm bằng một đoạn script nhỏ trong `<head>`).
 
 ## Cách mở
+Cách chính (có API và database): chạy `uv run python backend/run.py` ở gốc repo rồi mở `http://127.0.0.1:5000/`. Flask phục vụ thư mục này, xem README ở gốc repo.
+
+Cách chỉ xem giao diện giả lập (không cần database):
 1. Mở thư mục `frontend` bằng VS Code.
 2. Cài tiện ích **Live Server** (Ritwick Dey) nếu chưa có.
 3. Chuột phải `index.html` (ở gốc `frontend/`) → **Open with Live Server**. File này tự chuyển tới `src/pages/client/index.html`.
