@@ -1,10 +1,16 @@
 import os
+import posixpath
 
 import pyodbc
 from dotenv import load_dotenv
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
+from werkzeug.exceptions import HTTPException
 
+from .config import FRONTEND_DIR
 from .db import ProcError
+
+# The only parts of frontend/ that browsers may fetch.
+PUBLIC_PREFIXES = ("/src/", "/public/", "/mock-data/")
 
 # HTTP status for each error number thrown by the stored procedures and triggers (see database/*.sql).
 # Anything not listed is treated as a bad request (400).
@@ -23,7 +29,10 @@ PROC_ERROR_STATUS = {
 
 def create_app() -> Flask:
     load_dotenv()  # read .env if present
-    app = Flask(__name__)
+    # static_url_path="" puts the frontend files at the site root, the same paths Live Server used:
+    # /src/pages/client/index.html, /mock-data/products.json, /public/fonts/...
+    # Flask only serves files inside FRONTEND_DIR. API routes win over files because they are more specific.
+    app = Flask(__name__, static_folder=str(FRONTEND_DIR), static_url_path="")
     app.json.ensure_ascii = False  # keep Vietnamese text readable in JSON
 
     # Signs the login cookie. Without it anyone could forge a login.
@@ -32,6 +41,24 @@ def create_app() -> Flask:
         raise RuntimeError("SECRET_KEY is missing or shorter than 32 characters. Copy .env.example to .env and set a random value.")
     app.config["SESSION_COOKIE_SAMESITE"] = "Lax"  # blocks the cookie on cross-site POSTs
     app.config["MAX_CONTENT_LENGTH"] = 16 * 1024  # reject huge request bodies
+
+    @app.before_request
+    def only_web_folders():
+        # The frontend folder also holds notes such as README.md. Serve only what a page needs.
+        # Check the cleaned path: "/src/../README.md" starts with /src/ but points at README.md.
+        if request.endpoint == "static" and not posixpath.normpath(request.path).startswith(PUBLIC_PREFIXES):
+            return jsonify(error="Not found"), 404
+
+    @app.get("/")
+    def home():
+        return app.send_static_file("index.html")  # redirects to the client home page
+
+    @app.errorhandler(HTTPException)
+    def handle_http_error(error: HTTPException):
+        # Errors under /api answer in JSON (404, 405, 413...). Page requests keep the normal error page.
+        if request.path.startswith("/api/"):
+            return jsonify(error=error.description or error.name), error.code
+        return error
 
     @app.errorhandler(ProcError)
     def handle_proc_error(error: ProcError):
