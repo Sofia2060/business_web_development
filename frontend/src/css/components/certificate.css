@@ -1,0 +1,70 @@
+/* =====================================================================
+   GIẤY CHỨNG NHẬN KIỂM ĐỊNH (dùng ở chi tiết sản phẩm và cổng bảo hành)
+   ===================================================================== */
+/* Huy hiệu ở trang chi tiết sản phẩm */
+.huy-hieu-kd {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 14px; width: 100%;
+  padding: 14px 16px; text-align: left; background: var(--vang-nhat); border: 1px solid rgba(176, 141, 87, .45);
+  transition: background-color var(--nhanh), border-color var(--nhanh);
+}
+.huy-hieu-kd:hover { background: #EDE0C6; border-color: var(--vang); }
+.huy-hieu-kd:focus-visible { outline: 2px solid var(--vang-chu); outline-offset: 2px; }
+.huy-hieu-kd > .bt { width: 30px; height: 30px; color: var(--vang-chu); }
+.huy-hieu-kd strong { display: block; font-size: 14px; font-weight: 600; }
+.huy-hieu-kd small { display: block; font-size: 12.5px; color: var(--chu-phu); line-height: 1.45; margin-top: 2px; }
+.huy-hieu-kd__xem { font-size: 12px; font-weight: 500; letter-spacing: .1em; text-transform: uppercase; color: var(--vang-chu); white-space: nowrap; text-decoration: underline; text-underline-offset: 3px; }
+
+/* Tờ giấy chứng nhận */
+.gcn {
+  container-type: inline-size; position: relative; padding: 10px; color: var(--chu);
+  background: #FBF8F2 radial-gradient(120% 80% at 100% 0, rgba(216, 186, 132, .22), transparent 60%);
+  border: 1px solid rgba(176, 141, 87, .55); box-shadow: 0 18px 40px -26px rgba(26, 23, 20, .45);
+}
+.gcn__vien { position: relative; display: grid; gap: 18px; padding: clamp(18px, 4cqw, 30px); border: 1px solid var(--vang); outline: 1px solid rgba(176, 141, 87, .35); outline-offset: -6px; }
+.gcn__dau { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-bottom: 14px; border-bottom: 1px solid rgba(176, 141, 87, .45); }
+.gcn__dau img { height: 34px; width: auto; }
+.gcn__dau > div { text-align: right; }
+.gcn__phu { font-size: 10.5px; letter-spacing: .28em; text-transform: uppercase; color: var(--vang-chu); }
+.gcn__tieu-de { font-family: var(--font-tieu-de); font-size: clamp(20px, 4.4cqw, 28px); font-weight: 600; line-height: 1.15; text-transform: uppercase; letter-spacing: .04em; }
+.gcn__than { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 22px; align-items: start; }
+.gcn__anh { margin: 0; aspect-ratio: 1; background: #F1EADD; border: 1px solid rgba(176, 141, 87, .3); }
+.gcn__anh img { width: 100%; height: 100%; object-fit: contain; mix-blend-mode: multiply; }
+.gcn__ds { display: grid; gap: 0; margin: 0; }
+.gcn__ds > div { display: grid; grid-template-columns: 132px minmax(0, 1fr); gap: 12px; padding: 7px 0; border-bottom: 1px dotted rgba(140, 128, 110, .5); font-size: 13.5px; }
+.gcn__ds dt { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--chu-phu); padding-top: 2px; }
+.gcn__ds dd { margin: 0; font-weight: 500; line-height: 1.45; }
+.gcn__ds dd small { font-weight: 400; color: var(--chu-phu); }
+.gcn__ds dd em { font-style: normal; font-weight: 400; color: var(--vang-chu); }
+.gcn__chan { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 18px; align-items: center; }
+.gcn__chan p { font-size: 12px; line-height: 1.6; color: var(--chu-phu); }
+.gcn__dau-moc {
+  display: grid; place-items: center; align-content: center; width: 92px; height: 92px; border-radius: 50%; transform: rotate(-12deg);
+  border: 2px solid rgba(155, 44, 38, .7); box-shadow: inset 0 0 0 3px #FBF8F2, inset 0 0 0 4px rgba(155, 44, 38, .55);
+  color: rgba(155, 44, 38, .85); text-align: center; line-height: 1.15;
+}
+.gcn__dau-moc b { font-size: 9px; letter-spacing: .16em; font-weight: 700; }
+.gcn__dau-moc i { font-family: var(--font-tieu-de); font-style: normal; font-size: 24px; font-weight: 700; }
+/* Bản mẫu ở trang sản phẩm: chữ "MẪU" mờ phía sau */
+.gcn--mau::after {
+  content: "MẪU"; position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none;
+  font-family: var(--font-tieu-de); font-size: clamp(64px, 18cqw, 140px); font-weight: 700; letter-spacing: .2em;
+  color: rgba(176, 141, 87, .1); transform: rotate(-18deg);
+}
+@container (max-width: 520px) {
+  .gcn__than { grid-template-columns: 1fr; }
+  .gcn__anh { width: 120px; }
+  .gcn__ds > div { grid-template-columns: 112px minmax(0, 1fr); }
+  .gcn__chan { grid-template-columns: 1fr; }
+  .gcn__dau-moc { justify-self: end; width: 80px; height: 80px; }
+  .gcn__dau { flex-direction: column; align-items: flex-start; }
+  .gcn__dau > div { text-align: left; }
+}
+.hop-gcn .hop-thoai__than { gap: var(--k-4); }
+
+/* In: chỉ in tờ giấy chứng nhận */
+@media print {
+  html.dang-in-gcn body > *:not(dialog.hop-gcn) { display: none !important; }
+  html.dang-in-gcn dialog.hop-gcn { position: static; box-shadow: none; width: 100%; max-width: none; }
+  html.dang-in-gcn dialog.hop-gcn .hop-thoai__dong, html.dang-in-gcn dialog.hop-gcn .hop-thoai__hanh-dong,
+  html.dang-in-gcn dialog.hop-gcn [data-gcn-ghi-chu] { display: none !important; }
+}

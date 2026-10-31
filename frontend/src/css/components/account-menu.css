@@ -1,0 +1,84 @@
+/* =====================================================================
+   KHU VỰC TÀI KHOẢN & HẬU MÃI (dùng chung: tài khoản, đơn hàng, bảo hành, lịch hẹn)
+   + thanh tiến trình mua hàng (giỏ hàng, thanh toán, kết quả đặt hàng)
+   ===================================================================== */
+.dau-tk { padding-block: var(--k-6) var(--k-5); border-bottom: 1px solid var(--vien); background: linear-gradient(180deg, #FBF8F2, var(--nen)); }
+.dau-tk__hang { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--k-4); flex-wrap: wrap; margin-top: var(--k-5); }
+.dau-tk__chu { display: grid; gap: 8px; }
+.dau-tk__chu .chu-phu { font-size: 15px; max-width: 640px; }
+
+.khu-tk { display: grid; grid-template-columns: 264px minmax(0, 1fr); gap: var(--k-7); align-items: start; padding-block: var(--k-6) var(--k-9); }
+.khu-tk--khach { grid-template-columns: minmax(0, 1fr); max-width: 1000px; }
+.khu-tk__noi-dung { min-width: 0; display: grid; gap: var(--k-6); align-content: start; }
+
+/* Menu tài khoản */
+.menu-tk { position: sticky; top: calc(var(--cao-dau-trang) + 64px); background: var(--nen-noi); border: 1px solid var(--vien); }
+.menu-tk__dau { display: flex; align-items: center; gap: 14px; padding: 20px; border-bottom: 1px solid var(--vien); }
+.menu-tk__dau > div { display: grid; min-width: 0; }
+.menu-tk__dau strong { font-family: var(--font-tieu-de); font-size: 19px; font-weight: 500; line-height: 1.25; }
+.menu-tk__dau small { font-size: 12px; color: var(--chu-phu); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.menu-tk__chu-cai {
+  flex: none; width: 46px; height: 46px; display: grid; place-items: center; border-radius: 50%;
+  font-family: var(--font-tieu-de); font-size: 22px; color: var(--chu-tren-toi); background: var(--nen-toi);
+  box-shadow: inset 0 0 0 2px var(--nen-toi), inset 0 0 0 3px var(--vang);
+}
+.menu-tk__ds { padding: 8px 0; }
+.menu-tk__ds a, .menu-tk__ds button {
+  position: relative; display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px 20px; font-size: 14px; text-align: left;
+  color: var(--chu-phu); transition: color var(--nhanh), background-color var(--nhanh);
+}
+.menu-tk__ds a:hover, .menu-tk__ds button:hover { color: var(--chu); background: var(--nen-nhan); }
+.menu-tk__ds a[aria-current="page"] { color: var(--chu); font-weight: 500; background: var(--nen-nhan); }
+.menu-tk__ds a[aria-current="page"]::before { content: ""; position: absolute; left: 0; top: 8px; bottom: 8px; width: 2px; background: var(--vang); }
+.menu-tk__ds .bt { color: var(--vang-chu); }
+.menu-tk__ds li:last-child { margin-top: 6px; border-top: 1px solid var(--vien); padding-top: 6px; }
+.menu-tk__dem {
+  margin-left: auto; min-width: 22px; height: 20px; padding: 0 6px; display: inline-grid; place-items: center; border-radius: var(--bo-tron);
+  font-size: 11px; font-weight: 600; color: var(--chu-tren-toi); background: var(--chu); font-variant-numeric: lining-nums tabular-nums;
+}
+
+/* Khối nội dung dạng thẻ trong khu tài khoản */
+.khoi-tk { background: var(--nen-noi); border: 1px solid var(--vien); padding: var(--k-6); display: grid; gap: var(--k-5); align-content: start; }
+.khoi-tk__dau { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--k-4); flex-wrap: wrap; }
+.khoi-tk__dau > div { display: grid; gap: 6px; }
+.khoi-tk__dau h2 { font-size: 26px; }
+.khoi-tk__dau p:not(.nhan-tren) { font-size: 14px; color: var(--chu-phu); }
+
+/* Yêu cầu đăng nhập */
+.can-dang-nhap { display: grid; justify-items: center; gap: 14px; padding: var(--k-8) var(--k-5); text-align: center; background: var(--nen-noi); border: 1px solid var(--vien); }
+.can-dang-nhap p { color: var(--chu-phu); max-width: 600px; }
+.can-dang-nhap + .ds-the-nho:not(:empty) { margin-top: var(--k-5); }
+
+/* Thanh tiến trình mua hàng */
+.buoc-mua { display: flex; align-items: center; gap: 12px; justify-content: center; margin: 0; padding: 0; list-style: none; }
+.buoc-mua__muc { display: flex; align-items: center; gap: 10px; font-size: 12px; font-weight: 500; letter-spacing: .14em; text-transform: uppercase; color: var(--chu-phu); white-space: nowrap; }
+.buoc-mua__muc + .buoc-mua__muc::before { content: ""; width: clamp(24px, 6vw, 72px); height: 1px; background: var(--vien-dam); margin-right: 2px; }
+.buoc-mua__so { width: 28px; height: 28px; display: grid; place-items: center; border: 1px solid var(--vien-dam); border-radius: 50%; font-size: 12px; letter-spacing: 0; background: var(--nen-noi); }
+.buoc-mua__muc.dang-o { color: var(--chu); }
+.buoc-mua__muc.dang-o .buoc-mua__so { background: var(--chu); border-color: var(--chu); color: var(--chu-tren-toi); }
+.buoc-mua__muc.da-xong { color: var(--ngoc); }
+.buoc-mua__muc.da-xong .buoc-mua__so { border-color: var(--ngoc); color: var(--ngoc); background: var(--ngoc-nhat); }
+
+@media (max-width: 1024px) {
+  .khu-tk { grid-template-columns: minmax(0, 1fr); gap: var(--k-5); padding-top: var(--k-4); }
+  .menu-tk { position: static; border: 0; background: none; }
+  .menu-tk__dau { display: none; }
+  .menu-tk__ds { display: flex; gap: 8px; overflow-x: auto; padding: 0 0 4px; scrollbar-width: none; margin-inline: calc(-1 * var(--le-trang)); padding-inline: var(--le-trang); }
+  .menu-tk__ds::-webkit-scrollbar { display: none; }
+  .menu-tk__ds li, .menu-tk__ds li:last-child { flex: none; margin: 0; padding: 0; border: 0; }
+  .menu-tk__ds a, .menu-tk__ds button { padding: 9px 14px; font-size: 13px; border: 1px solid var(--vien); background: var(--nen-noi); white-space: nowrap; }
+  .menu-tk__ds a[aria-current="page"] { border-color: var(--chu); box-shadow: inset 0 0 0 1px var(--chu); }
+  .menu-tk__ds a[aria-current="page"]::before { display: none; }
+}
+@media (max-width: 600px) {
+  .khoi-tk { padding: var(--k-5) var(--k-4); }
+  .khoi-tk__dau h2 { font-size: 22px; }
+  .buoc-mua { justify-content: flex-start; }
+  .buoc-mua__muc:not(.dang-o) .buoc-mua__ten { display: none; }
+  .buoc-mua__muc + .buoc-mua__muc::before { width: 18px; }
+  .buoc-mua { gap: 8px; max-width: 100%; }
+  .buoc-mua__muc { letter-spacing: .06em; font-size: 11px; gap: 8px; }
+}
+.khu-tk__noi-dung > *, [role="tabpanel"] > * { min-width: 0; }
+.khu-tk__noi-dung .thanh-tab { max-width: 100%; }
+@media (max-width: 600px) { .cong-cu-dh .thanh-tab { flex-basis: 100%; } }
