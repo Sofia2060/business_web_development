@@ -1,0 +1,134 @@
+
+<html lang="vi">
+<head>
+  <title>Khách hàng – Vinora Admin</title>
+  <script>
+    document.documentElement.classList.add('co-js');
+    (function () { var m = document.createElement('meta'); m.name = 'viewport'; m.content = 'width=device-width, initial-scale=1'; document.head.appendChild(m); })();
+  </script>
+  <link rel="icon" href="../../../public/images/logo/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../../../public/fonts/fonts.css">
+  <link rel="stylesheet" href="../../css/base/variables.css">
+  <link rel="stylesheet" href="../../css/base/layout.css">
+  <link rel="stylesheet" href="../../css/admin/admin.css">
+  
+    
+  <script id="duong-dan" type="application/json">{
+    "trangChu": "../client/index.html",
+    "sanPham": "../client/products.html",
+    "chiTiet": "../client/product-detail.html?ma=__MA__",
+    "daXem": "../client/recently-viewed.html",
+    "yeuThich": "../client/wishlist.html",
+    "gioHang": "../client/cart.html",
+    "thanhToan": "../client/checkout.html",
+    "ketQuaDatHang": "../client/order-success.html",
+    "taiKhoan": "../client/account.html",
+    "donHang": "../client/orders.html",
+    "kichHoatBaoHanh": "../client/warranty-activation.html",
+    "congBaoHanh": "../client/warranty-portal.html",
+    "lienHe": "../client/contact.html",
+    "huongDanSize": "../client/size-guide.html",
+    "chinhSachBaoHanh": "../client/warranty-policy.html",
+    "chinhSachGiaoHang": "../client/shipping-policy.html",
+    "qtTongQuan": "dashboard.html",
+    "qtDonHang": "orders.html",
+    "qtSanPham": "products.html",
+    "qtKhachHang": "customers.html",
+    "qtBaoHanh": "warranty.html",
+    "qtPhanAnh": "complaints.html",
+    "qtDanhGia": "reviews.html",
+    "duLieu": "../../../mock-data/",
+    "hinh": "../../../public/images/"
+  }</script>
+</head>
+<body class="qt" data-trang="qt-khach-hang">
+  
+<svg xmlns="http://www.w3.org/2000/svg" class="bo-bieu-tuong" aria-hidden="true" focusable="false" style="position:absolute;width:0;height:0;overflow:hidden"><symbol id="i-tim-kiem" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></symbol><symbol id="i-tai-khoan" viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.75"/><path d="M4.5 20c.8-3.6 3.8-5.5 7.5-5.5s6.7 1.9 7.5 5.5"/></symbol><symbol id="i-tui" viewBox="0 0 24 24"><path d="M5 8.5h14l-1 12H6z"/><path d="M9 8.5V7a3 3 0 0 1 6 0v1.5"/></symbol><symbol id="i-dong" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol><symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 8h16M4 16h16"/></symbol><symbol id="i-xuong" viewBox="0 0 24 24"><path d="M6 9.5l6 6 6-6"/></symbol><symbol id="i-phai" viewBox="0 0 24 24"><path d="M9.5 6l6 6-6 6"/></symbol><symbol id="i-trai" viewBox="0 0 24 24"><path d="M14.5 6l-6 6 6 6"/></symbol><symbol id="i-mui-ten" viewBox="0 0 24 24"><path d="M4.5 12h15M14 6.5l5.5 5.5-5.5 5.5"/></symbol><symbol id="i-mui-ten-trai" viewBox="0 0 24 24"><path d="M19.5 12h-15M10 6.5L4.5 12l5.5 5.5"/></symbol><symbol id="i-cong" viewBox="0 0 24 24"><path d="M12 5.5v13M5.5 12h13"/></symbol><symbol id="i-tru" viewBox="0 0 24 24"><path d="M5.5 12h13"/></symbol><symbol id="i-dau-tich" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol><symbol id="i-thung-rac" viewBox="0 0 24 24"><path d="M5 7h14M10 4.5h4M7 7l.8 12.5h8.4L17 7M10.5 10.5v6M13.5 10.5v6"/></symbol><symbol id="i-khien" viewBox="0 0 24 24"><path d="M12 3.5l7 2.5v5.5c0 4.5-3 7.6-7 9-4-1.4-7-4.5-7-9V6z"/><path d="M9 12l2.2 2.2L15.5 10"/></symbol><symbol id="i-xe-giao" viewBox="0 0 24 24"><path d="M2.5 6.5h11.5V16H2.5z"/><path d="M14 9.5h3.8l3.2 3.6V16H14"/><circle cx="6.5" cy="17.5" r="1.8"/><circle cx="17" cy="17.5" r="1.8"/></symbol><symbol id="i-kim-cuong" viewBox="0 0 24 24"><path d="M7 4.5h10l3.5 4.5L12 20 3.5 9z"/><path d="M3.5 9h17M9.5 4.5L8 9l4 11 4-11-1.5-4.5"/></symbol><symbol id="i-hop-hang" viewBox="0 0 24 24"><path d="M4 7.5l8-4 8 4v9l-8 4-8-4z"/><path d="M4 7.5l8 4 8-4M12 11.5v9"/></symbol><symbol id="i-thong-tin" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5M12 7.8v.4"/></symbol><symbol id="i-canh-bao" viewBox="0 0 24 24"><path d="M12 4l9 16H3z"/><path d="M12 10v4.5M12 17.2v.4"/></symbol><symbol id="i-dong-ho" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></symbol><symbol id="i-mat" viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></symbol><symbol id="i-lich" viewBox="0 0 24 24"><path d="M4.5 6.5h15v13h-15z"/><path d="M4.5 10.5h15M8.5 4v4M15.5 4v4"/></symbol><symbol id="i-ghim" viewBox="0 0 24 24"><path d="M12 21s-6.5-6-6.5-11a6.5 6.5 0 0 1 13 0c0 5-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.3"/></symbol><symbol id="i-dien-thoai" viewBox="0 0 24 24"><path d="M6.5 3.5h3l1.5 4.5-2 1.3a11 11 0 0 0 5.7 5.7l1.3-2 4.5 1.5v3a2 2 0 0 1-2 2C11.3 19.5 4.5 12.7 4.5 5.5a2 2 0 0 1 2-2z"/></symbol><symbol id="i-thu" viewBox="0 0 24 24"><path d="M3.5 6h17v12h-17z"/><path d="M3.5 6.5l8.5 6.5 8.5-6.5"/></symbol><symbol id="i-sao" viewBox="0 0 24 24"><path d="M12 3.8l2.5 5.2 5.7.8-4.1 4 1 5.6L12 16.7l-5.1 2.7 1-5.6-4.1-4 5.7-.8z"/></symbol><symbol id="i-thuoc" viewBox="0 0 24 24"><path d="M3 15.5L15.5 3 21 8.5 8.5 21z"/><path d="M7 11.5l1.8 1.8M9.5 9l2.5 2.5M12 6.5l1.8 1.8M14.5 4l2.5 2.5"/></symbol><symbol id="i-but" viewBox="0 0 24 24"><path d="M15.5 4.5l4 4L9 19H5v-4z"/><path d="M13.5 6.5l4 4"/></symbol><symbol id="i-qua" viewBox="0 0 24 24"><path d="M4 9.5h16v3H4zM5.5 12.5h13V20h-13zM12 9.5V20"/><path d="M12 9.5S10.5 5 8.3 5.4C6.6 5.7 7 8.6 12 9.5zM12 9.5s1.5-4.5 3.7-4.1c1.7.3 1.3 3.2-3.7 4.1z"/></symbol><symbol id="i-doi-tra" viewBox="0 0 24 24"><path d="M4.5 10a7.5 7.5 0 0 1 13.4-3.5L20 9M19.5 14a7.5 7.5 0 0 1-13.4 3.5L4 15"/><path d="M20 4.5V9h-4.5M4 19.5V15h4.5"/></symbol><symbol id="i-khoa" viewBox="0 0 24 24"><path d="M5.5 10.5h13v9.5h-13z"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/></symbol><symbol id="i-the" viewBox="0 0 24 24"><path d="M3 6h18v12H3z"/><path d="M3 10h18M6.5 14.5h4"/></symbol><symbol id="i-qr" viewBox="0 0 24 24"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4z"/><path d="M14 14h2.5v2.5H14zM17.5 17.5H20V20h-2.5zM17.5 14H20M14 20h1.5"/></symbol><symbol id="i-trang-chu" viewBox="0 0 24 24"><path d="M4 11l8-6.5 8 6.5V20h-5.5v-5.5h-5V20H4z"/></symbol><symbol id="i-bo-loc" viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></symbol><symbol id="i-dang-xuat" viewBox="0 0 24 24"><path d="M14 4.5h4.5v15H14"/><path d="M10 8l-4 4 4 4M6 12h10"/></symbol><symbol id="i-lap-lanh" viewBox="0 0 24 24"><path d="M12 3.5l1.6 4.9 4.9 1.6-4.9 1.6L12 16.5l-1.6-4.9L5.5 10l4.9-1.6z"/><path d="M18.5 15.5l.7 2.1 2.1.7-2.1.7-.7 2.1-.7-2.1-2.1-.7 2.1-.7z"/></symbol><symbol id="i-phong-to" viewBox="0 0 24 24"><path d="M14.5 4.5h5v5M9.5 19.5h-5v-5M19.5 4.5L14 10M4.5 19.5L10 14"/></symbol><symbol id="i-tai-len" viewBox="0 0 24 24"><path d="M12 15.5V4.5M7.5 9L12 4.5 16.5 9"/><path d="M4.5 15v4.5h15V15"/></symbol><symbol id="i-cua-hang" viewBox="0 0 24 24"><path d="M4 9.5L5.5 4.5h13L20 9.5"/><path d="M4 9.5c0 1.5 1.2 2.5 2.7 2.5S9.3 11 9.3 9.5c0 1.5 1.2 2.5 2.7 2.5s2.7-1 2.7-2.5c0 1.5 1.2 2.5 2.6 2.5S20 11 20 9.5M5.5 12v8h13v-8M10 20v-4.5h4V20"/></symbol><symbol id="i-chung-nhan" viewBox="0 0 24 24"><circle cx="12" cy="9.5" r="5.5"/><path d="M9 14l-1.5 6.5L12 18l4.5 2.5L15 14"/><path d="M9.8 9.5l1.5 1.5 3-3"/></symbol><symbol id="i-nhan-ma" viewBox="0 0 24 24"><path d="M3.5 12.5l8.8-8.8H20v7.7l-8.8 8.8z"/><circle cx="15.8" cy="8" r="1.4"/></symbol><symbol id="i-chinh-sua" viewBox="0 0 24 24"><path d="M4.5 19.5h15"/><path d="M14.5 5l3 3-8 8H6.5v-3z"/></symbol><symbol id="i-bao-ve" viewBox="0 0 24 24"><path d="M12 3.5l7 2.5v5.5c0 4.5-3 7.6-7 9-4-1.4-7-4.5-7-9V6z"/></symbol><symbol id="i-nhan-nhan" viewBox="0 0 24 24"><circle cx="12" cy="14" r="6"/><path d="M9.5 8.5L12 4l2.5 4.5"/><path d="M10 4h4"/></symbol><symbol id="i-huy" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M8.8 8.8l6.4 6.4M15.2 8.8l-6.4 6.4"/></symbol><symbol id="i-xac-nhan" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M8 12.3l2.8 2.8L16.2 9.6"/></symbol><symbol id="i-tro-giup" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M9.6 9.5a2.5 2.5 0 1 1 3.4 2.3c-.6.3-1 .8-1 1.5v.7M12 16.6v.4"/></symbol><symbol id="i-luoi" viewBox="0 0 24 24"><path d="M4.5 4.5h6v6h-6zM13.5 4.5h6v6h-6zM4.5 13.5h6v6h-6zM13.5 13.5h6v6h-6z"/></symbol><symbol id="i-chia-se" viewBox="0 0 24 24"><circle cx="6.5" cy="12" r="2.3"/><circle cx="17.5" cy="6" r="2.3"/><circle cx="17.5" cy="18" r="2.3"/><path d="M8.6 10.9l6.8-3.7M8.6 13.1l6.8 3.7"/></symbol><symbol id="i-in" viewBox="0 0 24 24"><path d="M7 8.5V4h10v4.5M7 16H4.5V9h15v7H17"/><path d="M7 13.5h10V20H7z"/></symbol><symbol id="i-sao-chep" viewBox="0 0 24 24"><path d="M8.5 8.5h11v11h-11z"/><path d="M15.5 8.5v-4h-11v11h4"/></symbol><symbol id="i-chat" viewBox="0 0 24 24"><path d="M4.5 5.5h15v10h-8l-4.5 3.5v-3.5H4.5z"/></symbol><symbol id="i-yeu-thich" viewBox="0 0 24 24"><path d="M12 20.3l-7.1-6.9A4.6 4.6 0 0 1 11.4 6.9l.6.6.6-.6a4.6 4.6 0 0 1 6.5 6.5z"/></symbol><symbol id="i-anh" viewBox="0 0 24 24"><path d="M3.5 5.5h17v13h-17z"/><circle cx="9" cy="10" r="1.8"/><path d="M4 17l5-4.5 3.5 3 3-2.5 4.5 4"/></symbol></svg>
+  <a class="bo-qua" href="#noi-dung">Bỏ qua, đến nội dung chính</a>
+
+  <div class="qt-khung">
+    <aside class="qt-ben" aria-label="Menu quản trị">
+      <a class="qt-ben__logo" href="dashboard.html">
+        <img src="../../../public/images/logo/logo-vinora-sang.svg" alt="Vinora Jewelry" width="132" height="38">
+        <span>Quản trị</span>
+      </a>
+      
+      <nav>
+        <ul class="qt-ben__ds">
+          
+          <li><a href="dashboard.html"><svg class="bt"><use href="#i-luoi"></use></svg><span>Tổng quan</span></a></li>
+          
+          <li><a href="orders.html"><svg class="bt"><use href="#i-hop-hang"></use></svg><span>Đơn hàng</span><b class="qt-dem" data-qt-dem="don" hidden></b></a></li>
+          
+          <li><a href="complaints.html"><svg class="bt"><use href="#i-chat"></use></svg><span>Phản ánh</span><b class="qt-dem" data-qt-dem="phan-anh" hidden></b></a></li>
+          
+          <li><a href="warranty.html"><svg class="bt"><use href="#i-khien"></use></svg><span>Bảo hành &amp; lịch hẹn</span><b class="qt-dem" data-qt-dem="lich" hidden></b></a></li>
+          
+          <li><a href="products.html"><svg class="bt"><use href="#i-kim-cuong"></use></svg><span>Sản phẩm</span></a></li>
+          
+          <li><a href="customers.html" aria-current="page"><svg class="bt"><use href="#i-tai-khoan"></use></svg><span>Khách hàng</span></a></li>
+          
+          <li><a href="reviews.html"><svg class="bt"><use href="#i-sao"></use></svg><span>Đánh giá</span><b class="qt-dem" data-qt-dem="danh-gia" hidden></b></a></li>
+          
+        </ul>
+      </nav>
+      <div class="qt-ben__chan">
+        <a href="../client/index.html" target="_blank" rel="noopener"><svg class="bt"><use href="#i-cua-hang"></use></svg><span>Xem cửa hàng</span></a>
+        <button type="button" data-qt-dang-xuat><svg class="bt"><use href="#i-dang-xuat"></use></svg><span>Đăng xuất</span></button>
+      </div>
+    </aside>
+
+    <div class="qt-chinh">
+      <header class="qt-tren">
+        <div>
+          <p class="nhan-tren">Khách hàng</p>
+          <h1 class="qt-tren__td">Khách hàng</h1>
+        </div>
+        <div class="qt-tren__phai">
+          
+          <span class="qt-nguoi"><span class="qt-nguoi__chu" data-qt-chu-cai>Q</span><span><strong data-qt-ten>Quản trị viên</strong><small data-qt-vai-tro>Quản lý cửa hàng</small></span></span>
+        </div>
+      </header>
+      <main id="noi-dung" class="qt-noi-dung" tabindex="-1">
+        
+<section class="qt-so-lieu" id="qt-kh-so" aria-label="Thống kê khách hàng"></section>
+<div class="qt-loc">
+  <div class="thanh-tab" role="tablist" aria-label="Lọc khách hàng" id="qt-kh-tab">
+    <button type="button" role="tab" data-loai="" aria-selected="true">Tất cả</button>
+    <button type="button" role="tab" data-loai="tk" aria-selected="false">Có tài khoản</button>
+    <button type="button" role="tab" data-loai="vl" aria-selected="false">Mua không tài khoản</button>
+  </div>
+  <div class="qt-tim">
+    <label class="an-chu" for="qt-kh-tim">Tìm khách hàng</label>
+    <svg class="bt bt--nho" aria-hidden="true"><use href="#i-tim-kiem"></use></svg>
+    <input class="o-nhap" id="qt-kh-tim" type="search" placeholder="Tên, email, số điện thoại">
+  </div>
+</div>
+<div class="qt-bang-boc"><table class="qt-bang" id="qt-kh-bang"></table></div>
+
+      </main>
+    </div>
+  </div>
+
+  <div class="vung-thong-bao" id="vung-thong-bao" aria-live="polite" aria-atomic="false"></div>
+    
+  <dialog class="hop-thoai" id="hop-xac-nhan" aria-labelledby="hop-xac-nhan-tieu-de">
+    <form method="dialog" class="hop-thoai__than">
+      <button class="nut-bt hop-thoai__dong" value="huy" aria-label="Đóng"><svg class="bt"><use href="#i-dong"></use></svg></button>
+      <div class="hop-thoai__dau">
+        <p class="nhan-tren" data-xn="nhan"></p>
+        <h2 class="hop-thoai__tieu-de" id="hop-xac-nhan-tieu-de" data-xn="tieu-de"></h2>
+      </div>
+      <div class="chu-phu" data-xn="noi-dung"></div>
+      <div class="hop-thoai__hanh-dong">
+        <button class="nut nut--vien nut--nho" value="huy" data-xn="nut-huy">Quay lại</button>
+        <button class="nut nut--chinh nut--nho" value="dong-y" data-xn="nut-dong-y">Đồng ý</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="../../js/core/common.js" defer></script>
+  <script src="../../js/admin/admin.js" defer></script>
+  <script src="../../js/admin/customers.js" defer></script>
+</body>
+</html>

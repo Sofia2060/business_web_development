@@ -1,0 +1,279 @@
+{
+  "thuongHieu": {
+    "ten": "Vinora Jewelry",
+    "hotline": "1900 0000",
+    "email": "cskh@vinora.vn",
+    "gioLamViec": "09:00 – 21:00, tất cả các ngày trong tuần",
+    "ghiChu": ""
+  },
+  "giaoHang": {
+    "mienPhiTu": 2000000,
+    "phuongThuc": [
+      {
+        "ma": "tieu-chuan",
+        "ten": "Giao tiêu chuẩn có bảo hiểm",
+        "phi": 30000,
+        "thoiGian": "2 – 4 ngày làm việc",
+        "apDung": "toan-quoc",
+        "mienPhiTheoDon": true
+      },
+      {
+        "ma": "hoa-toc",
+        "ten": "Giao hỏa tốc trong ngày",
+        "phi": 60000,
+        "thoiGian": "Trong 4 giờ với đơn xác nhận trước 16:00",
+        "apDung": [
+          "Thành phố Hồ Chí Minh",
+          "Thành phố Hà Nội"
+        ],
+        "mienPhiTheoDon": false
+      }
+    ]
+  },
+  "thanhToan": [
+    {
+      "ma": "COD",
+      "ten": "Thanh toán khi nhận hàng (COD)",
+      "moTa": "Kiểm tra sản phẩm và giấy bảo đảm tuổi vàng trước khi trả tiền.",
+      "trucTuyen": false
+    },
+    {
+      "ma": "BANK",
+      "ten": "Chuyển khoản ngân hàng (VietQR)",
+      "moTa": "Quét mã QR, nội dung chuyển khoản là mã đơn hàng.",
+      "trucTuyen": true
+    },
+    {
+      "ma": "VNPAY",
+      "ten": "Cổng VNPay",
+      "moTa": "Thẻ ATM nội địa, thẻ quốc tế, QR ngân hàng.",
+      "trucTuyen": true
+    },
+    {
+      "ma": "MOMO",
+      "ten": "Ví MoMo",
+      "moTa": "Quét mã QR bằng ứng dụng MoMo.",
+      "trucTuyen": true
+    }
+  ],
+  "maUuDai": [
+    {
+      "ma": "VINORA5",
+      "moTa": "Giảm 5% (tối đa 1.000.000 ₫) cho đơn từ 5.000.000 ₫",
+      "loai": "phan-tram",
+      "giaTri": 5,
+      "toiDa": 1000000,
+      "donToiThieu": 5000000
+    },
+    {
+      "ma": "CHAOBAN200",
+      "moTa": "Giảm 200.000 ₫ cho đơn từ 2.000.000 ₫",
+      "loai": "so-tien",
+      "giaTri": 200000,
+      "donToiThieu": 2000000
+    },
+    {
+      "ma": "FREESHIP",
+      "moTa": "Miễn phí mọi phương thức giao hàng",
+      "loai": "mien-phi-giao",
+      "giaTri": 0,
+      "donToiThieu": 0
+    }
+  ],
+  "hoanTien": {
+    "thoiGian": "3 – 5 ngày làm việc",
+    "ghiChu": "Ngân hàng không hỗ trợ trả ngược tiền về nguồn thanh toán, vì vậy Vinora chuyển khoản hoàn tiền vào tài khoản bạn cung cấp.",
+    "nganHang": [
+      "Vietcombank",
+      "VietinBank",
+      "BIDV",
+      "Agribank",
+      "Techcombank",
+      "MB Bank",
+      "ACB",
+      "VPBank",
+      "Sacombank",
+      "TPBank",
+      "VIB",
+      "HDBank",
+      "SHB",
+      "OCB",
+      "MSB",
+      "Ngân hàng khác"
+    ]
+  },
+  "hoTro": {
+    "phanHoiTrongGio": 24,
+    "phanAnhTrongNgay": 7,
+    "loaiVanDe": [
+      {
+        "ma": "loi-san-pham",
+        "ten": "Sản phẩm lỗi, trầy xước hoặc rơi đá",
+        "sauKhiNhan": true
+      },
+      {
+        "ma": "sai-san-pham",
+        "ten": "Giao sai mẫu, sai size hoặc sai chữ khắc",
+        "sauKhiNhan": true
+      },
+      {
+        "ma": "thieu-hang",
+        "ten": "Thiếu sản phẩm, hộp hoặc giấy chứng nhận",
+        "sauKhiNhan": true
+      },
+      {
+        "ma": "giao-hang",
+        "ten": "Giao hàng chậm hoặc gói hàng móp, rách niêm phong",
+        "sauKhiNhan": false
+      },
+      {
+        "ma": "dieu-chinh",
+        "ten": "Muốn điều chỉnh đơn (size, chữ khắc, địa chỉ, ngày giao)",
+        "chiKhiChoXuLy": true
+      },
+      {
+        "ma": "thanh-toan",
+        "ten": "Thanh toán hoặc hoàn tiền",
+        "sauKhiNhan": false
+      },
+      {
+        "ma": "khac",
+        "ten": "Vấn đề khác",
+        "sauKhiNhan": false
+      }
+    ]
+  },
+  "lyDoHuy": [
+    "Tôi muốn đổi sang mẫu hoặc size khác",
+    "Tôi tìm được nơi bán giá tốt hơn",
+    "Tôi cần cân nhắc lại về tài chính",
+    "Thời gian giao hàng không kịp dịp quan trọng",
+    "Tôi đặt nhầm hoặc đặt trùng đơn",
+    "Lý do khác"
+  ],
+  "khacChu": {
+    "toiDaKyTu": 15,
+    "phongChu": [
+      {
+        "ma": "co-dien",
+        "ten": "Cổ điển"
+      },
+      {
+        "ma": "hien-dai",
+        "ten": "Hiện đại"
+      },
+      {
+        "ma": "viet-tay",
+        "ten": "Viết tay"
+      }
+    ],
+    "apDungDanhMuc": [
+      1,
+      2,
+      3
+    ],
+    "phi": 0
+  },
+  "sizeNhan": {
+    "nhoNhat": 6,
+    "lonNhat": 24
+  },
+  "soLuongToiDaMoiDong": 5,
+  "baoHanh": {
+    "quyenLoi": [
+      {
+        "ma": "Cleaning",
+        "ten": "Làm sạch sản phẩm tại cửa hàng",
+        "luot": null,
+        "hienThi": "Trọn đời",
+        "datLich": true
+      },
+      {
+        "ma": "Polishing",
+        "ten": "Đánh bóng và xi mới",
+        "luot": 5,
+        "hienThi": "05 lần",
+        "datLich": true
+      },
+      {
+        "ma": "Resizing",
+        "ten": "Chỉnh size nhẫn, khắc tên",
+        "luot": null,
+        "hienThi": "Trọn đời",
+        "datLich": true,
+        "chiChoNhan": true
+      },
+      {
+        "ma": "CZ",
+        "ten": "Gắn đá CZ",
+        "luot": null,
+        "hienThi": "Trọn đời",
+        "datLich": false
+      },
+      {
+        "ma": "Stone",
+        "ten": "Gắn kim cương / đá màu / ngọc trai (chưa gồm viên)",
+        "luot": null,
+        "hienThi": "Miễn phí công gắn",
+        "datLich": false
+      },
+      {
+        "ma": "Moissanite",
+        "ten": "Gắn đá Moissanite từ 0,8 – 3,0 mm",
+        "luot": null,
+        "hienThi": "Trọn đời",
+        "datLich": false
+      },
+      {
+        "ma": "Repair",
+        "ten": "Hàn dây, sửa khóa (không gồm thay mới)",
+        "luot": 1,
+        "hienThi": "01 lần",
+        "datLich": false
+      }
+    ],
+    "tinhPhi": [
+      {
+        "ten": "Sửa độ rung ladanse",
+        "chiPhi": "100.000 ₫"
+      },
+      {
+        "ten": "Nắn lại nhẫn (tùy tình trạng), đánh bóng, xi mới",
+        "chiPhi": "50.000 ₫"
+      },
+      {
+        "ten": "Cắt dây / hàn dây: cắt, đốt, hàn, đánh bóng, xi mới (chưa gồm vàng thêm)",
+        "chiPhi": "70.000 ₫ + phí vàng thêm"
+      },
+      {
+        "ten": "Nhẫn thay đai, sản phẩm thêm chi tiết (chưa gồm vàng thêm)",
+        "chiPhi": "70.000 ₫ + phí vàng thêm"
+      }
+    ],
+    "khungGio": [
+      "09:30",
+      "11:00",
+      "14:00",
+      "15:30",
+      "17:00",
+      "19:00"
+    ],
+    "datTruocToiDaNgay": 30
+  },
+  "hamLuongVang": {
+    "10K": "41,7%",
+    "14K": "58,5%",
+    "18K": "75%",
+    "22K": "91,6%",
+    "24K": "99,99%",
+    "BAC925": "92,5% bạc"
+  },
+  "tenChatLieu": {
+    "10K": "Vàng 10K",
+    "14K": "Vàng 14K",
+    "18K": "Vàng 18K",
+    "22K": "Vàng 22K",
+    "24K": "Vàng 24K",
+    "BAC925": "Bạc 925"
+  }
+}

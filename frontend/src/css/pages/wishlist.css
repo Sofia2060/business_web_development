@@ -1,0 +1,44 @@
+/* =====================================================================
+   SẢN PHẨM YÊU THÍCH
+   Dùng lại bố cục của trang Sản phẩm đã xem (sanphamdaxem.css) + các phần riêng bên dưới
+   ===================================================================== */
+.dau-yeu-thich__nut { gap: 10px; }
+
+/* Khung danh sách được chia sẻ qua đường dẫn */
+.yt-chia-se { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 14px 18px; margin-bottom: var(--k-5); padding: 18px 20px; }
+.yt-chia-se strong { display: block; font-size: 15px; margin-bottom: 2px; }
+.yt-chia-se p { color: var(--chu-phu); font-size: 14px; }
+
+/* Dải tổng kết */
+.yt-tong {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) auto; align-items: center; gap: var(--k-5);
+  margin-top: var(--k-5); padding: 18px 22px; background: var(--nen-noi); border: 1px solid var(--vien);
+}
+.yt-tong > div { display: grid; gap: 4px; min-width: 0; }
+.yt-tong strong { font-family: var(--font-tieu-de); font-size: 24px; font-weight: 500; line-height: 1.2; font-variant-numeric: lining-nums tabular-nums; }
+.yt-tong small { font-size: 12px; color: var(--chu-phu); }
+
+/* Chân thẻ: ngày thêm + nút hành động */
+.the-yt { display: flex; flex-direction: column; transition: opacity .22s var(--nhip), transform .22s var(--nhip); }
+.the-yt .the-sp__lien-ket { flex: 1; align-content: start; }
+.the-yt.dang-xoa { opacity: 0; transform: scale(.97); }
+.the-yt__chan { display: grid; gap: 10px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--vien); }
+.the-yt__luc { display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-size: 12px; color: var(--chu-phu); }
+.the-yt__luc .bt { width: 14px; height: 14px; }
+.the-yt__chan .nut { width: 100%; justify-content: center; }
+.the-yt__giam { color: var(--hong-ngoc); font-weight: 500; }
+
+@media (max-width: 1024px) {
+  .yt-tong { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .yt-tong > .nut { grid-column: 1 / -1; justify-self: start; }
+}
+@media (max-width: 600px) {
+  .yt-chia-se { grid-template-columns: auto minmax(0, 1fr); }
+  .yt-chia-se > .hang { grid-column: 1 / -1; }
+  .yt-tong { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; padding: 16px; }
+  .yt-tong > div:nth-child(2) { grid-column: 1 / -1; order: -1; }
+  .yt-tong strong { font-size: 20px; }
+  .yt-tong > .nut { justify-self: stretch; }
+  .the-yt__chan .nut { padding-inline: 8px; font-size: 10.5px; }
+}
+.trang-yeu-thich .luoi-sp { margin-top: var(--k-5); }
