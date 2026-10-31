@@ -2,37 +2,17 @@
 import re
 
 import pyodbc
-from flask import Blueprint, jsonify, request, session
+from flask import Blueprint, jsonify, session
 
 from ..auth import MAX_PASSWORD_BYTES, check_password, current_user, hash_password
 from ..db import query, transaction
+from ..validation import body, text, utf16_len
 
 bp = Blueprint("auth", __name__, url_prefix="/api/auth")
 
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 PHONE_RE = re.compile(r"^[0-9+]{9,15}$")  # same rule as the Customers.Phone CHECK constraint
 MIN_PASSWORD = 8
-
-
-def _body() -> dict:
-    """The JSON body if it is an object, otherwise an empty dict (so a list or text body gives a clean 400/401)."""
-    data = request.get_json(silent=True)
-    return data if isinstance(data, dict) else {}
-
-
-def _text(data: dict, key: str) -> str | None:
-    """A body field as text. Missing or null gives "". Returns None when the value is not
-    a string (number, list...) or cannot be encoded as UTF-8 (lone surrogate), so the caller can reject it."""
-    value = data.get(key)
-    if value is None:
-        return ""
-    if not isinstance(value, str):
-        return None
-    try:
-        value.encode()
-    except UnicodeEncodeError:
-        return None
-    return value
 
 
 def _public(user: dict) -> dict:
@@ -47,15 +27,15 @@ def _start_session(user_id: int) -> None:
 @bp.post("/register")
 def register():
     """Create a customer account and log in. The role is always Customer, whatever the body says."""
-    data = _body()
-    fields = [_text(data, key) for key in ("fullName", "email", "password", "phone")]
+    data = body()
+    fields = [text(data, key) for key in ("fullName", "email", "password", "phone")]
     if None in fields:
         return jsonify(error="All fields must be plain text"), 400
     full_name, email, password, phone = fields
     full_name, email, phone = full_name.strip(), email.strip().lower(), phone.strip() or None
 
     # SQL Server counts NVARCHAR length in UTF-16 units, so an emoji counts as 2.
-    if not full_name or len(full_name.encode("utf-16-le")) // 2 > 100:
+    if not full_name or utf16_len(full_name) > 100:
         return jsonify(error="Full name is required (max 100 characters)"), 400
     # Length and ASCII are checked before the regex to keep it fast, and the column is VARCHAR (ASCII only).
     if len(email) > 255 or not email.isascii() or not EMAIL_RE.match(email):
@@ -84,9 +64,9 @@ def register():
 
 @bp.post("/login")
 def login():
-    data = _body()
-    email = (_text(data, "email") or "").strip().lower()  # a non-text value counts as empty
-    password = _text(data, "password") or ""
+    data = body()
+    email = (text(data, "email") or "").strip().lower()  # a non-text value counts as empty
+    password = text(data, "password") or ""
 
     rows = query(
         "SELECT UserID, FullName, Email, Role, IsActive, PasswordHash FROM dbo.Users WHERE Email = ?", (email,))

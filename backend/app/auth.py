@@ -64,3 +64,18 @@ def admin_required(view):
             return jsonify(error="Admin only"), 403
         return view(*args, **kwargs)
     return wrapper
+
+
+def customer_required(view):
+    """Logged-in user who has a Customers row. Sets g.customer_id for the view. Admins have none, so they get 403."""
+    @wraps(view)
+    def wrapper(*args, **kwargs):
+        user = current_user()
+        if user is None:
+            return jsonify(error="Login required"), 401
+        rows = query("SELECT CustomerID FROM dbo.Customers WHERE UserID = ?", (user["UserID"],))
+        if not rows:
+            return jsonify(error="Customer account required"), 403
+        g.customer_id = rows[0]["CustomerID"]
+        return view(*args, **kwargs)
+    return wrapper

@@ -1,5 +1,5 @@
 """Integration tests for the product API. They use the local VinoraJewelry database
-loaded from database/01_init_schema.sql (443 products, all Active)."""
+loaded from database/01_VinoraJewelry_SQLServer.sql (443 products, all Active)."""
 import pytest
 
 # The `client` fixture comes from conftest.py.

@@ -19,3 +19,9 @@ def db_connection_string() -> str:
     else:
         parts.append("Trusted_Connection=yes")
     return ";".join(parts)
+
+
+# Shipping rule, copied from frontend/mock-data/config.json ("giaoHang"):
+# standard delivery costs 30,000 VND and is free for orders of 2,000,000 VND or more.
+STANDARD_SHIPPING_FEE = 30_000
+FREE_SHIPPING_FROM = 2_000_000
