@@ -96,6 +96,52 @@ uv run pytest
 
 Thêm thư viện: `uv add <tên>`. Thư viện chỉ dùng cho test: `uv add --dev <tên>`.
 Kết nối SQL Server cần ODBC Driver 18 (máy hiện tại đã có). Sao chép `.env.example` thành `.env` rồi điền thông tin.
+Để trống `DB_USER` thì back-end đăng nhập bằng Windows Authentication.
+
+### Chạy API sản phẩm
+
+Cần đã chạy `database/01_init_schema.sql`. Mở terminal ở gốc repo:
+
+```bash
+uv run python backend/run.py
+```
+
+| Địa chỉ | Việc làm |
+|---|---|
+| `GET /api/products` | Danh sách sản phẩm đang bán. Tham số: `category` (id danh mục), `q` (tìm theo tên, không phân biệt hoa thường và dấu), `page`, `limit` (tối đa 100, mặc định 24) |
+| `GET /api/products/<sku>` | Chi tiết một sản phẩm, kèm ảnh, đá và biến thể. Ví dụ `/api/products/NDINO131LDIA` |
+
+Tham số sai trả về 400. Mã sản phẩm không có trả về 404. Test nằm ở `backend/tests/test_products.py` và cần database đang chạy.
+
+### Đăng nhập và phân quyền
+
+Cần `SECRET_KEY` trong file `.env` (chuỗi ngẫu nhiên từ 32 ký tự trở lên, dùng để ký cookie đăng nhập). Tạo bằng:
+
+```bash
+uv run python -c "import secrets; print(secrets.token_hex(32))"
+```
+
+Mật khẩu lưu bằng bcrypt. Đăng nhập được giữ trong cookie phiên. Có hai vai trò: `Customer` và `Admin`. Đăng ký luôn tạo `Customer`.
+
+| Địa chỉ | Việc làm |
+|---|---|
+| `POST /api/auth/register` | Đăng ký. Body: `fullName`, `email`, `password` (8 đến 72 byte), `phone` (không bắt buộc). Trả 201 và tự đăng nhập. Email trùng trả 409 |
+| `POST /api/auth/login` | Đăng nhập bằng `email` và `password`. Sai mật khẩu hoặc email không có đều trả 401 cùng một nội dung. Tài khoản bị khóa trả 403 |
+| `POST /api/auth/logout` | Đăng xuất, trả 204 |
+| `GET /api/auth/me` | Thông tin người đang đăng nhập, chưa đăng nhập trả 401 |
+| `GET /api/admin/users` | Danh sách tài khoản. Chỉ `Admin`: chưa đăng nhập trả 401, là khách trả 403 |
+
+Các tài khoản mẫu trong database (như `admin@vinora.vn`) mang mã băm giả nên chưa đăng nhập được. Đặt mật khẩu thật cho một tài khoản bằng:
+
+```bash
+uv run python scripts/set_password.py admin@vinora.vn
+```
+
+Giới hạn đầu vào: tên tối đa 100 ký tự, email chỉ gồm ký tự ASCII (tối đa 255), thân yêu cầu tối đa 16 KB (quá thì trả 413). Các trường phải là chuỗi.
+
+Chưa làm: giới hạn số lần đăng nhập sai, cờ `Secure` cho cookie khi chạy HTTPS, hết hạn phiên phía server. Cần bổ sung trước khi đưa lên mạng thật.
+
+Test nằm ở `backend/tests/test_auth.py`. Test tạo tài khoản có email dạng `pytest-*@example.test` và tự xóa sau khi chạy.
 
 ## Quy ước
 
