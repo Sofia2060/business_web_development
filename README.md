@@ -1,0 +1,97 @@
+# Vinora Jewelry
+
+Website thương mại điện tử kinh doanh trang sức cao cấp **Vinora Jewelry** — đồ án môn *Phát triển web kinh doanh*.
+
+- **Front-end:** HTML5, CSS3, JavaScript
+- **Back-end:** Python (Flask)
+- **Cơ sở dữ liệu:** Microsoft SQL Server
+- **Mô hình hóa:** Draw.io (BPMN, Use Case, Sequence, ERD)
+
+## Cấu trúc thư mục
+
+```
+business_web_development/
+├── README.md
+├── .gitignore
+├── .editorconfig
+├── .env.example               # mẫu biến môi trường (KHÔNG commit .env thật)
+│
+├── docs/                      # tài liệu đồ án
+│   ├── [Web] FinalProject.md  # khung báo cáo
+│   ├── report/                # báo cáo hoàn chỉnh (Word/PDF)
+│   ├── analysis/              # BPMN, use case, sequence, sitemap
+│   ├── database/              # ERD, từ điển dữ liệu 11 bảng
+│   ├── design/                # logo, bảng màu, wireframe
+│   └── api/                   # mô tả endpoint
+│
+├── frontend/                  # giao diện
+│   ├── index.html             # chuyển hướng tới trang chủ (gốc cho Live Server)
+│   ├── README.md
+│   ├── public/                # tài nguyên phục vụ nguyên trạng
+│   │   ├── fonts/
+│   │   └── images/
+│   │       ├── logo/
+│   │       ├── products/
+│   │       └── placeholders/
+│   ├── src/
+│   │   ├── pages/
+│   │   │   ├── client/        # trang khách hàng
+│   │   │   └── admin/         # trang quản trị
+│   │   ├── partials/          # header, footer dùng chung
+│   │   ├── css/
+│   │   │   ├── base/          # biến màu, reset, layout
+│   │   │   ├── components/    # header/footer, thẻ sản phẩm, modal...
+│   │   │   └── pages/         # CSS riêng từng trang
+│   │   └── js/
+│   │       ├── core/          # hàm chung, API client, storage
+│   │       ├── components/
+│   │       └── pages/         # JS riêng từng trang
+│   └── mock-data/             # JSON/XML mẫu khi chưa có back-end
+│
+├── backend/                   # Python (Flask)
+│   ├── app/
+│   │   ├── __init__.py
+│   │   ├── config.py
+│   │   ├── models/            # User, Customer, Product, Order, Warranty...
+│   │   ├── routes/            # auth, products, cart, orders, warranty, admin
+│   │   ├── services/          # nghiệp vụ: giữ đơn, kích hoạt bảo hành, phí giao hàng
+│   │   ├── schemas/           # kiểm tra dữ liệu vào/ra
+│   │   ├── templates/         # Jinja templates (nếu dùng server-side render)
+│   │   └── utils/
+│   ├── migrations/
+│   ├── tests/
+│   ├── requirements.txt
+│   └── run.py
+│
+├── database/
+│   ├── 01_init_schema.sql     # tạo DB, 26 bảng, trigger, procedure, view, dữ liệu sản phẩm
+│   ├── 02_seed_fake_data.sql  # dữ liệu giả lập cho dev/demo
+│   └── README.md
+│
+├── scripts/                   # script tiện ích (import dữ liệu, build...)
+└── .github/
+    ├── workflows/             # CI (bổ sung sau)
+    ├── ISSUE_TEMPLATE/
+    └── PULL_REQUEST_TEMPLATE.md
+```
+
+> **Trạng thái:** mã giao diện đã nằm trong `frontend/` (thư mục `VinoraJewelry_HTML/` cũ đã bỏ).
+> `backend/`, `database/`, `src/pages/admin/` và `src/partials/` mới là khung rỗng, chưa có mã.
+> Chi tiết các trang client xem [frontend/README.md](frontend/README.md).
+
+## Chạy front-end
+
+1. Mở thư mục `frontend` bằng VS Code.
+2. Cài tiện ích **Live Server**, chuột phải `frontend/index.html` → *Open with Live Server*.
+3. Không mở file `.html` trực tiếp (`file://`), vì trình duyệt chặn đọc JSON/XML.
+
+## Quy ước
+
+- Tên file, thư mục, biến trong code: tiếng Anh, `kebab-case` cho file, `snake_case` cho Python.
+- Nội dung hiển thị trên giao diện: tiếng Việt.
+- Không commit `.env`, mật khẩu, khóa API hay dữ liệu khách hàng thật.
+- Làm việc theo nhánh `feature/<tên>`, tạo Pull Request vào `main`.
+
+## Thành viên nhóm
+
+_(điền sau)_
