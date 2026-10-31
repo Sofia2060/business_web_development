@@ -85,6 +85,18 @@ business_web_development/
 2. Cài tiện ích **Live Server**, chuột phải `frontend/index.html` → *Open with Live Server*.
 3. Không mở file `.html` trực tiếp (`file://`), vì trình duyệt chặn đọc JSON/XML.
 
+## Môi trường Python (back-end)
+
+Dùng [uv](https://docs.astral.sh/uv/). Thư viện khai báo trong `pyproject.toml`, khóa phiên bản trong `uv.lock`.
+
+```bash
+uv sync
+uv run pytest
+```
+
+Thêm thư viện: `uv add <tên>`. Thư viện chỉ dùng cho test: `uv add --dev <tên>`.
+Kết nối SQL Server cần ODBC Driver 18 (máy hiện tại đã có). Sao chép `.env.example` thành `.env` rồi điền thông tin.
+
 ## Quy ước
 
 - Tên file, thư mục, biến trong code: tiếng Anh, `kebab-case` cho file, `snake_case` cho Python.
