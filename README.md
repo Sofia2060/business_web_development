@@ -96,6 +96,22 @@ uv run pytest
 
 Thêm thư viện: `uv add <tên>`. Thư viện chỉ dùng cho test: `uv add --dev <tên>`.
 Kết nối SQL Server cần ODBC Driver 18 (máy hiện tại đã có). Sao chép `.env.example` thành `.env` rồi điền thông tin.
+Để trống `DB_USER` thì back-end đăng nhập bằng Windows Authentication.
+
+### Chạy API sản phẩm
+
+Cần đã chạy `database/01_init_schema.sql`. Mở terminal ở gốc repo:
+
+```bash
+uv run python backend/run.py
+```
+
+| Địa chỉ | Việc làm |
+|---|---|
+| `GET /api/products` | Danh sách sản phẩm đang bán. Tham số: `category` (id danh mục), `q` (tìm theo tên, không phân biệt hoa thường và dấu), `page`, `limit` (tối đa 100, mặc định 24) |
+| `GET /api/products/<sku>` | Chi tiết một sản phẩm, kèm ảnh, đá và biến thể. Ví dụ `/api/products/NDINO131LDIA` |
+
+Tham số sai trả về 400. Mã sản phẩm không có trả về 404. Test nằm ở `backend/tests/test_products.py` và cần database đang chạy.
 
 ## Quy ước
 
