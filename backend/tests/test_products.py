@@ -2,18 +2,7 @@
 loaded from database/01_init_schema.sql (443 products, all Active)."""
 import pytest
 
-from app import create_app
-from app.db import query
-
-
-@pytest.fixture(scope="module")
-def client():
-    try:
-        query("SELECT 1 AS ok")
-    except Exception:
-        pytest.skip("SQL Server database VinoraJewelry is not reachable")
-    return create_app().test_client()
-
+# The `client` fixture comes from conftest.py.
 
 def test_list_defaults(client):
     data = client.get("/api/products").get_json()
