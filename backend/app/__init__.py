@@ -76,7 +76,7 @@ def create_app() -> Flask:
         app.logger.exception("Database error")
         return jsonify(error="Database error. Please try again."), 500
 
-    from .routes import addresses, admin, auth, cart, orders, products
-    for module in (products, auth, admin, addresses, cart, orders):
+    from .routes import addresses, admin, auth, cart, catalog, orders, products, profile, recently_viewed, vouchers
+    for module in (products, catalog, auth, profile, admin, addresses, cart, vouchers, orders, recently_viewed):
         app.register_blueprint(module.bp)
     return app

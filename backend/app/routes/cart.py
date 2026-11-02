@@ -4,7 +4,7 @@ from flask import Blueprint, g, jsonify
 from ..auth import customer_required
 from ..config import FREE_SHIPPING_FROM, STANDARD_SHIPPING_FEE
 from ..db import query, transaction
-from ..validation import body, is_int, text, utf16_len
+from ..validation import INT_MAX, body, is_int, text, utf16_len
 
 bp = Blueprint("cart", __name__, url_prefix="/api/cart")
 
@@ -93,6 +93,8 @@ def add_item():
 @customer_required
 def set_quantity(item_id: int):
     quantity = body().get("quantity")
+    if item_id > INT_MAX:    # too big for the database driver, so no such item
+        return jsonify(error="Cart item not found"), 404
     if not is_int(quantity, 1, MAX_QTY):
         return jsonify(error=f"quantity must be a whole number from 1 to {MAX_QTY}"), 400
     rows = query("SELECT v.StockQuantity FROM dbo.CartItems ci JOIN dbo.ProductVariants v ON v.VariantID = ci.VariantID "
@@ -110,6 +112,8 @@ def set_quantity(item_id: int):
 @bp.delete("/<int:item_id>")
 @customer_required
 def remove_item(item_id: int):
+    if item_id > INT_MAX:
+        return jsonify(error="Cart item not found"), 404
     with transaction() as cur:
         cur.execute("DELETE FROM dbo.CartItems WHERE CartItemID = ? AND CustomerID = ?", (item_id, g.customer_id))
         if cur.rowcount == 0:

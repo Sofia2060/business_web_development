@@ -120,10 +120,24 @@ uv run python backend/run.py
 
 | Địa chỉ | Việc làm |
 |---|---|
-| `GET /api/products` | Danh sách sản phẩm đang bán. Tham số: `category` (id danh mục), `q` (tìm theo tên, không phân biệt hoa thường và dấu), `page`, `limit` (tối đa 100, mặc định 24) |
+| `GET /api/products` | Danh sách sản phẩm đang bán, có lọc và sắp xếp (xem bảng dưới) |
 | `GET /api/products/<sku>` | Chi tiết một sản phẩm, kèm ảnh, đá và biến thể. Ví dụ `/api/products/NDINO131LDIA` |
 
-Tham số sai trả về 400. Mã sản phẩm không có trả về 404. Test nằm ở `backend/tests/test_products.py` và cần database đang chạy.
+Tham số của `GET /api/products`. Các tham số khác nhau kết hợp bằng AND, các giá trị trong một tham số (cách nhau bằng dấu phẩy) kết hợp bằng OR:
+
+| Tham số | Ý nghĩa |
+|---|---|
+| `category` | Id danh mục, ví dụ `1,2,3` (tối đa 50 id) |
+| `collection` | Id bộ sưu tập. Sản phẩm thuộc bất kỳ bộ sưu tập nào trong danh sách đều khớp |
+| `material` | Tuổi vàng: `10K`, `14K`, `18K`, `22K`, `24K`, `BAC925` |
+| `color` | Màu vàng, ví dụ `Vàng Trắng,Bạc Trắng` (tối đa 10 màu). Khớp khi sản phẩm có biến thể đang bán màu đó |
+| `minPrice`, `maxPrice` | Khoảng giá hiện hành, đơn vị đồng, gồm cả hai đầu |
+| `onSale=1` | Chỉ sản phẩm đang giảm giá (`OriginalPrice` lớn hơn `CurrentPrice`) |
+| `q` | Tìm theo tên, không phân biệt hoa thường và dấu. Ký tự `%`, `_`, `[` được tìm đúng như đã gõ |
+| `sort` | `featured` (mặc định: sản phẩm có mô tả trước), `newest`, `price_asc`, `price_desc`, `discount` (giảm nhiều nhất trước). Sản phẩm chưa có giá luôn xếp cuối khi sắp theo giá |
+| `page`, `limit` | Phân trang. `limit` tối đa 100, mặc định 24 |
+
+Tham số sai trả về 400, kèm tên tham số sai. Mã sản phẩm không có trả về 404. Test nằm ở `backend/tests/test_products.py` và cần database đang chạy.
 
 ### Đăng nhập và phân quyền
 
@@ -141,6 +155,7 @@ Mật khẩu lưu bằng bcrypt. Đăng nhập được giữ trong cookie phiê
 | `POST /api/auth/login` | Đăng nhập bằng `email` và `password`. Sai mật khẩu hoặc email không có đều trả 401 cùng một nội dung. Tài khoản bị khóa trả 403 |
 | `POST /api/auth/logout` | Đăng xuất, trả 204 |
 | `GET /api/auth/me` | Thông tin người đang đăng nhập, chưa đăng nhập trả 401 |
+| `POST /api/auth/change-password` | Đổi mật khẩu. Body: `currentPassword`, `newPassword` (8 đến 72 byte). Mật khẩu hiện tại sai trả 403 (không phải 401, để giao diện không nhầm với hết phiên). Thành công trả 204, vẫn đăng nhập |
 | `GET /api/admin/users` | Danh sách tài khoản. Chỉ `Admin`: chưa đăng nhập trả 401, là khách trả 403 |
 
 Các tài khoản mẫu trong database (như `admin@vinora.vn`) mang mã băm giả nên chưa đăng nhập được. Đặt mật khẩu thật cho một tài khoản bằng:
@@ -151,7 +166,7 @@ uv run python scripts/set_password.py admin@vinora.vn
 
 Giới hạn đầu vào: tên tối đa 100 ký tự, email chỉ gồm ký tự ASCII (tối đa 255), thân yêu cầu tối đa 16 KB (quá thì trả 413). Các trường phải là chuỗi.
 
-Chưa làm: giới hạn số lần đăng nhập sai, cờ `Secure` cho cookie khi chạy HTTPS, hết hạn phiên phía server. Cần bổ sung trước khi đưa lên mạng thật.
+Chưa làm: giới hạn số lần đăng nhập sai, cờ `Secure` cho cookie khi chạy HTTPS, hết hạn phiên phía server. Cookie đăng nhập cũ vẫn dùng được sau khi đổi mật khẩu, vì phiên không gắn với mật khẩu. Cần bổ sung trước khi đưa lên mạng thật.
 
 Test nằm ở `backend/tests/test_auth.py`.
 
@@ -162,6 +177,8 @@ Các API này cần đăng nhập bằng tài khoản khách (`Customer`). Tài 
 | Địa chỉ | Việc làm |
 |---|---|
 | `GET /api/addresses`, `POST /api/addresses` | Sổ địa chỉ. Địa chỉ đầu tiên tự là mặc định. `isDefault: true` đổi mặc định sang địa chỉ mới |
+| `PATCH /api/addresses/<id>` | Sửa địa chỉ, chỉ gửi trường cần đổi. `isDefault: true` đặt làm mặc định. Tắt mặc định của địa chỉ đang là mặc định trả 400, phải đặt địa chỉ khác làm mặc định |
+| `DELETE /api/addresses/<id>` | Xóa địa chỉ (204). Xóa địa chỉ mặc định thì địa chỉ cũ nhất còn lại thành mặc định. Đơn đã đặt giữ bản sao địa chỉ riêng |
 | `GET /api/cart` | Giỏ hàng kèm `subtotal`, `shippingFee`, `total` |
 | `POST /api/cart` | Thêm biến thể: `variantSku`, `quantity` (1 đến 10), `engravingText` (khắc tên, tối đa 30 ký tự). Thêm lại cùng biến thể và cùng chữ khắc thì cộng dồn số lượng. Quá tồn kho trả 409 |
 | `PATCH /api/cart/<id>`, `DELETE /api/cart/<id>` | Đổi số lượng, xóa dòng |
@@ -180,8 +197,26 @@ Các API này cần đăng nhập bằng tài khoản khách (`Customer`). Tài 
 - Gửi lại cùng token cho kết quả giống hệt lần đầu (cùng khóa `OrderCode`, `TotalAmount`, `ShippingFee`), chỉ khác mã 200 thay vì 201.
 - Địa chỉ đầy đủ (đường, phường, tỉnh) tối đa 400 ký tự, vì đơn hàng chép địa chỉ vào một cột 400 ký tự.
 - Khắc tên: database coi chữ hoa và chữ thường là một, và bỏ qua dấu thanh ("Mai" bằng "Mại"). Thêm một chữ khắc chỉ khác kiểu đó vào giỏ trả 409. Các chữ khác nhau thật như "Năm" và "Nam" là hai dòng riêng.
-- Hai yêu cầu chạy cùng lúc gây xung đột (trùng dòng giỏ hàng, mã ưu đãi vừa hết lượt) trả 409 để thử lại. Lỗi database khác trả 500 với câu chung, không lộ nội dung SQL.
+- Hai yêu cầu chạy cùng lúc gây xung đột (trùng dòng giỏ hàng, mã ưu đãi vừa hết lượt) trả 409 để thử lại. Lỗi database khác trả 500 với câu chung, không lộ nội dung SQL. Khi SQL Server chọn một yêu cầu làm nạn nhân của deadlock (hai yêu cầu chờ nhau), hàm `call()` tự chạy lại thủ tục, tối đa 3 lần.
 - Chưa làm: cổng thanh toán (ghi nhận kết quả VNPay hoặc MoMo, `sp_RecordPaymentResult`), bảo hành và lịch hẹn hậu mãi, đánh giá. Đơn trả trước hiện ở trạng thái thanh toán `Pending`.
+
+### Hồ sơ, tra cứu và sản phẩm đã xem
+
+| Địa chỉ | Việc làm |
+|---|---|
+| `GET /api/profile`, `PATCH /api/profile` | Hồ sơ khách (cần đăng nhập khách). Sửa `fullName`, `phone`, `dateOfBirth` (`YYYY-MM-DD`, trước hôm nay), `defaultRingSize` (có trong bảng size nhẫn). Chỉ trường có trong body mới đổi. `null` hoặc `""` xóa số điện thoại, ngày sinh, size. Một trường sai thì không lưu gì. Email và vai trò không đổi được ở đây |
+| `GET /api/categories` | Danh mục còn bán, kèm số sản phẩm (`ProductCount`). Thay `mock-data/categories.json` |
+| `GET /api/collections` | Bộ sưu tập kèm số sản phẩm, các danh mục (`Categories`) và tuổi vàng (`Materials`) có trong bộ sưu tập. Thay `mock-data/collections.json` |
+| `GET /api/ring-sizes` | Bảng quy đổi size nhẫn. Thay `mock-data/size-chart.json` |
+| `GET /api/gold-prices` | Giá vàng đang có hiệu lực cho từng tuổi vàng (đồng một chỉ), cao nhất trước |
+| `POST /api/vouchers/check` | Kiểm tra mã giảm giá với giỏ hàng hiện tại (cần đăng nhập khách). Body: `code`. Thành công trả `discount`. Mã không có, đã tắt hoặc chưa tới ngày trả 404. Hết hạn, hết lượt hoặc chưa đủ tiền tối thiểu trả 409 kèm `reason` (`expired`, `used_up`, `min_order`). Cách tính giống `sp_PlaceOrder`; việc đặt hàng mới là lúc giảm giá được chốt |
+| `POST /api/recently-viewed` | Ghi nhận khách vừa mở một sản phẩm. Body: `sku`. Trả 204 (`sp_TrackProductView`) |
+| `GET /api/recently-viewed` | Sản phẩm đã xem, mới nhất trước. Tham số `limit` (mặc định 10, tối đa 50) |
+
+Điểm cần nhớ:
+- Các API tra cứu (`categories`, `collections`, `ring-sizes`, `gold-prices`) không cần đăng nhập.
+- Khách chưa đăng nhập giữ danh sách đã xem trong trình duyệt, API này chỉ cho khách có tài khoản.
+- Bảng size nhẫn trong database và trong `mock-data/size-chart.json` lệch nhau ở size 15 (size Mỹ 7,5 so với 7,0). Các phần còn lại giống nhau.
 
 ### Chạy test
 
@@ -189,7 +224,7 @@ Các API này cần đăng nhập bằng tài khoản khách (`Customer`). Tài 
 uv run pytest
 ```
 
-Test không đụng vào dữ liệu thật. Mỗi lần chạy, `backend/tests/conftest.py` dựng lại một database riêng tên `VinoraJewelry_Test` từ file `database/01_*.sql` (mất khoảng 5 giây). Cần quyền tạo database trên SQL Server. Nếu không kết nối được, các test bị bỏ qua và pytest in lý do.
+Test nằm trong `backend/tests/` (345 test, chạy hơn hai phút). Test không đụng vào dữ liệu thật. Mỗi lần chạy, `backend/tests/conftest.py` dựng lại một database riêng tên `VinoraJewelry_Test` từ file `database/01_*.sql` (mất khoảng 5 giây). Cần quyền tạo database trên SQL Server. Nếu không kết nối được, các test bị bỏ qua và pytest in lý do.
 
 ## Quy ước
 

@@ -515,3 +515,9 @@ def test_deeply_nested_json_gives_400_not_500(client):
     deep = "[" * 8000 + "]" * 8000
     res = client.post("/api/auth/register", data=deep, content_type="application/json")
     assert res.status_code == 400
+
+
+def test_cart_item_id_too_big_for_the_database_is_404_not_a_crash(client):
+    c, _ = new_customer()
+    assert c.patch(f"/api/cart/{2 ** 63}", json={"quantity": 1}).status_code == 404
+    assert c.delete(f"/api/cart/{2 ** 63}").status_code == 404

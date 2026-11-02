@@ -22,6 +22,9 @@ class ProcError(Exception):
 # pyodbc error text looks like: "... [SQL Server]Giỏ hàng đang trống. (50012) (SQLExecDirectW)".
 # The trailing "(SQL...)" is part of the pattern so other messages that happen to contain "(5xxxx)" do not match.
 _PROC_ERROR = re.compile(r"\[SQL Server\](.*?) \((5\d{4})\) \(SQL\w+\)", re.S)
+# SQL Server error 1205: "Transaction ... was deadlocked ... chosen as the deadlock victim. Rerun the transaction."
+_DEADLOCK = re.compile(r"\(1205\) \(SQL\w+\)")
+DEADLOCK_TRIES = 3
 
 
 def _connect(autocommit: bool = False):
@@ -74,7 +77,19 @@ def call(sql: str, params: tuple = (), actor: tuple[int, str] | None = None) -> 
     The procedures open and commit their own transactions, so this uses autocommit.
     `actor` is (user id, label) and goes into the session context, which the procedures
     and triggers write to AuditLogs. A THROW from a procedure becomes ProcError.
+    When SQL Server picks this request as the victim of a deadlock (two requests waiting for each other),
+    its transaction is rolled back completely, so the call is simply run again (up to 3 tries).
     """
+    for attempt in range(DEADLOCK_TRIES):
+        try:
+            return _call_once(sql, params, actor)
+        except pyodbc.Error as exc:
+            if attempt == DEADLOCK_TRIES - 1 or not _DEADLOCK.search(str(exc)):
+                raise
+    raise AssertionError("unreachable")
+
+
+def _call_once(sql: str, params: tuple, actor: tuple[int, str] | None) -> list[dict]:
     with closing(_connect(autocommit=True)) as conn:
         cursor = conn.cursor()
         try:

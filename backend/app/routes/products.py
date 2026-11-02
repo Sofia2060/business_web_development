@@ -1,42 +1,117 @@
-"""Read-only product API: list and detail."""
+"""Read-only product API: list (with filters and sorting) and detail."""
 from flask import Blueprint, jsonify, request
 
 from ..db import query
-from ..validation import page_number
+from ..validation import id_list, money, page_number
 
 bp = Blueprint("products", __name__, url_prefix="/api/products")
 
 DEFAULT_LIMIT = 24
 MAX_LIMIT = 100
+MATERIALS = ("10K", "14K", "18K", "22K", "24K", "BAC925")
+MAX_COLORS = 10
+
+# Sort name -> ORDER BY text. Only these fixed texts reach the SQL, never the raw query string.
+# Products without a price (gold-rate items with no gold price yet) always come last when sorting by price.
+SORTS = {
+    # Products with a description first (the shop's own picks), then newest.
+    "featured": "CASE WHEN p.Description IS NULL THEN 1 ELSE 0 END, p.CreatedAt DESC, c.ProductID",
+    "newest": "p.CreatedAt DESC, c.ProductID DESC",
+    "price_asc": "CASE WHEN c.CurrentPrice IS NULL THEN 1 ELSE 0 END, c.CurrentPrice, c.ProductID",
+    "price_desc": "CASE WHEN c.CurrentPrice IS NULL THEN 1 ELSE 0 END, c.CurrentPrice DESC, c.ProductID",
+    # Biggest percentage off first; products that are not on sale count as 0%.
+    "discount": "CASE WHEN c.OriginalPrice > c.CurrentPrice THEN (c.OriginalPrice - c.CurrentPrice) * 100.0 / c.OriginalPrice "
+                "ELSE 0 END DESC, c.CurrentPrice DESC, c.ProductID",
+}
 
 
-@bp.get("")
-def list_products():
-    """List active products. Query: category (id), q (name search), page, limit."""
-    page = page_number(request.args.get("page"), 1)
-    limit = page_number(request.args.get("limit"), DEFAULT_LIMIT)
-    category = page_number(request.args.get("category"), None)
-    if not page or not limit or (request.args.get("category") is not None and not category):
-        return jsonify(error="Invalid query parameter"), 400
-    limit = min(limit, MAX_LIMIT)
+def _filters(args) -> tuple[list[str], list]:
+    """Turn the query string into WHERE conditions and their parameters (always '?' placeholders).
+    Raises ValueError(parameter name) when a value is not valid."""
+    where, params = ["c.Status = 'Active'"], []
 
-    where, params = ["Status = 'Active'"], []
-    if category:
-        where.append("CategoryID = ?")
-        params.append(category)
-    q = request.args.get("q", "").strip()
+    def in_list(column_sql: str, values: list):
+        where.append(f"{column_sql} IN ({','.join('?' * len(values))})")
+        params.extend(values)
+
+    for name in ("category", "collection"):
+        if args.get(name) is not None:
+            ids = id_list(args[name])
+            if ids is None:
+                raise ValueError(name)
+            if name == "category":
+                in_list("c.CategoryID", ids)
+            else:
+                # A product can sit in several collections, so look at the link table, not only the main collection.
+                where.append(f"EXISTS (SELECT 1 FROM dbo.ProductCollections pc WHERE pc.ProductID = c.ProductID "
+                             f"AND pc.CollectionID IN ({','.join('?' * len(ids))}))")
+                params.extend(ids)
+
+    if args.get("material") is not None:
+        materials = list(dict.fromkeys(args["material"].split(",")))   # no repeats, so the list stays short
+        if not set(materials) <= set(MATERIALS):
+            raise ValueError("material")
+        in_list("c.Material", materials)
+
+    if args.get("color") is not None:
+        colors = args["color"].split(",")
+        if len(colors) > MAX_COLORS or not all(0 < len(color) <= 20 for color in colors):
+            raise ValueError("color")
+        where.append(f"EXISTS (SELECT 1 FROM dbo.ProductVariants v WHERE v.ProductID = c.ProductID AND v.IsActive = 1 "
+                     f"AND v.GoldColor IN ({','.join('?' * len(colors))}))")
+        params.extend(colors)
+
+    for name, operator in (("minPrice", ">="), ("maxPrice", "<=")):
+        if args.get(name) is not None:
+            amount = money(args[name])
+            if amount is None:
+                raise ValueError(name)
+            where.append(f"c.CurrentPrice {operator} ?")  # a product with no price never matches a price range
+            params.append(amount)
+
+    if args.get("onSale") is not None:
+        if args["onSale"] not in ("0", "1"):
+            raise ValueError("onSale")
+        if args["onSale"] == "1":
+            where.append("c.OriginalPrice > c.CurrentPrice")
+
+    q = args.get("q", "").strip()
     if q:
         # The database collation (Vietnamese_100_CI_AI) does NOT fold accents, so "nhan" would not
         # match "Nhẫn". Compare with Latin1_General_100_CI_AI instead, which does.
         # That collation keeps "đ" as a separate letter, so map it to "d" on both sides.
-        where.append("REPLACE(ProductName, N'đ', N'd') COLLATE Latin1_General_100_CI_AI LIKE ?")
-        params.append("%" + q.replace("đ", "d").replace("Đ", "D") + "%")
+        term = q.replace("đ", "d").replace("Đ", "D")
+        for special in ("\\", "%", "_", "["):    # the typed text is searched as it is, not as a LIKE pattern
+            term = term.replace(special, "\\" + special)
+        where.append("REPLACE(c.ProductName, N'đ', N'd') COLLATE Latin1_General_100_CI_AI LIKE ? ESCAPE '\\'")
+        params.append("%" + term + "%")
+    return where, params
+
+
+@bp.get("")
+def list_products():
+    """List active products.
+
+    Query: page, limit, q (name search without accents), sort (featured, newest, price_asc, price_desc, discount),
+    and filters that combine with AND: category, collection (comma separated ids), material (10K, 14K, ...),
+    color (gold colors such as "Vàng Trắng"), minPrice, maxPrice (VND), onSale=1 (only discounted products).
+    """
+    page = page_number(request.args.get("page"), 1)
+    limit = page_number(request.args.get("limit"), DEFAULT_LIMIT)
+    sort = request.args.get("sort", "featured")
+    if not page or not limit or sort not in SORTS:
+        return jsonify(error="Invalid query parameter"), 400
+    limit = min(limit, MAX_LIMIT)
+    try:
+        where, params = _filters(request.args)
+    except ValueError as bad:
+        return jsonify(error=f"Invalid query parameter: {bad}"), 400
     clause = " AND ".join(where)
 
-    total = query(f"SELECT COUNT(*) AS n FROM dbo.vw_ProductCatalog WHERE {clause}", tuple(params))[0]["n"]
+    total = query(f"SELECT COUNT(*) AS n FROM dbo.vw_ProductCatalog c WHERE {clause}", tuple(params))[0]["n"]
     items = query(
-        f"SELECT * FROM dbo.vw_ProductCatalog WHERE {clause} "
-        "ORDER BY ProductID OFFSET ? ROWS FETCH NEXT ? ROWS ONLY",
+        f"SELECT c.* FROM dbo.vw_ProductCatalog c JOIN dbo.Products p ON p.ProductID = c.ProductID "
+        f"WHERE {clause} ORDER BY {SORTS[sort]} OFFSET ? ROWS FETCH NEXT ? ROWS ONLY",
         tuple(params) + ((page - 1) * limit, limit),
     )
     return jsonify(total=total, page=page, limit=limit, items=items)

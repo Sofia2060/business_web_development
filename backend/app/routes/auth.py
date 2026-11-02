@@ -4,7 +4,7 @@ import re
 import pyodbc
 from flask import Blueprint, jsonify, session
 
-from ..auth import MAX_PASSWORD_BYTES, check_password, current_user, hash_password
+from ..auth import MAX_PASSWORD_BYTES, check_password, current_user, hash_password, login_required
 from ..db import query, transaction
 from ..validation import body, text, utf16_len
 
@@ -85,6 +85,26 @@ def login():
 @bp.post("/logout")
 def logout():
     session.clear()
+    return "", 204
+
+
+@bp.post("/change-password")
+@login_required
+def change_password():
+    """Body: {"currentPassword", "newPassword"}. Works for customers and admins. The login stays active."""
+    data = body()
+    current, new = text(data, "currentPassword"), text(data, "newPassword")
+    if not current or new is None:
+        return jsonify(error="currentPassword and newPassword are required"), 400
+    if len(new) < MIN_PASSWORD or len(new.encode()) > MAX_PASSWORD_BYTES:
+        return jsonify(error=f"Password must be {MIN_PASSWORD} to {MAX_PASSWORD_BYTES} bytes"), 400
+    user_id = current_user()["UserID"]
+    stored = query("SELECT PasswordHash FROM dbo.Users WHERE UserID = ?", (user_id,))[0]["PasswordHash"]
+    if not check_password(current, stored):
+        return jsonify(error="Current password is wrong"), 403
+    with transaction() as cur:
+        cur.execute("UPDATE dbo.Users SET PasswordHash = ?, UpdatedAt = SYSDATETIME() WHERE UserID = ?",
+                    (hash_password(new), user_id))
     return "", 204
 
 
