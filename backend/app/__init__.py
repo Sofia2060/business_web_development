@@ -7,7 +7,7 @@ from flask import Flask, jsonify, request
 from werkzeug.exceptions import HTTPException
 
 from .config import FRONTEND_DIR
-from .db import ProcError
+from .db import LockBusy, ProcError, call
 
 # The only parts of frontend/ that browsers may fetch.
 PUBLIC_PREFIXES = ("/src/", "/public/", "/mock-data/")
@@ -23,7 +23,10 @@ PROC_ERROR_STATUS = {
     50038: 409,                          # online order is not paid yet, cannot be confirmed
     50041: 409, 50043: 409,              # payment: transaction id already used, amount does not match
     50048: 409,                          # checkout token belongs to another customer
-    50029: 403,                          # order is above 5,000,000 VND: cancel by phone, not on the website
+    50029: 403,                          # cannot cancel on the website (2,000,000 VND or more, or engraved): call the hotline
+    50049: 409,                          # order is being crafted: nobody can cancel it
+    50050: 409,                          # payment for an order that is cancelled or past the payment time limit
+    50051: 409,                          # production can only start on a confirmed order
 }
 
 
@@ -49,6 +52,16 @@ def create_app() -> Flask:
         if request.endpoint == "static" and not posixpath.normpath(request.path).startswith(PUBLIC_PREFIXES):
             return jsonify(error="Not found"), 404
 
+    @app.before_request
+    def expire_unpaid_orders():
+        # An online order that is not paid within 15 minutes has failed: cancel it and return the stock and the voucher.
+        # Doing it before each API call means no timer is needed, and the check is cheap when nothing is overdue.
+        if request.path.startswith("/api/"):
+            try:
+                call("EXEC dbo.sp_ExpireUnpaidOrders")
+            except (pyodbc.Error, ProcError):    # a failed check must not stop everyone from using the shop
+                app.logger.exception("Could not cancel the overdue unpaid orders")
+
     @app.get("/")
     def home():
         return app.send_static_file("index.html")  # redirects to the client home page
@@ -64,6 +77,10 @@ def create_app() -> Flask:
     def handle_proc_error(error: ProcError):
         return jsonify(error=error.message, code=error.code), PROC_ERROR_STATUS.get(error.code, 400)
 
+    @app.errorhandler(LockBusy)
+    def handle_busy(error):
+        return jsonify(error="Another request for the same customer is still running. Please try again."), 409
+
     @app.errorhandler(pyodbc.IntegrityError)
     def handle_conflict(error):
         # A database rule was broken, usually because two requests ran at the same moment
@@ -76,7 +93,7 @@ def create_app() -> Flask:
         app.logger.exception("Database error")
         return jsonify(error="Database error. Please try again."), 500
 
-    from .routes import addresses, admin, auth, cart, orders, products
-    for module in (products, auth, admin, addresses, cart, orders):
+    from .routes import addresses, admin, auth, cart, catalog, orders, products, profile, recently_viewed, vouchers
+    for module in (products, catalog, auth, profile, admin, addresses, cart, vouchers, orders, recently_viewed):
         app.register_blueprint(module.bp)
     return app

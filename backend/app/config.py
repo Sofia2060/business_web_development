@@ -25,6 +25,10 @@ def db_connection_string() -> str:
     return ";".join(parts)
 
 
+# Demo only: the shop sends no SMS, so the code that "proves" a phone number is always this one.
+# A real system would send a random code to the phone.
+DEMO_OTP = "123456"
+
 # Shipping rule, copied from frontend/mock-data/config.json ("giaoHang"):
 # standard delivery costs 30,000 VND and is free for orders of 2,000,000 VND or more.
 STANDARD_SHIPPING_FEE = 30_000

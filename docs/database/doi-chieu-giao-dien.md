@@ -1,0 +1,56 @@
+# Đối chiếu giao diện và database
+
+File này ghi các mã, trạng thái và quy tắc khác nhau giữa giao diện (`frontend/`) và database (`database/`). Khi nối giao diện vào API (lớp `VN.api`), phần đổi mã nằm một chỗ ở lớp này, không rải trong từng trang.
+
+## 1. Mã và giá trị phải đổi qua lại
+
+| Giao diện | Database và API | Ghi chú |
+|---|---|---|
+| Phương thức thanh toán `COD`, `BANK`, `VNPAY`, `MOMO` | `COD`, `BankTransfer`, `VNPay`, `MoMo` | Gửi sang API bằng tên bên phải |
+| Kiểu chữ khắc `co-dien`, `hien-dai`, `viet-tay` | `Classic`, `Modern`, `Handwritten` | Trường `engravingStyle`. Không gửi thì mặc định `Classic`. Chữ khắc tối đa 15 ký tự |
+| Loại giá `co_dinh`, `gia_cong` | `Fixed`, `GoldRate` (cột `PricingMethod`) | Xem mục 2 |
+| `ma`, `danhMuc`, `boSuuTap`, `chatLieu` | `SKU`, `CategoryID`, `CollectionID`, `Material` | API trả theo tên cột của database |
+| `gia`, `giaCu` | `CurrentPrice`, `OriginalPrice` | `giaCu` có khi sản phẩm đang giảm giá |
+| `canChonSize` | `RequiresRingSize` | |
+| Một dòng giỏ gồm `ma` + `mau` + `size` | `variantSku` | Lấy từ danh sách `variants` của `GET /api/products/<sku>` (có `GoldColor`, `RingSize`, `StockQuantity`) |
+| Mã đơn `VNR` + ngày + 4 ký tự | `VN` + ngày + 6 số, ví dụ `VN261102000017` | Giao diện chỉ hiển thị, không tách mã |
+| Mã thẻ bảo hành `VNRA` + tháng + 8 ký tự | `VNW` + tháng + 7 số + `-` + số thứ tự đơn vị | Hàm `soTheDep`, `soChungNhan` chỉ định dạng được mã `VNRA…`, cần sửa hoặc bỏ |
+
+## 2. Quy tắc đã chốt
+
+1. **22 sản phẩm giá theo giá vàng chỉ báo giá, không bán online.** Đó là 21 mặt dây chuyền và 1 bông tai vàng 24K hoặc 22K. Database đánh dấu `Products.IsQuoteOnly = 1`.
+   - API trả `IsQuoteOnly: true` và `CurrentPrice: null` cho các sản phẩm này. Danh sách và trang chi tiết vẫn có (ảnh, màu, size, trọng lượng).
+   - Bộ lọc giá và `onSale` không khớp chúng. Khi sắp xếp theo giá chúng luôn nằm cuối. Giao diện đã làm đúng như vậy (`coTheMua`, giá rỗng xếp cuối), nên chỉ cần lấy `coTheMua = !IsQuoteOnly` từ API thay cho `loaiGia !== 'gia_cong'`.
+   - Thêm vào giỏ hoặc đặt hàng sản phẩm này: API trả 409 với `reason: quote_only`. Database cũng chặn (lỗi 50014).
+   - Giao diện giữ nút "Nhận báo giá" và "Gọi hotline". Số trong `products.json` của 22 sản phẩm này là tiền công, không hiển thị như giá bán. Giá cũ giảm 10% của `MDZ076`, `MDZ081`, `MDZ091` cũng bỏ.
+   - Bảng giá vàng (`GoldPrices`) vẫn dùng để nhân viên báo giá. Muốn bán online lại: đặt `IsQuoteOnly = 0`, giá tự tính theo giá vàng.
+
+## 3. Trạng thái
+
+| Đối tượng | Giao diện | Database | Cách xử lý |
+|---|---|---|---|
+| Đơn hàng | `Pending`, `Shipping`, `Delivered`, `Cancelled` | Thêm `Confirmed` giữa `Pending` và `Shipping` | Giao diện thêm nhãn "Đã xác nhận". Nút "Xác nhận và giao" của admin gọi `Confirmed` rồi `Shipping`. Khách hủy được ở cả `Pending` và `Confirmed` |
+| Thanh toán | `Pending`, `Success`, `Failed`, `Expired`, `RefundPending`, `Refunded` | `Pending`, `Success`, `Failed`, `Expired`, `Refunded` | `Expired` đã có (đơn quá 15 phút chưa trả). `RefundPending` chưa có, xem file `database/README.md` mục 11 |
+| Lịch hẹn | `Pending`, `Confirmed`, `Completed`, `Cancelled` | Thêm `Rescheduled` (cửa hàng đề xuất giờ khác với giờ khách chọn) | Giao diện thêm nhãn "Đã đổi giờ" |
+| Dịch vụ hậu mãi | `Cleaning`, `Polishing`, `Resizing` (hiển thị "Đánh bóng và xi mới" chung) | `Cleaning`, `Polishing`, `Replating`, `Resizing` | `Replating` hiện chung nhóm "Đánh bóng và xi mới". Các quyền lợi `CZ`, `Stone`, `Moissanite`, `Repair` không đặt lịch nên không có trong database |
+| Màu | `Vàng Vàng`, `Vàng Trắng`, `Vàng Hồng`, nhóm `Bạc` | Thêm `Bạc Trắng`, `Bạc Vàng` (nhóm `Bạc` gồm hai màu này) | Sản phẩm `BTPTB418` ghi màu "Bạc Hồng" trong file giao diện, database không có màu cho biến thể này |
+
+## 4. Giới hạn khác nhau (giao diện chặt hơn, giữ nguyên)
+
+| Nội dung | Giao diện | Database và API |
+|---|---|---|
+| Số lượng mỗi dòng | 5 | 10 |
+| Đặt lịch hậu mãi | Tối đa 30 ngày tới, theo khung giờ | Trong 1 năm, giờ bất kỳ |
+| Mật khẩu | 8 ký tự trở lên, có chữ hoa, chữ thường, số | 8 đến 72 byte |
+| Size nhẫn | 6 đến 24 | Biến thể có size 6 đến 20 (bảng quy đổi 5 đến 25) |
+
+Size 21 đến 24 và tồn kho là hai chỗ giao diện phải xử lý thêm: API trả 404 khi chọn size không có biến thể, trả 409 khi hết hàng.
+
+## 5. Chưa có trong database
+
+- Lưu yêu cầu báo giá: form liên hệ (`Nhận báo giá`) hiện chỉ lưu trong trình duyệt (khóa `lienHe`), cửa hàng không nhận được. Cần bảng và API nhận yêu cầu liên hệ.
+- Ngày tạo thật của từng sản phẩm: cả 443 sản phẩm cùng một `CreatedAt`, nên sắp xếp "mới nhất" của API khác giao diện (giao diện có 48 ngày `ngayTao` khác nhau).
+- Danh sách yêu thích, phản ánh đơn hàng kèm ảnh, phản hồi của cửa hàng cho đánh giá.
+- Phương thức giao hàng (hỏa tốc 60.000 đ), mã miễn phí giao `FREESHIP`, gói quà.
+- Hoàn tiền hai bước (`RefundPending`) và tài khoản ngân hàng nhận hoàn.
+- Gắn đơn vãng lai vào tài khoản đã có (hiện chỉ gắn lúc đăng ký).

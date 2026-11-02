@@ -9,6 +9,10 @@ import pyodbc
 from .config import db_connection_string
 
 
+class LockBusy(Exception):
+    """Another request holds the lock this request needs and did not let go in time. The caller can try again."""
+
+
 class ProcError(Exception):
     """A business rule error raised by a stored procedure with THROW (error numbers 50000 and up).
     `message` is the Vietnamese text written in the procedure, safe to show to the user."""
@@ -22,6 +26,9 @@ class ProcError(Exception):
 # pyodbc error text looks like: "... [SQL Server]Giỏ hàng đang trống. (50012) (SQLExecDirectW)".
 # The trailing "(SQL...)" is part of the pattern so other messages that happen to contain "(5xxxx)" do not match.
 _PROC_ERROR = re.compile(r"\[SQL Server\](.*?) \((5\d{4})\) \(SQL\w+\)", re.S)
+# SQL Server error 1205: "Transaction ... was deadlocked ... chosen as the deadlock victim. Rerun the transaction."
+_DEADLOCK = re.compile(r"\(1205\) \(SQL\w+\)")
+DEADLOCK_TRIES = 3
 
 
 def _connect(autocommit: bool = False):
@@ -29,6 +36,31 @@ def _connect(autocommit: bool = False):
     conn = pyodbc.connect(db_connection_string(), timeout=5, autocommit=autocommit)
     conn.timeout = 30
     return conn
+
+
+@contextmanager
+def named_lock(name: str, wait_ms: int = 10_000):
+    """Hold a SQL Server application lock while the block runs, so two requests for the same thing
+    (for example two orders from the same phone number) run one after the other instead of at the same time.
+    The lock belongs to a connection kept open for the block. It is released by name, because closing a pooled
+    connection only gives it back to the pool and the session (with its lock) stays alive."""
+    conn = _connect(autocommit=True)
+    held = False
+    try:
+        got = conn.cursor().execute(
+            "SET NOCOUNT ON; DECLARE @r INT; "
+            "EXEC @r = sp_getapplock @Resource = ?, @LockMode = 'Exclusive', @LockOwner = 'Session', @LockTimeout = ?; "
+            "SELECT @r;", (name, wait_ms)).fetchval()
+        if got < 0:
+            raise LockBusy(name)
+        held = True
+        yield
+    finally:
+        try:
+            if held:
+                conn.cursor().execute("EXEC sp_releaseapplock @Resource = ?, @LockOwner = 'Session'", (name,))
+        finally:
+            conn.close()
 
 
 def _clean(value):
@@ -74,7 +106,19 @@ def call(sql: str, params: tuple = (), actor: tuple[int, str] | None = None) -> 
     The procedures open and commit their own transactions, so this uses autocommit.
     `actor` is (user id, label) and goes into the session context, which the procedures
     and triggers write to AuditLogs. A THROW from a procedure becomes ProcError.
+    When SQL Server picks this request as the victim of a deadlock (two requests waiting for each other),
+    its transaction is rolled back completely, so the call is simply run again (up to 3 tries).
     """
+    for attempt in range(DEADLOCK_TRIES):
+        try:
+            return _call_once(sql, params, actor)
+        except pyodbc.Error as exc:
+            if attempt == DEADLOCK_TRIES - 1 or not _DEADLOCK.search(str(exc)):
+                raise
+    raise AssertionError("unreachable")
+
+
+def _call_once(sql: str, params: tuple, actor: tuple[int, str] | None) -> list[dict]:
     with closing(_connect(autocommit=True)) as conn:
         cursor = conn.cursor()
         try:

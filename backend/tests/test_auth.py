@@ -6,11 +6,12 @@ from app.db import query
 from conftest import PASSWORD, make_user
 
 EMAIL = "pytest-user@example.test"
+PHONE = "0999000111"    # not used by any sample customer (the phone is the customer id, so it is unique)
 ADMIN = "pytest-admin@example.test"
 
 
 def register(client, **overrides):
-    body = {"fullName": "Nguyễn Test", "email": EMAIL, "password": PASSWORD, "phone": "0901234567"}
+    body = {"fullName": "Nguyễn Test", "email": EMAIL, "password": PASSWORD, "phone": PHONE}
     body.update(overrides)
     return client.post("/api/auth/register", json=body)
 
@@ -28,7 +29,7 @@ def test_register_creates_customer_and_logs_in(client, clean_users):
     assert client.get("/api/auth/me").get_json()["email"] == EMAIL
     row = query("SELECT c.Phone FROM dbo.Customers c JOIN dbo.Users u ON u.UserID = c.UserID WHERE u.Email = ?",
                 (EMAIL,))
-    assert row[0]["Phone"] == "0901234567"
+    assert row[0]["Phone"] == PHONE
 
 
 def test_register_stores_a_bcrypt_hash_and_never_returns_it(client, clean_users):

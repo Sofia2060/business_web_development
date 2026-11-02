@@ -81,22 +81,31 @@ CREATE TABLE dbo.RingSizeChart (
 );
 GO
 
--- (3) Customers: hồ sơ khách hàng, quan hệ 1-1 với Users (FR3)
+-- (3) Customers: hồ sơ khách hàng (FR3)
+--     Khách có tài khoản: UserID trỏ tới Users (quan hệ 1-1).
+--     Khách vãng lai (đặt hàng không cần tài khoản): UserID = NULL, nhận diện bằng số điện thoại.
+--     Số điện thoại là mã khách hàng nên không trùng giữa hai khách. Khi khách vãng lai đăng ký tài khoản
+--     bằng đúng số đó, backend gán UserID cho dòng này, nên đơn hàng, thẻ bảo hành cũ tự thuộc về tài khoản.
 CREATE TABLE dbo.Customers (
     CustomerID       INT IDENTITY(1,1) NOT NULL,
-    UserID           INT               NOT NULL,
+    UserID           INT               NULL,
     Phone            VARCHAR(15)       NULL,
     DateOfBirth      DATE              NULL,
     DefaultRingSize  TINYINT           NULL,               -- size nhẫn mặc định của khách
     CreatedAt        DATETIME2(0)      NOT NULL CONSTRAINT DF_Customers_CreatedAt DEFAULT (SYSDATETIME()),
     UpdatedAt        DATETIME2(0)      NULL,
     CONSTRAINT PK_Customers PRIMARY KEY (CustomerID),
-    CONSTRAINT UQ_Customers_User UNIQUE (UserID),          -- đảm bảo quan hệ 1-1
     CONSTRAINT FK_Customers_Users FOREIGN KEY (UserID) REFERENCES dbo.Users(UserID),
     CONSTRAINT FK_Customers_RingSize FOREIGN KEY (DefaultRingSize) REFERENCES dbo.RingSizeChart(SizeVN),
     CONSTRAINT CK_Customers_Phone CHECK (Phone IS NULL OR (LEN(Phone) BETWEEN 9 AND 15 AND Phone NOT LIKE '%[^0-9+]%')),
-    CONSTRAINT CK_Customers_DOB CHECK (DateOfBirth IS NULL OR DateOfBirth < CAST(GETDATE() AS DATE))
+    CONSTRAINT CK_Customers_DOB CHECK (DateOfBirth IS NULL OR DateOfBirth < CAST(GETDATE() AS DATE)),
+    CONSTRAINT CK_Customers_Identity CHECK (UserID IS NOT NULL OR Phone IS NOT NULL)   -- khách vãng lai bắt buộc có số điện thoại
 );
+GO
+-- Một tài khoản chỉ có một hồ sơ khách (quan hệ 1-1); nhiều khách vãng lai có UserID NULL nên dùng chỉ mục lọc
+CREATE UNIQUE INDEX UX_Customers_User  ON dbo.Customers(UserID) WHERE UserID IS NOT NULL;
+-- Số điện thoại là mã khách hàng
+CREATE UNIQUE INDEX UX_Customers_Phone ON dbo.Customers(Phone)  WHERE Phone IS NOT NULL;
 GO
 
 -- (4) CustomerAddresses: sổ địa chỉ nhận hàng, một khách có nhiều địa chỉ (FR3, FR10)
@@ -189,6 +198,7 @@ CREATE TABLE dbo.Products (
     OriginalPrice     DECIMAL(15,0)     NULL,              -- giá gốc trước khuyến mãi
     Description       NVARCHAR(MAX)     NULL,
     IsEngravable      BIT               NOT NULL CONSTRAINT DF_Products_IsEngravable DEFAULT (0), -- hỗ trợ khắc tên laser
+    IsQuoteOnly       BIT               NOT NULL CONSTRAINT DF_Products_IsQuoteOnly DEFAULT (0),  -- 1 = không bán online, khách liên hệ để được báo giá (sản phẩm giá theo giá vàng ngày)
     Status            VARCHAR(15)       NOT NULL CONSTRAINT DF_Products_Status DEFAULT ('Active'),
     CreatedAt         DATETIME2(0)      NOT NULL CONSTRAINT DF_Products_CreatedAt DEFAULT (SYSDATETIME()),
     UpdatedAt         DATETIME2(0)      NULL,
@@ -339,14 +349,16 @@ CREATE TABLE dbo.CartItems (
     CustomerID     INT               NOT NULL,
     VariantID      INT               NOT NULL,
     Quantity       SMALLINT          NOT NULL,
-    EngravingText  NVARCHAR(30)      NULL,
+    EngravingText  NVARCHAR(15)      NULL,                 -- chữ khắc, tối đa 15 ký tự (cùng giới hạn với giao diện)
+    EngravingStyle VARCHAR(12)       NULL,                 -- kiểu chữ: Classic (cổ điển), Modern (hiện đại), Handwritten (viết tay); NULL = không khắc
     AddedAt        DATETIME2(0)      NOT NULL CONSTRAINT DF_CartItems_AddedAt DEFAULT (SYSDATETIME()),
     UpdatedAt      DATETIME2(0)      NULL,
     CONSTRAINT PK_CartItems PRIMARY KEY (CartItemID),
-    CONSTRAINT UQ_CartItems_Line UNIQUE (CustomerID, VariantID, EngravingText),
+    CONSTRAINT UQ_CartItems_Line UNIQUE (CustomerID, VariantID, EngravingText, EngravingStyle),
     CONSTRAINT FK_CartItems_Customers FOREIGN KEY (CustomerID) REFERENCES dbo.Customers(CustomerID) ON DELETE CASCADE,
     CONSTRAINT FK_CartItems_Variants FOREIGN KEY (VariantID) REFERENCES dbo.ProductVariants(VariantID),
-    CONSTRAINT CK_CartItems_Qty CHECK (Quantity BETWEEN 1 AND 10)
+    CONSTRAINT CK_CartItems_Qty CHECK (Quantity BETWEEN 1 AND 10),
+    CONSTRAINT CK_CartItems_Style CHECK (EngravingStyle IS NULL OR (EngravingText IS NOT NULL AND EngravingStyle IN ('Classic', 'Modern', 'Handwritten')))
 );
 GO
 
@@ -392,6 +404,7 @@ CREATE TABLE dbo.Orders (
     ShippedAt                DATETIME2(0)      NULL,
     DeliveredAt              DATETIME2(0)      NULL,
     CancelledAt              DATETIME2(0)      NULL,
+    ProductionStartedAt      DATETIME2(0)      NULL,       -- admin đánh dấu đã bắt đầu chế tác: từ lúc này đơn không hủy được
     UpdatedAt                DATETIME2(0)      NULL,
     CONSTRAINT PK_Orders PRIMARY KEY (OrderID),
     CONSTRAINT UQ_Orders_Code UNIQUE (OrderCode),
@@ -417,7 +430,8 @@ CREATE TABLE dbo.OrderItems (
     MaterialSnap     VARCHAR(10)       NOT NULL,           -- tuổi vàng lúc mua (thống kê doanh thu theo nhóm vàng)
     GoldColor        NVARCHAR(20)      NULL,
     RingSize         TINYINT           NULL,
-    EngravingText    NVARCHAR(30)      NULL,
+    EngravingText    NVARCHAR(15)      NULL,
+    EngravingStyle   VARCHAR(12)       NULL,               -- kiểu chữ khắc, cho nhân viên chế tác: Classic, Modern, Handwritten
     Quantity         SMALLINT          NOT NULL,
     UnitPrice        DECIMAL(15,0)     NOT NULL,           -- đơn giá đã kiểm tra lại khi tạo đơn
     LineTotal        AS (CAST(Quantity * UnitPrice AS DECIMAL(15,0))) PERSISTED,
@@ -430,7 +444,8 @@ CREATE TABLE dbo.OrderItems (
     CONSTRAINT FK_OrderItems_RingSize FOREIGN KEY (RingSize) REFERENCES dbo.RingSizeChart(SizeVN),
     CONSTRAINT CK_OrderItems_Qty CHECK (Quantity BETWEEN 1 AND 10),
     CONSTRAINT CK_OrderItems_Price CHECK (UnitPrice >= 0),
-    CONSTRAINT CK_OrderItems_Material CHECK (MaterialSnap IN ('10K', '14K', '18K', '22K', '24K', 'BAC925'))
+    CONSTRAINT CK_OrderItems_Material CHECK (MaterialSnap IN ('10K', '14K', '18K', '22K', '24K', 'BAC925')),
+    CONSTRAINT CK_OrderItems_Style CHECK (EngravingStyle IS NULL OR (EngravingText IS NOT NULL AND EngravingStyle IN ('Classic', 'Modern', 'Handwritten')))
 );
 GO
 
@@ -449,7 +464,7 @@ CREATE TABLE dbo.Payments (
     CONSTRAINT PK_Payments PRIMARY KEY (PaymentID),
     CONSTRAINT FK_Payments_Orders FOREIGN KEY (OrderID) REFERENCES dbo.Orders(OrderID),
     CONSTRAINT CK_Payments_Method CHECK (PaymentMethod IN ('COD', 'BankTransfer', 'VNPay', 'MoMo')),
-    CONSTRAINT CK_Payments_Status CHECK (Status IN ('Pending', 'Success', 'Failed', 'Refunded')),
+    CONSTRAINT CK_Payments_Status CHECK (Status IN ('Pending', 'Success', 'Failed', 'Expired', 'Refunded')),   -- Expired: quá hạn thanh toán, đơn bị hủy
     CONSTRAINT CK_Payments_Amount CHECK (Amount >= 0),
     CONSTRAINT CK_Payments_PaidAt CHECK (Status <> 'Success' OR PaidAt IS NOT NULL)
 );
@@ -611,6 +626,7 @@ CREATE INDEX IX_Orders_Status           ON dbo.Orders(OrderStatus, DeliveredAt);
 CREATE INDEX IX_OrderItems_Order        ON dbo.OrderItems(OrderID);
 CREATE INDEX IX_OrderItems_Variant      ON dbo.OrderItems(VariantID);
 CREATE INDEX IX_Payments_Order          ON dbo.Payments(OrderID, Status);
+CREATE INDEX IX_Payments_Pending        ON dbo.Payments(CreatedAt) INCLUDE (OrderID, PaymentMethod) WHERE Status = 'Pending';  -- quét đơn quá hạn
 CREATE INDEX IX_Warranty_Customer       ON dbo.WarrantyRecords(CustomerID);
 CREATE INDEX IX_Warranty_Order          ON dbo.WarrantyRecords(OrderID);
 CREATE INDEX IX_CustomerAddresses_Cust  ON dbo.CustomerAddresses(CustomerID);
@@ -634,7 +650,8 @@ AS
 BEGIN
     DECLARE @Price DECIMAL(15,0);
     SELECT @Price =
-        CASE WHEN p.PricingMethod = 'Fixed' THEN p.Price
+        CASE WHEN p.IsQuoteOnly = 1 THEN NULL          -- chỉ báo giá: không có giá bán online
+             WHEN p.PricingMethod = 'Fixed' THEN p.Price
              ELSE CAST(ROUND(p.WeightGram / 3.75 * gp.SellPricePerChi + ISNULL(p.LaborPrice, 0), -3) AS DECIMAL(15,0))
         END
     FROM dbo.Products p
@@ -643,7 +660,7 @@ BEGIN
                  WHERE g.Material = p.Material AND g.EffectiveFrom <= SYSDATETIME()
                  ORDER BY g.EffectiveFrom DESC) gp
     WHERE p.ProductID = @ProductID;
-    RETURN @Price;   -- NULL nếu sản phẩm tính theo giá vàng nhưng chưa có bảng giá
+    RETURN @Price;   -- NULL nếu sản phẩm chỉ báo giá, hoặc tính theo giá vàng nhưng chưa có bảng giá
 END
 GO
 
@@ -656,13 +673,33 @@ BEGIN
 END
 GO
 
--- 3.2b. Ngưỡng giá trị đơn được tự hủy trên web; đơn lớn hơn phải gọi hotline (BRD5, FR13, NFR7)
---       Đổi chính sách: chỉ cần sửa một con số tại đây.
+-- 3.2b. Quy tắc hủy đơn trên web (BRD5, FR13, NFR7). Đổi chính sách: chỉ cần sửa tại các hàm này.
+--       Khách chỉ tự hủy được đơn có tổng thanh toán DƯỚI ngưỡng này và KHÔNG có sản phẩm khắc chữ.
+--       Đơn từ ngưỡng trở lên hoặc có khắc chữ: khách gọi hotline, nhân viên hỏi tình hình chế tác.
+--       Đơn đã bắt đầu chế tác (Orders.ProductionStartedAt) thì không ai hủy được.
 CREATE OR ALTER FUNCTION dbo.fn_OnlineCancelLimit ()
 RETURNS DECIMAL(15,0)
 AS
 BEGIN
-    RETURN 5000000;
+    RETURN 2000000;
+END
+GO
+
+-- Số hotline hiện trong thông báo "gọi hotline để hủy đơn" (cùng số với frontend/mock-data/config.json)
+CREATE OR ALTER FUNCTION dbo.fn_HotlineNumber ()
+RETURNS NVARCHAR(30)
+AS
+BEGIN
+    RETURN N'1900 0000';
+END
+GO
+
+-- Đơn trả trực tuyến (VNPay, MoMo, chuyển khoản) phải thanh toán trong số phút này, quá hạn coi như đặt hàng thất bại
+CREATE OR ALTER FUNCTION dbo.fn_PaymentTimeoutMinutes ()
+RETURNS INT
+AS
+BEGIN
+    RETURN 15;
 END
 GO
 
@@ -841,12 +878,12 @@ BEGIN
 
         DECLARE @Items TABLE (
             CartItemID INT PRIMARY KEY, VariantID INT, ProductID INT, Quantity SMALLINT,
-            EngravingText NVARCHAR(30), UnitPrice DECIMAL(15,0), ProductName NVARCHAR(200),
+            EngravingText NVARCHAR(15), EngravingStyle VARCHAR(12), UnitPrice DECIMAL(15,0), ProductName NVARCHAR(200),
             VariantSKU VARCHAR(60), Material VARCHAR(10), GoldColor NVARCHAR(20), RingSize TINYINT,
             ProductStatus VARCHAR(15), VariantActive BIT);
 
         INSERT INTO @Items
-        SELECT ci.CartItemID, v.VariantID, p.ProductID, ci.Quantity, ci.EngravingText,
+        SELECT ci.CartItemID, v.VariantID, p.ProductID, ci.Quantity, ci.EngravingText, ci.EngravingStyle,
                dbo.fn_GetCurrentPrice(p.ProductID), p.ProductName, v.VariantSKU, p.Material,
                v.GoldColor, v.RingSize, p.Status, v.IsActive
         FROM dbo.CartItems ci
@@ -859,7 +896,7 @@ BEGIN
         IF EXISTS (SELECT 1 FROM @Items WHERE ProductStatus <> 'Active' OR VariantActive = 0)
             THROW 50013, N'Có sản phẩm trong giỏ đã ngừng bán.', 1;
         IF EXISTS (SELECT 1 FROM @Items WHERE UnitPrice IS NULL)
-            THROW 50014, N'Chưa xác định được giá bán của sản phẩm (thiếu bảng giá vàng).', 1;
+            THROW 50014, N'Có sản phẩm chưa có giá bán online (chỉ báo giá hoặc thiếu bảng giá vàng). Vui lòng liên hệ cửa hàng.', 1;
         IF EXISTS (SELECT 1
                    FROM (SELECT VariantID, SUM(Quantity) AS Qty FROM @Items GROUP BY VariantID) x
                    JOIN dbo.ProductVariants v ON v.VariantID = x.VariantID
@@ -898,9 +935,9 @@ BEGIN
         SET @OrderID = SCOPE_IDENTITY();
 
         INSERT INTO dbo.OrderItems (OrderID, ProductID, VariantID, ProductNameSnap, SKUSnap, MaterialSnap,
-                                    GoldColor, RingSize, EngravingText, Quantity, UnitPrice)
+                                    GoldColor, RingSize, EngravingText, EngravingStyle, Quantity, UnitPrice)
         SELECT @OrderID, ProductID, VariantID, ProductName, VariantSKU, Material,
-               GoldColor, RingSize, EngravingText, Quantity, UnitPrice
+               GoldColor, RingSize, EngravingText, EngravingStyle, Quantity, UnitPrice
         FROM @Items;
 
         -- Trừ tồn kho (CHECK StockQuantity >= 0 bảo vệ thêm một lớp)
@@ -935,7 +972,57 @@ BEGIN
 END
 GO
 
+-- 3.8a. Hủy các đơn trả trực tuyến quá hạn thanh toán (fn_PaymentTimeoutMinutes() phút kể từ lúc đặt):
+--       đơn bị hủy, tồn kho được hoàn lại, mã giảm giá được trả lượt (đặt hàng thất bại, khách chưa dùng voucher).
+--       Backend gọi thủ tục này thường xuyên; sp_RecordPaymentResult cũng gọi trước khi ghi nhận tiền về.
+CREATE OR ALTER PROCEDURE dbo.sp_ExpireUnpaidOrders
+    @Expired INT = NULL OUTPUT       -- số đơn vừa bị hủy
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+    DECLARE @Cutoff DATETIME2(0) = DATEADD(MINUTE, -dbo.fn_PaymentTimeoutMinutes(), SYSDATETIME());
+    DECLARE @OrderID INT = 0, @Reason NVARCHAR(500) =
+        CONCAT(N'Quá ', dbo.fn_PaymentTimeoutMinutes(), N' phút chưa thanh toán, đặt hàng thất bại');
+    SET @Expired = 0;
+
+    WHILE 1 = 1
+    BEGIN
+        SELECT @OrderID = MIN(o.OrderID)
+        FROM dbo.Orders o
+        WHERE o.OrderID > @OrderID AND o.OrderStatus = 'Pending'
+          AND EXISTS (SELECT 1 FROM dbo.Payments p
+                      WHERE p.OrderID = o.OrderID AND p.PaymentMethod <> 'COD' AND p.Status = 'Pending' AND p.CreatedAt <= @Cutoff);
+        IF @OrderID IS NULL BREAK;
+
+        BEGIN TRY
+            BEGIN TRANSACTION;
+            -- Khóa dòng đơn rồi kiểm tra lại: thanh toán có thể vừa thành công (sp_RecordPaymentResult cũng khóa dòng này trước)
+            IF EXISTS (SELECT 1 FROM dbo.Orders WITH (UPDLOCK) WHERE OrderID = @OrderID AND OrderStatus = 'Pending')
+               AND NOT EXISTS (SELECT 1 FROM dbo.Payments WHERE OrderID = @OrderID AND Status = 'Success')
+            BEGIN
+                EXEC dbo.usp_CancelOrderInternal @OrderID = @OrderID, @Reason = @Reason;
+                -- Lần thanh toán đang chờ vừa bị đánh dấu Failed: đổi thành Expired để phân biệt với thanh toán lỗi thật (có mã giao dịch)
+                UPDATE dbo.Payments SET Status = 'Expired' WHERE OrderID = @OrderID AND Status = 'Failed' AND TransactionID IS NULL;
+                UPDATE v SET v.UsedCount = v.UsedCount - 1
+                FROM dbo.Vouchers v JOIN dbo.Orders o ON o.VoucherID = v.VoucherID
+                WHERE o.OrderID = @OrderID AND v.UsedCount > 0;
+                INSERT INTO dbo.AuditLogs (EntityName, EntityID, Action, OldValue, NewValue, PerformedByUserID, PerformedBy)
+                VALUES ('Orders', @OrderID, 'PaymentExpired', 'Pending', 'Cancelled', NULL, N'System:PaymentTimeout');
+                SET @Expired += 1;
+            END
+            COMMIT TRANSACTION;
+        END TRY
+        BEGIN CATCH
+            IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+            THROW;
+        END CATCH
+    END
+END
+GO
+
 -- 3.8. Ghi nhận kết quả thanh toán từ cổng (sandbox) đã được xác thực chữ ký (FR11, NFR5)
+--      Thanh toán mô phỏng hoàn toàn: backend tự sinh mã giao dịch. Đơn đã bị hủy hoặc quá hạn thì báo lỗi 50050.
 CREATE OR ALTER PROCEDURE dbo.sp_RecordPaymentResult
     @PaymentID      INT,
     @IsSuccess      BIT,
@@ -946,6 +1033,8 @@ AS
 BEGIN
     SET NOCOUNT ON;
     SET XACT_ABORT ON;
+    -- Đơn quá hạn bị hủy trước, để tiền về muộn không được ghi vào đơn đã thất bại
+    EXEC dbo.sp_ExpireUnpaidOrders;
     -- Callback gửi lặp (cùng mã giao dịch, cùng PaymentID) -> bỏ qua.
     -- Mã giao dịch đã gắn với một thanh toán KHÁC -> báo lỗi, không bỏ qua âm thầm.
     DECLARE @UsedBy INT = (SELECT TOP (1) PaymentID FROM dbo.Payments WHERE TransactionID = @TransactionID);
@@ -957,15 +1046,26 @@ BEGIN
         THROW 50043, N'Số tiền thanh toán không khớp với số tiền của đơn hàng.', 1;
 
     BEGIN TRANSACTION;
+        -- Khóa dòng đơn trước (cùng thứ tự với sp_ExpireUnpaidOrders) để hết hạn và thanh toán không đè lên nhau
+        DECLARE @Locked INT;
+        SELECT @Locked = o.OrderID
+        FROM dbo.Orders o WITH (UPDLOCK) JOIN dbo.Payments p ON p.OrderID = o.OrderID WHERE p.PaymentID = @PaymentID;
+
         UPDATE dbo.Payments
         SET Status = CASE WHEN @IsSuccess = 1 THEN 'Success' ELSE 'Failed' END,
             TransactionID = @TransactionID,
             ResponseCode = @ResponseCode,
             PaidAt = CASE WHEN @IsSuccess = 1 THEN SYSDATETIME() END
-        WHERE PaymentID = @PaymentID AND Status = 'Pending';
+        WHERE PaymentID = @PaymentID AND Status = 'Pending'
+          -- Quá hạn thì không nhận nữa, kể cả khi yêu cầu này phải chờ khóa lâu mới tới lượt
+          AND (PaymentMethod = 'COD' OR CreatedAt > DATEADD(MINUTE, -dbo.fn_PaymentTimeoutMinutes(), SYSDATETIME()));
         IF @@ROWCOUNT = 0
         BEGIN
             ROLLBACK TRANSACTION;
+            EXEC dbo.sp_ExpireUnpaidOrders;    -- đơn quá hạn mà chưa ai quét thì hủy ngay, để báo đúng lỗi 50050
+            IF EXISTS (SELECT 1 FROM dbo.Payments p JOIN dbo.Orders o ON o.OrderID = p.OrderID
+                       WHERE p.PaymentID = @PaymentID AND p.Status IN ('Failed', 'Expired') AND o.OrderStatus = 'Cancelled')
+                THROW 50050, N'Đơn hàng đã bị hủy hoặc quá hạn thanh toán nên không thể ghi nhận thanh toán.', 1;
             THROW 50017, N'Không tìm thấy giao dịch đang chờ thanh toán.', 1;
         END
     COMMIT TRANSACTION;
@@ -980,11 +1080,18 @@ CREATE OR ALTER PROCEDURE dbo.usp_CancelOrderInternal
 AS
 BEGIN
     SET NOCOUNT ON;
+    -- Mọi đường hủy (khách trên web, admin qua hotline, hết hạn thanh toán) đều đi qua đây nên kiểm tra ở một chỗ.
+    -- Điều kiện nằm ngay trong UPDATE, nên admin vừa đánh dấu chế tác cùng lúc cũng không lọt qua.
     UPDATE dbo.Orders
     SET OrderStatus = 'Cancelled', CancelledAt = SYSDATETIME(), CancelReason = @Reason, UpdatedAt = SYSDATETIME()
-    WHERE OrderID = @OrderID AND OrderStatus IN ('Pending', 'Confirmed');
+    WHERE OrderID = @OrderID AND OrderStatus IN ('Pending', 'Confirmed') AND ProductionStartedAt IS NULL;
     IF @@ROWCOUNT = 0
+    BEGIN
+        IF EXISTS (SELECT 1 FROM dbo.Orders WHERE OrderID = @OrderID AND ProductionStartedAt IS NOT NULL
+                     AND OrderStatus IN ('Pending', 'Confirmed'))
+            THROW 50049, N'Đơn hàng đã bắt đầu chế tác nên không thể hủy.', 1;
         THROW 50020, N'Đơn hàng không còn đủ điều kiện hủy.', 1;
+    END
 
     -- Hoàn lại tồn kho đã trừ khi đặt hàng (FR13, FR21)
     UPDATE v
@@ -1001,8 +1108,9 @@ END
 GO
 
 -- 3.10. Khách bấm "Hủy đơn" trên web (BRD5, FR13)
---       - Chỉ đơn Pending/Confirmed và có tổng thanh toán <= fn_OnlineCancelLimit() (5 triệu) mới được hủy trên web;
---         đơn lớn hơn trả lỗi 50029 -> giao diện hướng dẫn khách gọi hotline, admin hủy bằng sp_UpdateOrderStatus.
+--       - Chỉ đơn Pending/Confirmed, có tổng thanh toán DƯỚI fn_OnlineCancelLimit() (2 triệu) và KHÔNG có sản phẩm
+--         khắc chữ mới được hủy trên web; các đơn còn lại trả lỗi 50029 -> giao diện hiện thông báo gọi hotline,
+--         nhân viên hỏi tình hình chế tác rồi hủy bằng sp_UpdateOrderStatus (đơn đang chế tác thì không hủy được).
 --       - Thủ tục KHÔNG hủy đơn ngay: tạo yêu cầu 'Pending' và trả về mã voucher/số tiền giảm đã áp cho đơn
 --         để giao diện hiện popup nhắc nhở ("Nếu hủy bây giờ, bạn sẽ mất voucher ... đã áp cho đơn này").
 --       - Khách chọn trong popup -> gọi sp_RespondCancelPopup.
@@ -1024,21 +1132,25 @@ BEGIN
     BEGIN TRY
         BEGIN TRANSACTION;
 
-        DECLARE @Status VARCHAR(15), @Total DECIMAL(15,0);
-        SELECT @Status = o.OrderStatus, @Total = o.TotalAmount,
-               @VoucherCode = v.VoucherCode, @VoucherDiscount = o.DiscountAmount
+        DECLARE @Status VARCHAR(15), @Total DECIMAL(15,0), @HasEngraving BIT, @InProduction DATETIME2(0);
+        SELECT @Status = o.OrderStatus, @Total = o.TotalAmount, @InProduction = o.ProductionStartedAt,
+               @VoucherCode = v.VoucherCode, @VoucherDiscount = o.DiscountAmount,
+               @HasEngraving = CASE WHEN EXISTS (SELECT 1 FROM dbo.OrderItems oi
+                                                 WHERE oi.OrderID = o.OrderID AND LEN(oi.EngravingText) > 0) THEN 1 ELSE 0 END
         FROM dbo.Orders o WITH (UPDLOCK)
         LEFT JOIN dbo.Vouchers v ON v.VoucherID = o.VoucherID
         WHERE o.OrderID = @OrderID AND o.CustomerID = @CustomerID;
 
         IF @Status IS NULL THROW 50021, N'Không tìm thấy đơn hàng của khách hàng.', 1;
         IF @Status NOT IN ('Pending', 'Confirmed') THROW 50020, N'Đơn hàng không còn đủ điều kiện hủy.', 1;
-        IF @Total > dbo.fn_OnlineCancelLimit()
+        IF @InProduction IS NOT NULL THROW 50049, N'Đơn hàng đã bắt đầu chế tác nên không thể hủy.', 1;
+        IF @Total >= dbo.fn_OnlineCancelLimit() OR @HasEngraving = 1
         BEGIN
-            -- Số tiền trong thông báo lấy từ hàm, nên đổi chính sách thì thông báo đổi theo
-            DECLARE @LimitMsg NVARCHAR(400) = CONCAT(N'Đơn hàng trên ', FORMAT(dbo.fn_OnlineCancelLimit(), 'N0', 'vi-VN'),
-                N'đ không thể hủy trên website. Vui lòng liên hệ hotline để được hỗ trợ hủy đơn.');
-            THROW 50029, @LimitMsg, 1;
+            -- Số hotline lấy từ hàm, nên đổi số thì thông báo đổi theo
+            DECLARE @HotlineMsg NVARCHAR(400) = CONCAT(
+                N'Khách hàng không thể tự hủy vì đơn hàng có giá trị cao hoặc có sản phẩm khắc chữ. Vui lòng gọi qua hotline ',
+                dbo.fn_HotlineNumber(), N' để được hỗ trợ.');
+            THROW 50029, @HotlineMsg, 1;
         END
 
         -- Đã có yêu cầu đang chờ (khách bấm lặp) -> trả về yêu cầu đó
@@ -1185,6 +1297,41 @@ BEGIN
         UPDATE dbo.Payments
         SET Status = 'Success', PaidAt = SYSDATETIME()
         WHERE OrderID = @OrderID AND PaymentMethod = 'COD' AND Status = 'Pending';
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        THROW;
+    END CATCH
+END
+GO
+
+-- 3.13b. Admin đánh dấu đơn đã bắt đầu chế tác (khắc chữ, chế tác theo yêu cầu). Từ lúc này đơn không hủy được
+--        (kể cả qua hotline). Chỉ đơn đã xác nhận (Confirmed) mới bắt đầu chế tác được.
+CREATE OR ALTER PROCEDURE dbo.sp_StartOrderProduction
+    @OrderID      INT,
+    @AdminUserID  INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+    IF NOT EXISTS (SELECT 1 FROM dbo.Users WHERE UserID = @AdminUserID AND Role = 'Admin' AND IsActive = 1)
+        THROW 50024, N'Người thực hiện không có quyền quản trị.', 1;
+    IF NOT EXISTS (SELECT 1 FROM dbo.Orders WHERE OrderID = @OrderID)
+        THROW 50025, N'Không tìm thấy đơn hàng.', 1;
+
+    BEGIN TRY
+        BEGIN TRANSACTION;
+        UPDATE dbo.Orders SET ProductionStartedAt = SYSDATETIME(), UpdatedAt = SYSDATETIME()
+        WHERE OrderID = @OrderID AND OrderStatus = 'Confirmed' AND ProductionStartedAt IS NULL;
+        IF @@ROWCOUNT = 0
+            THROW 50051, N'Chỉ đánh dấu chế tác được cho đơn đã xác nhận và chưa bắt đầu chế tác.', 1;
+        -- Khách đang chờ trả lời popup hủy thì đóng yêu cầu, vì từ giờ đơn không hủy được nữa
+        UPDATE dbo.OrderCancellationRequests SET Decision = 'Closed', DecidedAt = SYSDATETIME()
+        WHERE OrderID = @OrderID AND Decision = 'Pending';
+        INSERT INTO dbo.AuditLogs (EntityName, EntityID, Action, OldValue, NewValue, PerformedByUserID, PerformedBy)
+        VALUES ('Orders', @OrderID, 'ProductionStarted', NULL, NULL, @AdminUserID,
+                ISNULL(CAST(SESSION_CONTEXT(N'Actor') AS NVARCHAR(100)), ORIGINAL_LOGIN()));
         COMMIT TRANSACTION;
     END TRY
     BEGIN CATCH
@@ -1370,8 +1517,8 @@ AS
 SELECT p.ProductID, p.SKU, p.ProductName, p.ShortName, p.Slug,
        c.CategoryID, c.CategoryName, c.CategoryGroup, c.RequiresRingSize,
        col.CollectionID, col.CollectionName,
-       p.Material, p.WeightGram, p.PricingMethod,
-       dbo.fn_GetCurrentPrice(p.ProductID) AS CurrentPrice,
+       p.Material, p.WeightGram, p.PricingMethod, p.IsQuoteOnly,
+       dbo.fn_GetCurrentPrice(p.ProductID) AS CurrentPrice,   -- NULL khi chỉ báo giá
        p.OriginalPrice,
        ISNULL(st.TotalStock, 0) AS TotalStock,
        CAST(CASE WHEN ISNULL(st.TotalStock, 0) > 0 THEN 1 ELSE 0 END AS BIT) AS IsInStock,
@@ -1476,13 +1623,21 @@ AS
 SELECT o.OrderID, o.OrderCode, o.CustomerID, o.CreatedAt, o.OrderStatus,
        o.Subtotal, o.DiscountAmount, o.ShippingFee, o.TotalAmount,
        pay.PaymentMethod, pay.Status AS PaymentStatus,
-       -- Giao diện dùng để hiện nút "Hủy đơn" hoặc dòng "Gọi hotline để hủy"
-       CASE WHEN o.OrderStatus NOT IN ('Pending', 'Confirmed') THEN NULL
-            WHEN o.TotalAmount > dbo.fn_OnlineCancelLimit() THEN 'Hotline'
+       -- Hạn thanh toán của đơn trả trực tuyến chưa trả tiền (giao diện đếm ngược); NULL nếu không áp dụng
+       CASE WHEN o.OrderStatus = 'Pending' AND pay.PaymentMethod <> 'COD' AND pay.Status = 'Pending'
+            THEN DATEADD(MINUTE, dbo.fn_PaymentTimeoutMinutes(), pay.CreatedAt) END AS PaymentDeadline,
+       eng.HasEngraving,
+       o.ProductionStartedAt,
+       -- Giao diện dùng để hiện nút "Hủy đơn" ('Web'), dòng "Gọi hotline để hủy" ('Hotline') hoặc không hiện gì (NULL):
+       -- NULL khi đơn không còn hủy được (đã giao, đã hủy, hoặc đang chế tác)
+       CASE WHEN o.OrderStatus NOT IN ('Pending', 'Confirmed') OR o.ProductionStartedAt IS NOT NULL THEN NULL
+            WHEN o.TotalAmount >= dbo.fn_OnlineCancelLimit() OR eng.HasEngraving = 1 THEN 'Hotline'
             ELSE 'Web' END AS CancelChannel
 FROM dbo.Orders o
-OUTER APPLY (SELECT TOP (1) p.PaymentMethod, p.Status FROM dbo.Payments p
-             WHERE p.OrderID = o.OrderID ORDER BY p.PaymentID DESC) pay;
+OUTER APPLY (SELECT TOP (1) p.PaymentMethod, p.Status, p.CreatedAt FROM dbo.Payments p
+             WHERE p.OrderID = o.OrderID ORDER BY p.PaymentID DESC) pay
+OUTER APPLY (SELECT CAST(CASE WHEN EXISTS (SELECT 1 FROM dbo.OrderItems oi
+                                           WHERE oi.OrderID = o.OrderID AND LEN(oi.EngravingText) > 0) THEN 1 ELSE 0 END AS BIT) AS HasEngraving) eng;
 GO
 
 /* =====================================================================
@@ -2081,6 +2236,10 @@ Sản phẩm là lựa chọn hoàn hảo để cô dâu kết hợp cùng váy 
 (442, 'BINHNGOPHAT', N'Vàng lưu niệm 24K', N'BINHNGOPHAT', 'binhngophat', 10, 1, '24K', 0.100, 'Fixed', 2150000, 1094400, 1368000, NULL, 0, 'Active'),
 (443, 'PHUCLOCCAT', N'Vàng lưu niệm 24K', N'LNPHUCLOCCAT', 'phucloccat', 10, 1, '24K', NULL, 'Fixed', NULL, 539000, NULL, NULL, 0, 'Active');
 SET IDENTITY_INSERT dbo.Products OFF;
+GO
+-- Sản phẩm giá theo giá vàng ngày (22 sản phẩm vàng 24K và 22K) chỉ báo giá: không bán online, khách liên hệ cửa hàng.
+-- Bảng GoldPrices vẫn dùng để nhân viên báo giá. Muốn bán online lại: đặt IsQuoteOnly = 0, giá tự tính theo giá vàng.
+UPDATE dbo.Products SET IsQuoteOnly = 1 WHERE PricingMethod = 'GoldRate';
 GO
 
 -- 5.7. Gán sản phẩm vào bộ sưu tập chính
@@ -6341,7 +6500,8 @@ GO
 -- 5.11. Mã khuyến mãi khách áp dụng khi đặt hàng (BRD4)
 INSERT INTO dbo.Vouchers (VoucherCode, VoucherName, DiscountType, DiscountValue, MaxDiscountAmount, MinOrderValue, StartAt, EndAt, UsageLimit) VALUES
 ('WELCOME5',   N'Giảm 5% cho đơn từ 2 triệu (tối đa 1 triệu)', 'Percent', 5,      1000000, 2000000,  '2026-01-01', '2027-12-31', 1000),
-('VINORA500K', N'Giảm 500.000đ cho đơn từ 10 triệu',            'Amount',  500000, NULL,    10000000, '2026-01-01', '2027-12-31', 500);
+('VINORA500K', N'Giảm 500.000đ cho đơn từ 10 triệu',            'Amount',  500000, NULL,    10000000, '2026-01-01', '2027-12-31', 500),
+('GIAM300K',   N'Giảm 300.000đ cho đơn từ 2 triệu',             'Amount',  300000, NULL,    2000000,  '2026-01-01', '2027-12-31', 500);
 GO
 
 /* =====================================================================
@@ -6350,12 +6510,14 @@ GO
    trigger, ràng buộc và quy tắc ở Phần 3:
      - Khách A: đặt hàng VNPay + mã WELCOME5 -> thanh toán sandbox -> giao
        -> xác nhận đã nhận -> tự tạo thẻ bảo hành -> đánh giá -> hậu mãi.
-     - Khách B: đơn 33 triệu -> bấm hủy trên web bị từ chối (trên 5 triệu phải
-       gọi hotline) -> đơn tiếp tục giao thành công.
-     - Khách C, đơn 1 (dưới 5 triệu, có voucher WELCOME5): bấm hủy -> popup nhắc
-       "sẽ mất voucher" -> chọn GIỮ ĐƠN -> giao thành công.
-     - Khách C, đơn 2 (dưới 5 triệu): bấm hủy -> popup -> XÁC NHẬN HỦY -> đơn bị
-       hủy, tồn kho được hoàn lại.
+     - Khách B: đơn 33 triệu có khắc chữ -> bấm hủy trên web bị từ chối (đơn từ 2
+       triệu hoặc có khắc chữ phải gọi hotline) -> đơn tiếp tục giao thành công.
+     - Khách C, đơn 1 (giá gốc 2,198 triệu, voucher GIAM300K còn 1,898 triệu, không
+       khắc chữ): bấm hủy -> popup nhắc "sẽ mất voucher" -> chọn GIỮ ĐƠN -> giao thành công.
+     - Khách C, đơn 2 (dưới 2 triệu, không khắc chữ): bấm hủy -> popup -> XÁC NHẬN HỦY
+       -> đơn bị hủy, tồn kho được hoàn lại.
+     - Mục 6.9: khách vãng lai (chỉ có số điện thoại), đơn trả trực tuyến quá 15 phút
+       tự hủy, đơn đang chế tác không hủy được.
    PasswordHash là chuỗi băm minh họa (bcrypt), không phải mật khẩu thật.
    ===================================================================== */
 USE VinoraJewelry;
@@ -6364,13 +6526,13 @@ SET NOCOUNT ON;
 
 DECLARE @AdminID INT, @UA INT, @UB INT, @UC INT, @CA INT, @CB INT, @CC INT,
         @AddrA INT, @AddrB INT, @AddrC INT,
-        @V1 INT, @V2 INT, @V3 INT, @V4 INT, @V5 INT,
+        @V1 INT, @V2 INT, @V3 INT, @V4 INT, @V5 INT, @V6 INT,
         @OrderA INT, @OrderB INT, @OrderC1 INT, @OrderC2 INT, @PayA INT,
         @ReqB INT, @ReqC1 INT, @ReqC2 INT, @PopupVoucher VARCHAR(30), @PopupDiscount DECIMAL(15,0),
         @HotlineMsg NVARCHAR(400), @C1Voucher VARCHAR(30),
         @WCode VARCHAR(20), @S1 INT, @S2 INT, @S3 INT, @FbA INT, @FbB INT,
         @InDays3 DATETIME2(0) = DATEADD(HOUR, 9, DATEADD(DAY, 3, CAST(CAST(SYSDATETIME() AS DATE) AS DATETIME2(0)))),  -- 9h sáng, 3 ngày tới
-        @StockV2 INT;
+        @StockV6 INT;
 
 /* ---------- 6.1. Tài khoản ---------- */
 INSERT INTO dbo.Users (Username, FullName, Email, PasswordHash, Role)
@@ -6416,8 +6578,10 @@ FROM dbo.Products WHERE SKU = 'NDINO131LDIA';
 SELECT @V1 = VariantID FROM dbo.ProductVariants WHERE VariantSKU = 'NDINO131LDIA-VT-10';   -- Nhẫn cầu hôn 14K lab-grown, size 10
 SELECT @V2 = VariantID FROM dbo.ProductVariants WHERE VariantSKU = 'BT161B-VT';            -- Bông tai 10K đá CZ
 SELECT @V3 = VariantID FROM dbo.ProductVariants WHERE VariantSKU = 'NDINO172KC-VV-12';     -- Nhẫn cầu hôn 18K kim cương tự nhiên, size 12
-SELECT @V4 = VariantID FROM dbo.ProductVariants WHERE VariantSKU = 'MDBZ036-VV';           -- Mặt dây 24K (tính giá theo giá vàng)
+SELECT @V4 = VariantID FROM dbo.ProductVariants WHERE VariantSKU = 'BTZ008-VV';           -- Bông tai 2.198.000đ, không khắc chữ
 SELECT @V5 = VariantID FROM dbo.ProductVariants WHERE VariantSKU = 'DCMAMD679-VV';         -- Dây chuyền 14K đá CZ
+SELECT TOP (1) @V6 = v.VariantID FROM dbo.ProductVariants v                                 -- món rẻ (dưới 1 triệu), không size
+WHERE v.RingSize IS NULL AND v.StockQuantity >= 3 AND dbo.fn_GetCurrentPrice(v.ProductID) < 1000000 ORDER BY v.VariantID;
 
 /* ---------- 6.4. Khách A: mua hàng trọn vẹn ---------- */
 EXEC sp_set_session_context @key = N'UserID', @value = @UA;
@@ -6425,7 +6589,7 @@ EXEC dbo.sp_TrackProductView @CA, 1;
 EXEC dbo.sp_TrackProductView @CA, 201;
 EXEC dbo.sp_TrackProductView @CA, 1;
 
-INSERT INTO dbo.CartItems (CustomerID, VariantID, Quantity, EngravingText) VALUES (@CA, @V1, 1, N'M & A');
+INSERT INTO dbo.CartItems (CustomerID, VariantID, Quantity, EngravingText, EngravingStyle) VALUES (@CA, @V1, 1, N'M & A', 'Classic');
 INSERT INTO dbo.CartItems (CustomerID, VariantID, Quantity) VALUES (@CA, @V2, 1);
 
 DECLARE @TokenA UNIQUEIDENTIFIER = NEWID();
@@ -6474,9 +6638,9 @@ EXEC dbo.sp_BookAfterSalesService @WarrantyCode = @WCode, @CustomerID = @CA, @Se
      @PreferredDate = @InDays3, @ServiceID = @S3 OUTPUT;
 EXEC dbo.sp_CancelAfterSalesService @ServiceID = @S3, @CustomerID = @CA;   -- hủy lịch không mất lượt
 
-/* ---------- 6.5. Khách B: đơn trên 5 triệu không hủy được trên web ---------- */
+/* ---------- 6.5. Khách B: đơn từ 2 triệu (có khắc chữ) không hủy được trên web ---------- */
 EXEC sp_set_session_context @key = N'UserID', @value = @UB;
-INSERT INTO dbo.CartItems (CustomerID, VariantID, Quantity, EngravingText) VALUES (@CB, @V3, 1, N'Forever');
+INSERT INTO dbo.CartItems (CustomerID, VariantID, Quantity, EngravingText, EngravingStyle) VALUES (@CB, @V3, 1, N'Forever', 'Handwritten');
 DECLARE @TokenB UNIQUEIDENTIFIER = NEWID();
 EXEC dbo.sp_PlaceOrder @CustomerID = @CB, @AddressID = @AddrB, @PaymentMethod = 'COD',
      @CheckoutToken = @TokenB, @ShippingFee = 30000, @OrderID = @OrderB OUTPUT;
@@ -6500,17 +6664,17 @@ SET @FbB = SCOPE_IDENTITY();
 INSERT INTO dbo.FeedbackAspects (FeedbackID, AspectName, Polarity) VALUES
 (@FbB, N'Giao hàng', 'Negative'), (@FbB, N'Đóng gói', 'Positive');
 
-/* ---------- 6.6. Khách C: popup nhắc nhở khi hủy đơn dưới 5 triệu ---------- */
+/* ---------- 6.6. Khách C: popup nhắc nhở khi hủy đơn dưới 2 triệu, không khắc chữ ---------- */
 EXEC sp_set_session_context @key = N'UserID', @value = @UC;
 
--- Đơn 1: có voucher WELCOME5 -> bấm hủy -> popup "sẽ mất voucher" -> chọn giữ đơn
+-- Đơn 1: giá gốc 2.198.000đ, voucher GIAM300K còn 1.898.000đ -> bấm hủy -> popup "sẽ mất voucher" -> chọn giữ đơn
 INSERT INTO dbo.CartItems (CustomerID, VariantID, Quantity) VALUES (@CC, @V4, 1);
 DECLARE @TokenC1 UNIQUEIDENTIFIER = NEWID();
 EXEC dbo.sp_PlaceOrder @CustomerID = @CC, @AddressID = @AddrC, @PaymentMethod = 'COD',
-     @CheckoutToken = @TokenC1, @ShippingFee = 0, @VoucherCode = 'WELCOME5', @OrderID = @OrderC1 OUTPUT;
+     @CheckoutToken = @TokenC1, @ShippingFee = 0, @VoucherCode = 'GIAM300K', @OrderID = @OrderC1 OUTPUT;
 EXEC dbo.sp_RequestCancelOrder @OrderID = @OrderC1, @CustomerID = @CC, @Reason = N'Muốn chọn mẫu khác',
      @RequestID = @ReqC1 OUTPUT, @VoucherCode = @PopupVoucher OUTPUT, @VoucherDiscount = @PopupDiscount OUTPUT;
-SET @C1Voucher = @PopupVoucher;   -- giao diện hiện: "Nếu hủy bây giờ, bạn sẽ mất voucher WELCOME5 (giảm ...đ)"
+SET @C1Voucher = @PopupVoucher;   -- giao diện hiện: "Nếu hủy bây giờ, bạn sẽ mất voucher GIAM300K (giảm 300.000đ), đặt lại chỉ còn giá gốc"
 EXEC dbo.sp_RespondCancelPopup @RequestID = @ReqC1, @CustomerID = @CC, @KeepOrder = 1;
 EXEC dbo.sp_UpdateOrderStatus @OrderID = @OrderC1, @NewStatus = 'Confirmed', @AdminUserID = @AdminID;
 EXEC dbo.sp_UpdateOrderStatus @OrderID = @OrderC1, @NewStatus = 'Shipping',  @AdminUserID = @AdminID;
@@ -6518,8 +6682,8 @@ EXEC sp_set_session_context @key = N'UserID', @value = @UC;
 EXEC dbo.sp_ConfirmOrderReceived @OrderID = @OrderC1, @CustomerID = @CC;
 
 -- Đơn 2: bấm hủy -> popup -> xác nhận hủy
-SELECT @StockV2 = StockQuantity FROM dbo.ProductVariants WHERE VariantID = @V2;
-INSERT INTO dbo.CartItems (CustomerID, VariantID, Quantity) VALUES (@CC, @V2, 1);
+SELECT @StockV6 = StockQuantity FROM dbo.ProductVariants WHERE VariantID = @V6;
+INSERT INTO dbo.CartItems (CustomerID, VariantID, Quantity) VALUES (@CC, @V6, 1);
 DECLARE @TokenC2 UNIQUEIDENTIFIER = NEWID();
 EXEC dbo.sp_PlaceOrder @CustomerID = @CC, @AddressID = @AddrC, @PaymentMethod = 'COD',
      @CheckoutToken = @TokenC2, @ShippingFee = 30000, @OrderID = @OrderC2 OUTPUT;
@@ -6532,11 +6696,15 @@ EXEC sp_set_session_context @key = N'UserID', @value = NULL;
 /* ---------- 6.7. Kết quả demo ---------- */
 SELECT N'Đơn A gửi lặp trả về cùng OrderID' AS KiemTra, CASE WHEN @OrderA = @OrderA_Retry THEN N'ĐẠT' ELSE N'KHÔNG ĐẠT' END AS KetQua
 UNION ALL
-SELECT N'Đơn B (trên 5 triệu) không hủy được trên web',
-       CASE WHEN @HotlineMsg LIKE N'50029%' AND @ReqB IS NULL THEN N'ĐẠT' ELSE CONCAT(N'KHÔNG ĐẠT: ', @HotlineMsg) END
+SELECT N'Đơn B (từ 2 triệu, có khắc chữ) không hủy được trên web, thông báo có số hotline',
+       CASE WHEN @HotlineMsg LIKE N'50029%' AND @HotlineMsg LIKE N'%hotline ' + dbo.fn_HotlineNumber() + N'%' AND @ReqB IS NULL THEN N'ĐẠT' ELSE CONCAT(N'KHÔNG ĐẠT: ', @HotlineMsg) END
 UNION ALL
-SELECT N'Popup đơn C1 nhận đúng voucher đã áp (WELCOME5)',
-       CASE WHEN @C1Voucher = 'WELCOME5' THEN N'ĐẠT' ELSE N'KHÔNG ĐẠT' END
+SELECT N'Popup đơn C1 nhận đúng voucher đã áp (GIAM300K)',
+       CASE WHEN @C1Voucher = 'GIAM300K' THEN N'ĐẠT' ELSE N'KHÔNG ĐẠT' END
+UNION ALL
+SELECT N'Đơn C1: giá gốc từ 2 triệu nhưng sau voucher dưới 2 triệu nên được tự hủy',
+       CASE WHEN EXISTS (SELECT 1 FROM dbo.Orders WHERE OrderID = @OrderC1 AND Subtotal >= dbo.fn_OnlineCancelLimit()
+                           AND TotalAmount < dbo.fn_OnlineCancelLimit()) THEN N'ĐẠT' ELSE N'KHÔNG ĐẠT' END
 UNION ALL
 SELECT N'Đơn C1 giữ lại: tiền đơn không đổi, IsRetentionApplied = 1',
        CASE WHEN EXISTS (SELECT 1 FROM dbo.Orders o JOIN dbo.Payments p ON p.OrderID = o.OrderID AND p.Status = 'Success'
@@ -6546,7 +6714,7 @@ SELECT N'Đơn C1 giữ lại: tiền đơn không đổi, IsRetentionApplied = 
 UNION ALL
 SELECT N'Đơn C2 bị hủy và tồn kho được hoàn lại',
        CASE WHEN (SELECT OrderStatus FROM dbo.Orders WHERE OrderID = @OrderC2) = 'Cancelled'
-             AND (SELECT StockQuantity FROM dbo.ProductVariants WHERE VariantID = @V2) = @StockV2 THEN N'ĐẠT' ELSE N'KHÔNG ĐẠT' END
+             AND (SELECT StockQuantity FROM dbo.ProductVariants WHERE VariantID = @V6) = @StockV6 THEN N'ĐẠT' ELSE N'KHÔNG ĐẠT' END
 UNION ALL
 SELECT N'Đơn A tạo đủ 2 thẻ bảo hành',
        CASE WHEN (SELECT COUNT(*) FROM dbo.WarrantyRecords WHERE OrderID = @OrderA) = 2 THEN N'ĐẠT' ELSE N'KHÔNG ĐẠT' END
@@ -6654,7 +6822,193 @@ BEGIN CATCH
     INSERT INTO @Results (KiemTra, KetQua) VALUES (N'Đặt lịch chỉnh size mà không chọn size mới', CONCAT(N'ĐẠT – bị chặn: ', ERROR_MESSAGE()));
 END CATCH
 
+BEGIN TRY
+    INSERT INTO dbo.Customers (UserID, Phone) VALUES (NULL, '0901234567');   -- số điện thoại của khách A
+    INSERT INTO @Results (KiemTra, KetQua) VALUES (N'Hai khách trùng số điện thoại', N'KHÔNG ĐẠT: thao tác không bị chặn');
+END TRY
+BEGIN CATCH
+    IF XACT_STATE() <> 0 ROLLBACK TRANSACTION;
+    INSERT INTO @Results (KiemTra, KetQua) VALUES (N'Hai khách trùng số điện thoại', CONCAT(N'ĐẠT – bị chặn: ', ERROR_MESSAGE()));
+END CATCH
+
+BEGIN TRY
+    INSERT INTO dbo.Customers (UserID, Phone) VALUES (NULL, NULL);
+    INSERT INTO @Results (KiemTra, KetQua) VALUES (N'Khách vãng lai không có số điện thoại', N'KHÔNG ĐẠT: thao tác không bị chặn');
+END TRY
+BEGIN CATCH
+    IF XACT_STATE() <> 0 ROLLBACK TRANSACTION;
+    INSERT INTO @Results (KiemTra, KetQua) VALUES (N'Khách vãng lai không có số điện thoại', CONCAT(N'ĐẠT – bị chặn: ', ERROR_MESSAGE()));
+END CATCH
+
+BEGIN TRY
+    INSERT INTO dbo.CartItems (CustomerID, VariantID, Quantity, EngravingText, EngravingStyle)
+    SELECT TOP (1) c.CustomerID, v.VariantID, 1, N'Love', 'Gothic' FROM dbo.Customers c CROSS JOIN dbo.ProductVariants v;
+    INSERT INTO @Results (KiemTra, KetQua) VALUES (N'Kiểu chữ khắc không có trong danh sách', N'KHÔNG ĐẠT: thao tác không bị chặn');
+END TRY
+BEGIN CATCH
+    IF XACT_STATE() <> 0 ROLLBACK TRANSACTION;
+    INSERT INTO @Results (KiemTra, KetQua) VALUES (N'Kiểu chữ khắc không có trong danh sách', CONCAT(N'ĐẠT – bị chặn: ', ERROR_MESSAGE()));
+END CATCH
+
+BEGIN TRY
+    INSERT INTO dbo.CartItems (CustomerID, VariantID, Quantity, EngravingText, EngravingStyle)
+    SELECT TOP (1) c.CustomerID, v.VariantID, 1, NULL, 'Classic' FROM dbo.Customers c CROSS JOIN dbo.ProductVariants v;
+    INSERT INTO @Results (KiemTra, KetQua) VALUES (N'Có kiểu chữ nhưng không có chữ khắc', N'KHÔNG ĐẠT: thao tác không bị chặn');
+END TRY
+BEGIN CATCH
+    IF XACT_STATE() <> 0 ROLLBACK TRANSACTION;
+    INSERT INTO @Results (KiemTra, KetQua) VALUES (N'Có kiểu chữ nhưng không có chữ khắc', CONCAT(N'ĐẠT – bị chặn: ', ERROR_MESSAGE()));
+END CATCH
+
+BEGIN TRY
+    INSERT INTO dbo.CartItems (CustomerID, VariantID, Quantity, EngravingText, EngravingStyle)
+    SELECT TOP (1) c.CustomerID, v.VariantID, 1, N'Mười sáu ký tự nè nha', 'Classic' FROM dbo.Customers c CROSS JOIN dbo.ProductVariants v;
+    INSERT INTO @Results (KiemTra, KetQua) VALUES (N'Chữ khắc dài hơn 15 ký tự', N'KHÔNG ĐẠT: thao tác không bị chặn');
+END TRY
+BEGIN CATCH
+    IF XACT_STATE() <> 0 ROLLBACK TRANSACTION;
+    INSERT INTO @Results (KiemTra, KetQua) VALUES (N'Chữ khắc dài hơn 15 ký tự', CONCAT(N'ĐẠT – bị chặn: ', ERROR_MESSAGE()));
+END CATCH
+
 SELECT * FROM @Results ORDER BY STT;
+GO
+
+/* ---------- 6.9. Khách vãng lai, hết hạn thanh toán 15 phút, đơn đang chế tác ---------- */
+SET NOCOUNT ON;
+DECLARE @R TABLE (STT INT IDENTITY(1,1), KiemTra NVARCHAR(200), KetQua NVARCHAR(400));
+DECLARE @Adm INT = (SELECT TOP (1) UserID FROM dbo.Users WHERE Role = 'Admin' ORDER BY UserID);
+DECLARE @VBig INT = (SELECT VariantID FROM dbo.ProductVariants WHERE VariantSKU = 'BTZ008-VV');      -- 2.198.000đ
+DECLARE @VCheap INT = (SELECT TOP (1) v.VariantID FROM dbo.ProductVariants v
+                       WHERE v.RingSize IS NULL AND v.StockQuantity >= 4 AND dbo.fn_GetCurrentPrice(v.ProductID) < 1000000
+                       ORDER BY v.VariantID DESC);                                                   -- món rẻ, không size
+DECLARE @G INT, @GA INT, @O1 INT, @O2 INT, @O3 INT, @O4 INT, @O5 INT, @P1 INT, @P3 INT, @Stock0 INT, @Used0 INT,
+        @Rq INT, @Vc VARCHAR(30), @Vd DECIMAL(15,0), @T UNIQUEIDENTIFIER;
+
+-- Khách vãng lai: chỉ có số điện thoại (không có tài khoản), số này là mã khách hàng
+INSERT INTO dbo.Customers (UserID, Phone) VALUES (NULL, '0933333333');
+SET @G = SCOPE_IDENTITY();
+INSERT INTO dbo.CustomerAddresses (CustomerID, RecipientName, Phone, AddressLine, Ward, Province, IsDefault)
+VALUES (@G, N'Phạm Khách Lẻ', '0933333333', N'7 Lê Lợi', N'Phường Bến Thành', N'Thành phố Hồ Chí Minh', 1);
+SET @GA = SCOPE_IDENTITY();
+
+-- (1) Đơn VNPay dùng voucher, quá 15 phút chưa trả -> tự hủy, hoàn tồn kho, trả lượt voucher
+SELECT @Stock0 = StockQuantity FROM dbo.ProductVariants WHERE VariantID = @VBig;
+SELECT @Used0 = UsedCount FROM dbo.Vouchers WHERE VoucherCode = 'GIAM300K';
+INSERT INTO dbo.CartItems (CustomerID, VariantID, Quantity) VALUES (@G, @VBig, 1);
+SET @T = NEWID();
+EXEC dbo.sp_PlaceOrder @CustomerID = @G, @AddressID = @GA, @PaymentMethod = 'VNPay', @CheckoutToken = @T,
+     @ShippingFee = 0, @VoucherCode = 'GIAM300K', @OrderID = @O1 OUTPUT;
+UPDATE dbo.Payments SET CreatedAt = DATEADD(MINUTE, -20, SYSDATETIME()) WHERE OrderID = @O1;   -- giả lập đã qua 20 phút
+EXEC dbo.sp_ExpireUnpaidOrders;
+INSERT INTO @R (KiemTra, KetQua) VALUES (N'Đơn trả trực tuyến quá 15 phút bị hủy',
+    CASE WHEN (SELECT OrderStatus FROM dbo.Orders WHERE OrderID = @O1) = 'Cancelled'
+          AND (SELECT Status FROM dbo.Payments WHERE OrderID = @O1) = 'Expired' THEN N'ĐẠT' ELSE N'KHÔNG ĐẠT' END);
+INSERT INTO @R (KiemTra, KetQua) VALUES (N'Đơn hết hạn: tồn kho được hoàn, voucher được trả lượt',
+    CASE WHEN (SELECT StockQuantity FROM dbo.ProductVariants WHERE VariantID = @VBig) = @Stock0
+          AND (SELECT UsedCount FROM dbo.Vouchers WHERE VoucherCode = 'GIAM300K') = @Used0 THEN N'ĐẠT' ELSE N'KHÔNG ĐẠT' END);
+
+-- (2) Tiền về sau khi đơn đã hết hạn -> bị từ chối (50050)
+SELECT @P1 = PaymentID FROM dbo.Payments WHERE OrderID = @O1;
+BEGIN TRY
+    EXEC dbo.sp_RecordPaymentResult @PaymentID = @P1, @IsSuccess = 1, @TransactionID = 'SIM-LATE-0001', @ResponseCode = '00';
+    INSERT INTO @R (KiemTra, KetQua) VALUES (N'Thanh toán sau khi đơn hết hạn', N'KHÔNG ĐẠT: thao tác không bị chặn');
+END TRY
+BEGIN CATCH
+    IF XACT_STATE() <> 0 ROLLBACK TRANSACTION;
+    INSERT INTO @R (KiemTra, KetQua) VALUES (N'Thanh toán sau khi đơn hết hạn (lỗi 50050)',
+        CASE WHEN ERROR_NUMBER() = 50050 THEN N'ĐẠT' ELSE CONCAT(N'KHÔNG ĐẠT: ', ERROR_NUMBER(), N' ', ERROR_MESSAGE()) END);
+END CATCH
+
+-- (3) Đơn COD và đơn đã thanh toán không bị hủy dù đã quá 15 phút
+INSERT INTO dbo.CartItems (CustomerID, VariantID, Quantity) VALUES (@G, @VCheap, 1);
+SET @T = NEWID();
+EXEC dbo.sp_PlaceOrder @CustomerID = @G, @AddressID = @GA, @PaymentMethod = 'COD', @CheckoutToken = @T,
+     @ShippingFee = 30000, @OrderID = @O2 OUTPUT;
+INSERT INTO dbo.CartItems (CustomerID, VariantID, Quantity) VALUES (@G, @VCheap, 1);
+SET @T = NEWID();
+EXEC dbo.sp_PlaceOrder @CustomerID = @G, @AddressID = @GA, @PaymentMethod = 'MoMo', @CheckoutToken = @T,
+     @ShippingFee = 30000, @OrderID = @O3 OUTPUT;
+SELECT @P3 = PaymentID FROM dbo.Payments WHERE OrderID = @O3;
+EXEC dbo.sp_RecordPaymentResult @PaymentID = @P3, @IsSuccess = 1, @TransactionID = 'SIM-MOMO-0001', @ResponseCode = '00';
+UPDATE dbo.Payments SET CreatedAt = DATEADD(MINUTE, -20, SYSDATETIME()) WHERE OrderID IN (@O2, @O3);
+EXEC dbo.sp_ExpireUnpaidOrders;
+INSERT INTO @R (KiemTra, KetQua) VALUES (N'Đơn COD và đơn đã trả tiền không bị hủy do quá hạn',
+    CASE WHEN (SELECT COUNT(*) FROM dbo.Orders WHERE OrderID IN (@O2, @O3) AND OrderStatus = 'Pending') = 2
+         THEN N'ĐẠT' ELSE N'KHÔNG ĐẠT' END);
+
+-- (4) Đơn dưới 2 triệu nhưng có khắc chữ -> không tự hủy được, thông báo gọi hotline (50029)
+INSERT INTO dbo.CartItems (CustomerID, VariantID, Quantity, EngravingText, EngravingStyle) VALUES (@G, @VCheap, 1, N'Love', 'Modern');
+SET @T = NEWID();
+EXEC dbo.sp_PlaceOrder @CustomerID = @G, @AddressID = @GA, @PaymentMethod = 'COD', @CheckoutToken = @T,
+     @ShippingFee = 30000, @OrderID = @O4 OUTPUT;
+BEGIN TRY
+    EXEC dbo.sp_RequestCancelOrder @OrderID = @O4, @CustomerID = @G, @Reason = NULL,
+         @RequestID = @Rq OUTPUT, @VoucherCode = @Vc OUTPUT, @VoucherDiscount = @Vd OUTPUT;
+    INSERT INTO @R (KiemTra, KetQua) VALUES (N'Đơn dưới 2 triệu có khắc chữ tự hủy trên web', N'KHÔNG ĐẠT: thao tác không bị chặn');
+END TRY
+BEGIN CATCH
+    IF XACT_STATE() <> 0 ROLLBACK TRANSACTION;
+    INSERT INTO @R (KiemTra, KetQua) VALUES (N'Đơn dưới 2 triệu có khắc chữ phải gọi hotline (lỗi 50029)',
+        CASE WHEN ERROR_NUMBER() = 50029 THEN N'ĐẠT' ELSE CONCAT(N'KHÔNG ĐẠT: ', ERROR_NUMBER()) END);
+END CATCH
+
+-- Sản phẩm chỉ báo giá không đặt được (50014), kể cả khi giỏ bị chèn thẳng vào database
+DECLARE @VQuote INT = (SELECT TOP (1) v.VariantID FROM dbo.ProductVariants v JOIN dbo.Products p ON p.ProductID = v.ProductID
+                       WHERE p.IsQuoteOnly = 1 ORDER BY v.VariantID);
+INSERT INTO dbo.CartItems (CustomerID, VariantID, Quantity) VALUES (@G, @VQuote, 1);
+SET @T = NEWID();
+BEGIN TRY
+    EXEC dbo.sp_PlaceOrder @CustomerID = @G, @AddressID = @GA, @PaymentMethod = 'COD', @CheckoutToken = @T,
+         @ShippingFee = 0, @OrderID = @O5 OUTPUT;
+    INSERT INTO @R (KiemTra, KetQua) VALUES (N'Đặt hàng sản phẩm chỉ báo giá', N'KHÔNG ĐẠT: thao tác không bị chặn');
+END TRY
+BEGIN CATCH
+    IF XACT_STATE() <> 0 ROLLBACK TRANSACTION;
+    INSERT INTO @R (KiemTra, KetQua) VALUES (N'Đặt hàng sản phẩm chỉ báo giá (lỗi 50014)',
+        CASE WHEN ERROR_NUMBER() = 50014 THEN N'ĐẠT' ELSE CONCAT(N'KHÔNG ĐẠT: ', ERROR_NUMBER()) END);
+END CATCH
+DELETE FROM dbo.CartItems WHERE CustomerID = @G;
+
+-- Kiểu chữ khắc được chép từ giỏ sang đơn hàng
+INSERT INTO @R (KiemTra, KetQua) VALUES (N'Kiểu chữ khắc được chép sang đơn hàng',
+    CASE WHEN EXISTS (SELECT 1 FROM dbo.OrderItems WHERE OrderID = @O4 AND EngravingText = N'Love' AND EngravingStyle = 'Modern')
+         THEN N'ĐẠT' ELSE N'KHÔNG ĐẠT' END);
+
+-- (5) Đơn đã xác nhận và bắt đầu chế tác -> admin cũng không hủy được (50049)
+EXEC dbo.sp_UpdateOrderStatus @OrderID = @O4, @NewStatus = 'Confirmed', @AdminUserID = @Adm;
+EXEC dbo.sp_StartOrderProduction @OrderID = @O4, @AdminUserID = @Adm;
+BEGIN TRY
+    EXEC dbo.sp_UpdateOrderStatus @OrderID = @O4, @NewStatus = 'Cancelled', @AdminUserID = @Adm, @Reason = N'Khách gọi hotline';
+    INSERT INTO @R (KiemTra, KetQua) VALUES (N'Hủy đơn đang chế tác', N'KHÔNG ĐẠT: thao tác không bị chặn');
+END TRY
+BEGIN CATCH
+    IF XACT_STATE() <> 0 ROLLBACK TRANSACTION;
+    INSERT INTO @R (KiemTra, KetQua) VALUES (N'Hủy đơn đang chế tác (lỗi 50049)',
+        CASE WHEN ERROR_NUMBER() = 50049 THEN N'ĐẠT' ELSE CONCAT(N'KHÔNG ĐẠT: ', ERROR_NUMBER()) END);
+END CATCH
+
+-- (6) Chỉ đơn đã xác nhận mới đánh dấu chế tác được (50051)
+BEGIN TRY
+    EXEC dbo.sp_StartOrderProduction @OrderID = @O2, @AdminUserID = @Adm;   -- đơn O2 còn Pending
+    INSERT INTO @R (KiemTra, KetQua) VALUES (N'Đánh dấu chế tác cho đơn chưa xác nhận', N'KHÔNG ĐẠT: thao tác không bị chặn');
+END TRY
+BEGIN CATCH
+    IF XACT_STATE() <> 0 ROLLBACK TRANSACTION;
+    INSERT INTO @R (KiemTra, KetQua) VALUES (N'Đánh dấu chế tác cho đơn chưa xác nhận (lỗi 50051)',
+        CASE WHEN ERROR_NUMBER() = 50051 THEN N'ĐẠT' ELSE CONCAT(N'KHÔNG ĐẠT: ', ERROR_NUMBER()) END);
+END CATCH
+
+-- (7) Khách vãng lai đăng ký tài khoản bằng đúng số điện thoại: gán UserID, đơn cũ tự thuộc về tài khoản
+DECLARE @UG INT;
+INSERT INTO dbo.Users (FullName, Email, PasswordHash) VALUES (N'Phạm Khách Lẻ', 'khachle@example.com', '$2b$12$DemoHashGuest.OnlyForSampleData.xxxxxxxxxxxxxxxxxxxxxxxxxx');
+SET @UG = SCOPE_IDENTITY();
+UPDATE dbo.Customers SET UserID = @UG, UpdatedAt = SYSDATETIME() WHERE CustomerID = @G;
+INSERT INTO @R (KiemTra, KetQua) VALUES (N'Khách vãng lai gán tài khoản: đơn và địa chỉ cũ giữ nguyên',
+    CASE WHEN (SELECT COUNT(*) FROM dbo.Orders WHERE CustomerID = @G) = 4
+          AND (SELECT COUNT(*) FROM dbo.CustomerAddresses WHERE CustomerID = @G) = 1
+          AND (SELECT UserID FROM dbo.Customers WHERE CustomerID = @G) = @UG THEN N'ĐẠT' ELSE N'KHÔNG ĐẠT' END);
+
+SELECT * FROM @R ORDER BY STT;
 GO
 
 /* =====================================================================

@@ -1,4 +1,6 @@
 """Admin-only endpoints."""
+import uuid
+
 from flask import Blueprint, g, jsonify, request
 
 from ..auth import admin_required
@@ -31,9 +33,13 @@ def list_orders():
     where, params = ("WHERE o.OrderStatus = ?", (status,)) if status else ("", ())
     total = query(f"SELECT COUNT(*) AS n FROM dbo.Orders o {where}", params)[0]["n"]
     items = query(
-        "SELECT o.OrderCode, o.CreatedAt, o.OrderStatus, o.TotalAmount, u.FullName AS CustomerName, "
-        "u.Email AS CustomerEmail FROM dbo.Orders o JOIN dbo.Customers c ON c.CustomerID = o.CustomerID "
-        f"JOIN dbo.Users u ON u.UserID = c.UserID {where} "
+        "SELECT o.OrderCode, o.CreatedAt, o.OrderStatus, o.TotalAmount, "
+        "COALESCE(u.FullName, o.ShipRecipientName) AS CustomerName, u.Email AS CustomerEmail, c.Phone AS CustomerPhone, "
+        "CAST(CASE WHEN c.UserID IS NULL THEN 1 ELSE 0 END AS BIT) AS IsGuest, p.PaymentMethod, p.Status AS PaymentStatus, "
+        "o.ProductionStartedAt FROM dbo.Orders o JOIN dbo.Customers c ON c.CustomerID = o.CustomerID "
+        "LEFT JOIN dbo.Users u ON u.UserID = c.UserID "
+        "OUTER APPLY (SELECT TOP (1) PaymentMethod, Status FROM dbo.Payments WHERE OrderID = o.OrderID "
+        f"ORDER BY PaymentID DESC) p {where} "
         "ORDER BY o.OrderID DESC OFFSET ? ROWS FETCH NEXT ? ROWS ONLY",
         params + ((page - 1) * limit, limit))
     return jsonify(total=total, page=page, limit=limit, items=items)
@@ -55,3 +61,39 @@ def set_order_status(code: str):
          (rows[0]["OrderID"], status, admin_id, reason.strip() or None), actor=(admin_id, f"Admin:{admin_id}"))
     return jsonify(query("SELECT OrderCode, OrderStatus, ConfirmedAt, ShippedAt, DeliveredAt, CancelledAt "
                          "FROM dbo.Orders WHERE OrderID = ?", (rows[0]["OrderID"],))[0])
+
+
+@bp.post("/orders/<code>/confirm-payment")
+@admin_required
+def confirm_bank_transfer(code: str):
+    """The shop saw the bank transfer arrive (simulated: no bank is connected). Records the payment as successful
+    (sp_RecordPaymentResult). Only for BankTransfer orders; an order past the 15 minute limit answers 409."""
+    rows = query("SELECT TOP (1) o.OrderID, p.PaymentID, p.PaymentMethod, p.Amount, p.Status FROM dbo.Orders o "
+                 "JOIN dbo.Payments p ON p.OrderID = o.OrderID WHERE o.OrderCode = ? ORDER BY p.PaymentID DESC", (code,))
+    if not rows:
+        return jsonify(error="Order not found"), 404
+    payment = rows[0]
+    if payment["PaymentMethod"] != "BankTransfer":
+        return jsonify(error="Only bank transfer orders are confirmed by the shop"), 400
+    if payment["Status"] == "Success":
+        return jsonify(error="The order is already paid"), 409
+    admin_id = g.user["UserID"]
+    call("EXEC dbo.sp_RecordPaymentResult @PaymentID = ?, @IsSuccess = 1, @TransactionID = ?, @ResponseCode = '00', "
+         "@Amount = ?", (payment["PaymentID"], f"SIM-BANK-{uuid.uuid4().hex}", payment["Amount"]),
+         actor=(admin_id, f"Admin:{admin_id}"))
+    return jsonify(OrderCode=code, PaymentStatus="Success")
+
+
+@bp.post("/orders/<code>/start-production")
+@admin_required
+def start_production(code: str):
+    """Mark that the shop began crafting the order (sp_StartOrderProduction). From then on nobody can cancel it,
+    not even by phone. Only a confirmed order can start."""
+    rows = query("SELECT OrderID FROM dbo.Orders WHERE OrderCode = ?", (code,))
+    if not rows:
+        return jsonify(error="Order not found"), 404
+    admin_id = g.user["UserID"]
+    call("EXEC dbo.sp_StartOrderProduction @OrderID = ?, @AdminUserID = ?", (rows[0]["OrderID"], admin_id),
+         actor=(admin_id, f"Admin:{admin_id}"))
+    return jsonify(query("SELECT OrderCode, OrderStatus, ProductionStartedAt FROM dbo.Orders WHERE OrderID = ?",
+                         (rows[0]["OrderID"],))[0])
