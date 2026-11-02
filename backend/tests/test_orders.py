@@ -3,9 +3,11 @@ They run on the rebuilt test database. Seed data used (see database/01_*.sql):
   NC433-BT-6..11      silver ring, 1,481,000 VND, engravable, stock 3 each  (under the free-shipping line)
   BT161B-VT           earrings, 2,361,000 VND, not engravable               (over the free-shipping line)
   NDINO131LDIA-VT-11  engagement ring, 25,448,000 VND, engravable, stock 3  (over the 5,000,000 VND online cancel limit)
+  PSMEOTHANTAI-STD    charm, 139,000 VND, not engravable                    (a small order the customer may cancel)
+  BTZ008-VV           earrings, 2,198,000 VND, not engravable               (with voucher GIAM300K the total is 1,898,000)
 Rules: shipping is 30,000 VND below 2,000,000 VND of goods, else free. Voucher WELCOME5 gives 5% (rounded to 1,000).
-Cancel rule: an order of 5,000,000 VND or less can be cancelled on the website after a reminder popup;
-a larger order must be cancelled by phone (an admin cancels it).
+Cancel rule: an order under 2,000,000 VND (what the customer pays) without engraved items can be cancelled on the
+website after a reminder popup; any other order must be cancelled by phone (an admin cancels it).
 Each test uses its own new customer, and orders are never deleted (the database is rebuilt every run)."""
 import uuid
 
@@ -18,13 +20,16 @@ from conftest import PASSWORD, make_user
 CHEAP = "NC433-BT-{}"  # format with a ring size 6..11
 MID = "BT161B-VT"
 BIG = "NDINO131LDIA-VT-11"
+SMALL = "PSMEOTHANTAI-STD"
+DEAL = "BTZ008-VV"
 
 
 @pytest.fixture(autouse=True)
 def restock_mid(db_ready):
-    """Many tests buy MID, so give it plenty of stock before each test."""
+    """Many tests buy these, so give them plenty of stock before each test."""
     with transaction() as cur:
-        cur.execute("UPDATE dbo.ProductVariants SET StockQuantity = 100 WHERE VariantSKU = ?", (MID,))
+        cur.execute("UPDATE dbo.ProductVariants SET StockQuantity = 100 WHERE VariantSKU IN (?, ?, ?, ?)",
+                    (MID, SMALL, DEAL, CHEAP.format(11)))
 
 
 def new_customer(app_client=None, with_address=True):
@@ -161,7 +166,8 @@ def test_cart_same_variant_adds_up_but_engraving_makes_a_new_line(client):
     ({"variantSku": CHEAP.format(8), "quantity": "2"}, 400),
     ({"variantSku": CHEAP.format(8), "quantity": 4}, 409),               # stock is 3
     ({"variantSku": MID, "engravingText": "Love"}, 400),                 # not engravable
-    ({"variantSku": CHEAP.format(8), "engravingText": "x" * 31}, 400),
+    ({"variantSku": CHEAP.format(8), "engravingText": "x" * 16}, 400),          # the limit is 15 characters
+    ({"variantSku": CHEAP.format(8), "engravingText": "Love", "engravingStyle": "Gothic"}, 400),
     ({"variantSku": 123}, 400),
     ({}, 400),
 ])
@@ -302,27 +308,39 @@ def test_cancel_request_only_asks_and_a_confirmed_cancel_returns_stock(client):
 
 
 def test_popup_names_the_voucher_the_customer_would_lose(client):
+    # 2,198,000 VND of goods with voucher GIAM300K: the customer pays 1,898,000 VND, so the order may be cancelled
+    # on the website. The popup says what is lost and what the full price is if the customer orders again.
     c, addr = new_customer()
-    add_to_cart(c, MID)
-    code = checkout(c, addr, voucherCode="WELCOME5").get_json()["OrderCode"]
+    add_to_cart(c, DEAL)
+    code = checkout(c, addr, voucherCode="GIAM300K").get_json()["OrderCode"]
     popup = c.post(f"/api/orders/{code}/cancel", json={}).get_json()
-    assert popup["VoucherCode"] == "WELCOME5" and popup["VoucherDiscount"] == 118000
+    assert popup["VoucherCode"] == "GIAM300K" and popup["VoucherDiscount"] == 300000
+    assert popup["Subtotal"] == 2198000 and popup["TotalAmount"] == 1898000
     detail = c.get(f"/api/orders/{code}").get_json()        # the page can show the popup again after a reload
-    assert detail["pendingCancelRequest"] == {"RequestID": popup["RequestID"], "VoucherCode": "WELCOME5",
-                                              "VoucherDiscount": 118000}
+    assert detail["pendingCancelRequest"] == {"RequestID": popup["RequestID"], "VoucherCode": "GIAM300K",
+                                              "VoucherDiscount": 300000, "Subtotal": 2198000, "TotalAmount": 1898000}
+    assert detail["CancelChannel"] == "Web"
+
+
+def test_without_the_voucher_the_same_goods_cannot_be_cancelled_on_the_website(client):
+    c, addr = new_customer()
+    add_to_cart(c, DEAL)
+    code = checkout(c, addr).get_json()["OrderCode"]                 # 2,198,000 VND to pay
+    assert c.post(f"/api/orders/{code}/cancel", json={}).status_code == 403
+    assert c.get(f"/api/orders/{code}").get_json()["CancelChannel"] == "Hotline"
 
 
 def test_keeping_the_order_changes_nothing_about_the_money(client):
     c, addr = new_customer()
-    before = stock(MID)
-    add_to_cart(c, MID)
-    order = checkout(c, addr, voucherCode="WELCOME5").get_json()
+    before = stock(DEAL)
+    add_to_cart(c, DEAL)
+    order = checkout(c, addr, voucherCode="GIAM300K").get_json()
     code = order["OrderCode"]
     c.post(f"/api/orders/{code}/cancel", json={})
     done = c.post(f"/api/orders/{code}/cancel/respond", json={"keepOrder": True}).get_json()
     assert done["OrderStatus"] == "Pending" and done["TotalAmount"] == order["TotalAmount"]
     assert done["IsRetentionApplied"] is True
-    assert stock(MID) == before - 1
+    assert stock(DEAL) == before - 1
     assert c.get(f"/api/orders/{code}").get_json()["pendingCancelRequest"] is None
     # the customer may press cancel again later and gets a new popup
     assert c.post(f"/api/orders/{code}/cancel", json={}).status_code == 200
@@ -336,14 +354,25 @@ def test_pressing_cancel_twice_gives_the_same_request(client):
     assert first["RequestID"] == second["RequestID"]
 
 
-def test_order_over_5_million_cannot_be_cancelled_on_the_website(client):
+@pytest.mark.parametrize("sku,extra", [(BIG, {}), (MID, {}), (CHEAP.format(11), {"engravingText": "Love"})])
+def test_expensive_or_engraved_order_cannot_be_cancelled_on_the_website(client, sku, extra):
+    # 2,000,000 VND or more, or any engraved item (even a cheap one): the customer is told to call the hotline.
+    c, addr = new_customer()
+    assert add_to_cart(c, sku, **extra).status_code in (200, 201)
+    code = checkout(c, addr).get_json()["OrderCode"]
+    res = c.post(f"/api/orders/{code}/cancel", json={})
+    assert res.status_code == 403 and res.get_json()["code"] == 50029
+    assert res.get_json()["error"] == ("Khách hàng không thể tự hủy vì đơn hàng có giá trị cao hoặc có sản phẩm khắc chữ. "
+                                       "Vui lòng gọi qua hotline 1900 0000 để được hỗ trợ.")
+    assert order_status(code) == "Pending"
+    assert query("SELECT COUNT(*) AS n FROM dbo.OrderCancellationRequests r JOIN dbo.Orders o ON o.OrderID = r.OrderID "
+                 "WHERE o.OrderCode = ?", (code,))[0]["n"] == 0
+    listed = c.get("/api/orders").get_json()[0]
+    assert listed["CancelChannel"] == "Hotline" and listed["HasEngraving"] == bool(extra)
+
+def test_admin_cancels_an_order_for_a_customer_who_called_the_hotline(client):
     c, addr = new_customer()
     code = place(c, addr, BIG)["OrderCode"]
-    res = c.post(f"/api/orders/{code}/cancel", json={})
-    assert res.status_code == 403 and "hotline" in res.get_json()["error"]
-    assert order_status(code) == "Pending"
-    assert c.get("/api/orders").get_json()[0]["CancelChannel"] == "Hotline"
-    # an admin can still cancel it, as if the customer called
     admin = new_admin()
     assert admin.post(f"/api/admin/orders/{code}/status", json={"status": "Cancelled"}).status_code == 200
     assert order_status(code) == "Cancelled"
@@ -351,7 +380,7 @@ def test_order_over_5_million_cannot_be_cancelled_on_the_website(client):
 
 def test_cancel_channel_in_the_order_list(client):
     c, addr = new_customer()
-    code = place(c, addr, MID)["OrderCode"]
+    code = place(c, addr, SMALL)["OrderCode"]
     assert c.get("/api/orders").get_json()[0]["CancelChannel"] == "Web"
     admin = new_admin()
     for status in ("Confirmed", "Shipping"):
@@ -500,7 +529,7 @@ def test_odd_page_numbers_are_400_not_500(client, qs):
 
 def test_admin_cancel_closes_a_waiting_cancel_request(client):
     c, addr = new_customer()
-    code = place(c, addr, MID)["OrderCode"]
+    code = place(c, addr, SMALL)["OrderCode"]
     c.post(f"/api/orders/{code}/cancel", json={})                          # popup is waiting
     assert c.get(f"/api/orders/{code}").get_json()["pendingCancelRequest"] is not None
     new_admin().post(f"/api/admin/orders/{code}/status", json={"status": "Cancelled"})
@@ -521,3 +550,59 @@ def test_cart_item_id_too_big_for_the_database_is_404_not_a_crash(client):
     c, _ = new_customer()
     assert c.patch(f"/api/cart/{2 ** 63}", json={"quantity": 1}).status_code == 404
     assert c.delete(f"/api/cart/{2 ** 63}").status_code == 404
+
+
+# ---------------- engraving style ----------------
+
+def cart_lines(client):
+    return client.get("/api/cart").get_json()["items"]
+
+
+def test_engraving_text_of_exactly_15_characters_is_accepted(client):
+    c, _ = new_customer()
+    ring = CHEAP.format(11)                      # restocked before each test of this file
+    assert add_to_cart(c, ring, engravingText="1234567890ABCDE").status_code == 201
+    assert add_to_cart(c, ring, engravingText="1234567890ABCDEF").status_code == 400
+
+
+def test_engraving_style_defaults_to_classic_and_is_stored(client):
+    c, _ = new_customer()
+    ring = CHEAP.format(11)
+    add_to_cart(c, ring, engravingText="Love")
+    add_to_cart(c, ring, engravingText="Love", engravingStyle="Handwritten")
+    add_to_cart(c, ring)                                                   # no engraving: no style
+    lines = {(line["EngravingText"], line["EngravingStyle"]) for line in cart_lines(c)}
+    assert lines == {("Love", "Classic"), ("Love", "Handwritten"), (None, None)}
+
+
+def test_a_style_without_engraving_text_is_ignored(client):
+    c, _ = new_customer()
+    assert add_to_cart(c, CHEAP.format(11), engravingStyle="Modern").status_code == 201
+    assert cart_lines(c)[0]["EngravingText"] is None and cart_lines(c)[0]["EngravingStyle"] is None
+
+
+def test_same_text_in_another_style_is_a_separate_line_and_the_same_style_adds_up(client):
+    c, _ = new_customer()
+    ring = CHEAP.format(11)
+    assert add_to_cart(c, ring, engravingText="Love", engravingStyle="Modern").status_code == 201
+    assert add_to_cart(c, ring, engravingText="Love", engravingStyle="Classic").status_code == 201
+    assert add_to_cart(c, ring, engravingText="Love", engravingStyle="Modern").status_code == 200
+    quantities = {line["EngravingStyle"]: line["Quantity"] for line in cart_lines(c)}
+    assert quantities == {"Modern": 2, "Classic": 1}
+
+
+def test_the_style_is_copied_to_the_order_for_the_craftsmen(client):
+    c, addr = new_customer()
+    add_to_cart(c, CHEAP.format(11), engravingText="Forever", engravingStyle="Handwritten")
+    code = checkout(c, addr).get_json()["OrderCode"]
+    items = c.get(f"/api/orders/{code}").get_json()["items"]
+    assert [(i["EngravingText"], i["EngravingStyle"]) for i in items] == [("Forever", "Handwritten")]
+
+
+# ---------------- products sold by quote only ----------------
+
+def test_a_quote_only_product_cannot_be_put_in_the_cart(client):
+    c, _ = new_customer()
+    res = add_to_cart(c, "MDBZ036-VV")                 # 24K pendant priced by the gold price of the day
+    assert res.status_code == 409 and res.get_json()["reason"] == "quote_only"
+    assert c.get("/api/cart").get_json()["items"] == []

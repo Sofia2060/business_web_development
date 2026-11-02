@@ -20,6 +20,11 @@ def restock(db_ready):
         cur.execute("UPDATE dbo.ProductVariants SET StockQuantity = 100 WHERE VariantSKU = 'BT161B-VT'")
 
 
+def unique_phone():
+    """A phone number no other customer has (the phone is the customer id, so it is unique)."""
+    return "09" + str(uuid.uuid4().int)[:8]
+
+
 def email_of(client):
     return client.get("/api/auth/me").get_json()["email"]
 
@@ -52,20 +57,23 @@ def test_new_customer_has_an_empty_profile(client):
 
 def test_update_one_field_leaves_the_others(client):
     c, _ = new_customer(with_address=False)
-    res = c.patch("/api/profile", json={"phone": " 0901234567 "})
+    phone = unique_phone()
+    res = c.patch("/api/profile", json={"phone": f" {phone} "})
     assert res.status_code == 200
-    assert res.get_json()["phone"] == "0901234567" and res.get_json()["fullName"] == "Khách Test"
+    assert res.get_json()["phone"] == phone and res.get_json()["fullName"] == "Khách Test"
     row = stored(c)
-    assert row["Phone"] == "0901234567" and row["FullName"] == "Khách Test"
+    assert row["Phone"] == phone and row["FullName"] == "Khách Test"
     assert row["CustomerUpdated"] is not None and row["UserUpdated"] is None    # only the customer row changed
 
 
 def test_update_everything_and_read_it_back(client):
     c, _ = new_customer(with_address=False)
-    body = {"fullName": "Nguyễn Thị Mai", "phone": "+84901234567", "dateOfBirth": "1995-05-20", "defaultRingSize": 10}
+    phone = unique_phone()
+    body = {"fullName": "Nguyễn Thị Mai", "phone": "+84" + phone[1:], "dateOfBirth": "1995-05-20", "defaultRingSize": 10}
     res = c.patch("/api/profile", json=body)
     assert res.status_code == 200
-    assert {k: v for k, v in res.get_json().items() if k != "email"} == body
+    # +84 is stored as 0: one number has one spelling
+    assert {k: v for k, v in res.get_json().items() if k != "email"} == {**body, "phone": phone}
     assert c.get("/api/profile").get_json()["dateOfBirth"] == "1995-05-20"
     assert c.get("/api/auth/me").get_json()["fullName"] == "Nguyễn Thị Mai"      # the login info sees the new name
     row = stored(c)
@@ -75,7 +83,7 @@ def test_update_everything_and_read_it_back(client):
 @pytest.mark.parametrize("empty", [None, ""])
 def test_optional_fields_can_be_cleared(client, empty):
     c, _ = new_customer(with_address=False)
-    c.patch("/api/profile", json={"phone": "0901234567", "dateOfBirth": "1990-01-01", "defaultRingSize": 9})
+    c.patch("/api/profile", json={"phone": unique_phone(), "dateOfBirth": "1990-01-01", "defaultRingSize": 9})
     res = c.patch("/api/profile", json={"phone": empty, "dateOfBirth": empty, "defaultRingSize": empty})
     assert res.status_code == 200
     assert (res.get_json()["phone"], res.get_json()["dateOfBirth"], res.get_json()["defaultRingSize"]) == (None, None, None)

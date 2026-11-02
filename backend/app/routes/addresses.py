@@ -1,15 +1,12 @@
 """Delivery address book of the logged-in customer."""
-import re
-
 from flask import Blueprint, g, jsonify
 
 from ..auth import customer_required
 from ..db import query, transaction
-from ..validation import INT_MAX, body, text, utf16_len
+from ..validation import INT_MAX, body, normalize_phone, text, utf16_len
 
 bp = Blueprint("addresses", __name__, url_prefix="/api/addresses")
 
-PHONE_RE = re.compile(r"^[0-9+]{9,15}$")  # same rule as the CustomerAddresses.Phone CHECK constraint
 # body field name -> maximum length in UTF-16 units (the column size)
 LIMITS = {"recipientName": 100, "addressLine": 255, "ward": 100, "province": 100}
 COLUMNS = {"recipientName": "RecipientName", "phone": "Phone", "addressLine": "AddressLine",
@@ -19,7 +16,7 @@ SELECT_ADDRESS = ("SELECT AddressID, RecipientName, Phone, AddressLine, Ward, Pr
                   "FROM dbo.CustomerAddresses")
 
 
-def _read_fields(data: dict, keys) -> tuple[dict | None, str | None]:
+def read_fields(data: dict, keys) -> tuple[dict | None, str | None]:
     """The given body fields, stripped, and an error message when one is not valid."""
     fields = {}
     for key in keys:
@@ -30,12 +27,14 @@ def _read_fields(data: dict, keys) -> tuple[dict | None, str | None]:
     for key, limit in LIMITS.items():
         if key in fields and (not fields[key] or utf16_len(fields[key]) > limit):
             return None, f"{key} is required (max {limit} characters)"
-    if "phone" in fields and not PHONE_RE.match(fields["phone"]):
-        return None, "Invalid phone number"
+    if "phone" in fields:
+        fields["phone"] = normalize_phone(fields["phone"])
+        if fields["phone"] is None:
+            return None, "Invalid phone number"
     return fields, None
 
 
-def _full_address_error(line: str, ward: str, province: str) -> str | None:
+def full_address_error(line: str, ward: str, province: str) -> str | None:
     # An order copies the address into one 400-character text, so a longer address would be cut off.
     if utf16_len(f"{line}, {ward}, {province}") > MAX_FULL_ADDRESS:
         return f"The full address (street, ward, province) is limited to {MAX_FULL_ADDRESS} characters"
@@ -53,9 +52,9 @@ def list_addresses():
 def add_address():
     """Add an address. The first address is always the default. isDefault=true makes this one the default."""
     data = body()
-    fields, error = _read_fields(data, (*LIMITS, "phone"))
+    fields, error = read_fields(data, (*LIMITS, "phone"))
     if not error:
-        error = _full_address_error(fields["addressLine"], fields["ward"], fields["province"])
+        error = full_address_error(fields["addressLine"], fields["ward"], fields["province"])
     if not error and not isinstance(data.get("isDefault", False), bool):
         error = "isDefault must be true or false"
     if error:
@@ -88,7 +87,7 @@ def edit_address(address_id: int):
         return jsonify(error="Send at least one field to change"), 400
     if "isDefault" in data and not isinstance(data["isDefault"], bool):
         return jsonify(error="isDefault must be true or false"), 400
-    fields, error = _read_fields(data, keys)
+    fields, error = read_fields(data, keys)
     if error:
         return jsonify(error=error), 400
 
@@ -98,7 +97,7 @@ def edit_address(address_id: int):
         if current is None:
             return jsonify(error="Address not found"), 404
         merged = {"addressLine": current.AddressLine, "ward": current.Ward, "province": current.Province, **fields}
-        error = _full_address_error(merged["addressLine"], merged["ward"], merged["province"])
+        error = full_address_error(merged["addressLine"], merged["ward"], merged["province"])
         if not error and data.get("isDefault") is False and current.IsDefault:
             error = "Make another address the default instead"
         if error:

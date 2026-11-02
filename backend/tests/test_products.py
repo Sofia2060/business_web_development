@@ -193,3 +193,55 @@ def test_detail(client):
 
 def test_detail_unknown_sku(client):
     assert client.get("/api/products/NOPE").status_code == 404
+
+
+# ---------------- products that are sold by quote only ----------------
+# The 22 gold-priced products (24K and 22K pendants and one earring) have no online price: the shop gives a quote.
+
+QUOTE_SKU = "MDBZ038"          # 24K pendant, 0.74 g, labor 370,000 VND
+
+
+def test_the_gold_priced_products_are_quote_only(client):
+    assert count("IsQuoteOnly = 1") == 22
+    assert query("SELECT COUNT(*) AS n FROM dbo.Products WHERE PricingMethod = 'GoldRate' AND IsQuoteOnly = 0")[0]["n"] == 0
+    detail = client.get(f"/api/products/{QUOTE_SKU}").get_json()
+    assert detail["IsQuoteOnly"] is True and detail["CurrentPrice"] is None and detail["PricingMethod"] == "GoldRate"
+    assert detail["variants"]                                   # it can still be shown, with its colours and sizes
+    normal = client.get("/api/products/NDINO131LDIA").get_json()
+    assert normal["IsQuoteOnly"] is False and normal["CurrentPrice"] > 0
+
+
+def test_quote_only_products_are_listed_but_not_matched_by_price_filters(client):
+    assert client.get("/api/products?limit=1").get_json()["total"] == 443
+    assert list_all(client, "minPrice=0")["total"] == 421
+    assert list_all(client, "maxPrice=999999999999")["total"] == 421
+    assert list_all(client, "onSale=1")["total"] == count("OriginalPrice > CurrentPrice")
+    found = client.get("/api/products", query_string={"q": "Mặt dây", "limit": 100}).get_json()["items"]
+    assert any(i["IsQuoteOnly"] for i in found)                 # the search still finds them
+
+
+@pytest.mark.parametrize("sort", ["price_asc", "price_desc"])
+def test_quote_only_products_come_last_when_sorting_by_price(client, sort):
+    last_page = client.get(f"/api/products?sort={sort}&limit=100&page=5").get_json()["items"]        # products 401 to 443
+    assert len(last_page) == 43
+    assert [i["CurrentPrice"] is None for i in last_page] == [False] * 21 + [True] * 22
+    assert all(i["IsQuoteOnly"] for i in last_page[21:])
+
+
+def test_turning_the_flag_off_sells_the_product_at_the_gold_price(client):
+    # Tomorrow the shop may decide to sell these online again: the price then follows the gold price table.
+    from decimal import ROUND_HALF_UP, Decimal
+    from app.db import transaction
+    row = query("SELECT p.WeightGram, p.LaborPrice, g.SellPricePerChi FROM dbo.Products p CROSS APPLY "
+                "(SELECT TOP (1) SellPricePerChi FROM dbo.GoldPrices WHERE Material = p.Material AND EffectiveFrom <= SYSDATETIME() "
+                "ORDER BY EffectiveFrom DESC) g WHERE p.SKU = ?", (QUOTE_SKU,))[0]
+    exact = Decimal(str(row["WeightGram"])) / Decimal("3.75") * Decimal(row["SellPricePerChi"]) + Decimal(row["LaborPrice"])
+    expected = int((exact / 1000).quantize(Decimal(1), rounding=ROUND_HALF_UP) * 1000)
+    with transaction() as cur:
+        cur.execute("UPDATE dbo.Products SET IsQuoteOnly = 0 WHERE SKU = ?", (QUOTE_SKU,))
+    try:
+        assert client.get(f"/api/products/{QUOTE_SKU}").get_json()["CurrentPrice"] == expected == 3330000
+    finally:
+        with transaction() as cur:
+            cur.execute("UPDATE dbo.Products SET IsQuoteOnly = 1 WHERE SKU = ?", (QUOTE_SKU,))
+    assert client.get(f"/api/products/{QUOTE_SKU}").get_json()["CurrentPrice"] is None

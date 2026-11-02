@@ -123,6 +123,8 @@ uv run python backend/run.py
 | `GET /api/products` | Danh sách sản phẩm đang bán, có lọc và sắp xếp (xem bảng dưới) |
 | `GET /api/products/<sku>` | Chi tiết một sản phẩm, kèm ảnh, đá và biến thể. Ví dụ `/api/products/NDINO131LDIA` |
 
+Sản phẩm có `IsQuoteOnly: true` (22 sản phẩm vàng 24K, 22K tính theo giá vàng ngày) **chỉ báo giá**: `CurrentPrice` là `null`, không vào giỏ được (409, `reason: quote_only`), không khớp bộ lọc giá và xếp cuối khi sắp xếp theo giá.
+
 Tham số của `GET /api/products`. Các tham số khác nhau kết hợp bằng AND, các giá trị trong một tham số (cách nhau bằng dấu phẩy) kết hợp bằng OR:
 
 | Tham số | Ý nghĩa |
@@ -151,7 +153,7 @@ Mật khẩu lưu bằng bcrypt. Đăng nhập được giữ trong cookie phiê
 
 | Địa chỉ | Việc làm |
 |---|---|
-| `POST /api/auth/register` | Đăng ký. Body: `fullName`, `email`, `password` (8 đến 72 byte), `phone` (không bắt buộc). Trả 201 và tự đăng nhập. Email trùng trả 409 |
+| `POST /api/auth/register` | Đăng ký. Body: `fullName`, `email`, `password` (8 đến 72 byte), `phone` (không bắt buộc), `otp` (xem dưới). Trả 201 và tự đăng nhập. Email trùng trả 409. Số điện thoại đã thuộc một tài khoản trả 409 với `reason: phone_in_use` |
 | `POST /api/auth/login` | Đăng nhập bằng `email` và `password`. Sai mật khẩu hoặc email không có đều trả 401 cùng một nội dung. Tài khoản bị khóa trả 403 |
 | `POST /api/auth/logout` | Đăng xuất, trả 204 |
 | `GET /api/auth/me` | Thông tin người đang đăng nhập, chưa đăng nhập trả 401 |
@@ -172,7 +174,7 @@ Test nằm ở `backend/tests/test_auth.py`.
 
 ### Giỏ hàng, địa chỉ và đơn hàng
 
-Các API này cần đăng nhập bằng tài khoản khách (`Customer`). Tài khoản `Admin` gọi vào trả 403. Quy tắc nghiệp vụ nằm trong stored procedure của SQL Server. Back-end chỉ kiểm tra đầu vào, gọi thủ tục, và đổi lỗi của thủ tục thành mã HTTP. Thông báo lỗi là câu tiếng Việt viết sẵn trong thủ tục.
+Các API này cần đăng nhập bằng tài khoản khách (`Customer`). Tài khoản `Admin` gọi vào trả 403. Ngoại lệ là các API đơn hàng có `<mã đơn>` và `POST /api/orders/guest`: khách **không có tài khoản** (khách vãng lai) dùng được, xem mục "Đặt hàng không cần tài khoản" bên dưới. Quy tắc nghiệp vụ nằm trong stored procedure của SQL Server. Back-end chỉ kiểm tra đầu vào, gọi thủ tục, và đổi lỗi của thủ tục thành mã HTTP. Thông báo lỗi là câu tiếng Việt viết sẵn trong thủ tục.
 
 | Địa chỉ | Việc làm |
 |---|---|
@@ -180,31 +182,54 @@ Các API này cần đăng nhập bằng tài khoản khách (`Customer`). Tài 
 | `PATCH /api/addresses/<id>` | Sửa địa chỉ, chỉ gửi trường cần đổi. `isDefault: true` đặt làm mặc định. Tắt mặc định của địa chỉ đang là mặc định trả 400, phải đặt địa chỉ khác làm mặc định |
 | `DELETE /api/addresses/<id>` | Xóa địa chỉ (204). Xóa địa chỉ mặc định thì địa chỉ cũ nhất còn lại thành mặc định. Đơn đã đặt giữ bản sao địa chỉ riêng |
 | `GET /api/cart` | Giỏ hàng kèm `subtotal`, `shippingFee`, `total` |
-| `POST /api/cart` | Thêm biến thể: `variantSku`, `quantity` (1 đến 10), `engravingText` (khắc tên, tối đa 30 ký tự). Thêm lại cùng biến thể và cùng chữ khắc thì cộng dồn số lượng. Quá tồn kho trả 409 |
+| `POST /api/cart` | Thêm biến thể: `variantSku`, `quantity` (1 đến 10), `engravingText` (khắc tên, tối đa 15 ký tự), `engravingStyle` (`Classic`, `Modern`, `Handwritten`, mặc định `Classic`, bỏ qua nếu không có chữ khắc). Thêm lại cùng biến thể, cùng chữ khắc và cùng kiểu chữ thì cộng dồn số lượng, khác kiểu chữ là dòng riêng. Quá tồn kho trả 409 |
 | `PATCH /api/cart/<id>`, `DELETE /api/cart/<id>` | Đổi số lượng, xóa dòng |
 | `POST /api/orders` | Đặt hàng từ giỏ (`sp_PlaceOrder`). Body: `addressId`, `paymentMethod` (`COD`, `BankTransfer`, `VNPay`, `MoMo`), `checkoutToken`, `voucherCode`, `note`. Trả 201 |
 | `GET /api/orders`, `GET /api/orders/<mã đơn>` | Đơn của chính khách. Đơn của người khác trả 404 |
-| `POST /api/orders/<mã đơn>/cancel` | Khách bấm "Hủy đơn" (`sp_RequestCancelOrder`). Chưa hủy ngay: trả `RequestID`, `VoucherCode`, `VoucherDiscount` để hiện popup nhắc "hủy sẽ mất voucher". Đơn trên 5.000.000 đ trả 403, khách phải gọi hotline |
+| `POST /api/orders/<mã đơn>/cancel` | Khách bấm "Hủy đơn" (`sp_RequestCancelOrder`). Chưa hủy ngay: trả `RequestID`, `VoucherCode`, `VoucherDiscount`, `Subtotal` (giá gốc), `TotalAmount` để hiện popup "hủy sẽ mất voucher, đặt lại chỉ còn giá gốc". Đơn từ 2.000.000 đ hoặc có khắc chữ trả 403 kèm câu "gọi hotline". Đơn đã bắt đầu chế tác trả 409 |
+| `POST /api/orders/<mã đơn>/pay` | Thanh toán mô phỏng cho đơn VNPay hoặc MoMo, luôn thành công (`sp_RecordPaymentResult`). Đơn đã hủy hoặc quá 15 phút trả 409. Đơn COD và chuyển khoản trả 400 |
 | `POST /api/orders/<mã đơn>/cancel/respond` | Khách chọn trong popup (`sp_RespondCancelPopup`): `keepOrder: true` giữ đơn, `keepOrder: false` hủy đơn, trả tồn kho, mất voucher |
 | `POST /api/orders/<mã đơn>/confirm-received` | Xác nhận đã nhận hàng (`sp_ConfirmOrderReceived`). Chỉ khi đơn đang giao. Database tự tạo thẻ bảo hành |
 | `GET /api/admin/orders` | Admin xem mọi đơn. Tham số `status`, `page`, `limit` |
-| `POST /api/admin/orders/<mã đơn>/status` | Admin đổi trạng thái (`sp_UpdateOrderStatus`): `Confirmed`, `Shipping`, `Delivered`, `Cancelled`. Nhảy bước trả 409 |
+| `POST /api/admin/orders/<mã đơn>/status` | Admin đổi trạng thái (`sp_UpdateOrderStatus`): `Confirmed`, `Shipping`, `Delivered`, `Cancelled`. Nhảy bước trả 409. Hủy đơn đã bắt đầu chế tác trả 409 |
+| `POST /api/admin/orders/<mã đơn>/confirm-payment` | Admin xác nhận đã nhận tiền chuyển khoản (mô phỏng, không nối ngân hàng). Chỉ đơn `BankTransfer` |
+| `POST /api/admin/orders/<mã đơn>/start-production` | Admin đánh dấu đã bắt đầu chế tác đơn (`sp_StartOrderProduction`). Từ lúc này không ai hủy được đơn. Chỉ đơn đã xác nhận |
 
 Điểm cần nhớ:
 - `checkoutToken` là một UUID do trình duyệt tạo cho mỗi lần thanh toán. Gửi lại cùng token (bấm đúp, mạng chậm) thì nhận lại đúng đơn cũ với mã 200, không tạo đơn thứ hai.
 - Phí giao hàng do server tính, không nhận từ trình duyệt: 30.000 đ, miễn phí khi tiền hàng từ 2.000.000 đ (tính trước khi giảm giá). Hằng số nằm ở `backend/app/config.py`.
+- Quy tắc hủy đơn (số tiền khách phải trả, sau voucher, nằm trong `fn_OnlineCancelLimit()`): **dưới 2.000.000 đ và không khắc chữ** thì khách tự hủy trên web (qua popup nhắc mất voucher). **Từ 2.000.000 đ, hoặc có khắc chữ** thì phải gọi hotline; nhân viên hỏi tình hình chế tác rồi hủy bằng API admin. Đơn đã bắt đầu chế tác thì không ai hủy được. Ví dụ: giá gốc 2.198.000 đ, voucher `GIAM300K` còn 1.898.000 đ thì tự hủy được; không voucher thì phải gọi hotline.
 - Hủy đơn có hai bước. Bước 1 (`/cancel`) chỉ tạo yêu cầu và cho biết voucher sẽ mất. Bước 2 (`/cancel/respond`) mới giữ hoặc hủy. Cột `CancelChannel` trong danh sách đơn cho biết trang nên hiện nút hủy (`Web`), dòng "gọi hotline" (`Hotline`) hay không hiện gì (`null`). Admin hủy đơn qua `POST /api/admin/orders/<mã đơn>/status` với `Cancelled`.
 - Gửi lại cùng token cho kết quả giống hệt lần đầu (cùng khóa `OrderCode`, `TotalAmount`, `ShippingFee`), chỉ khác mã 200 thay vì 201.
 - Địa chỉ đầy đủ (đường, phường, tỉnh) tối đa 400 ký tự, vì đơn hàng chép địa chỉ vào một cột 400 ký tự.
+- Kiểu chữ khắc được chép sang đơn hàng (`EngravingStyle`) để nhân viên chế tác biết. Mã và trạng thái giao diện dùng khác database (kiểu chữ, phương thức thanh toán, trạng thái đơn, thanh toán, lịch hẹn): xem `docs/database/doi-chieu-giao-dien.md`.
 - Khắc tên: database coi chữ hoa và chữ thường là một, và bỏ qua dấu thanh ("Mai" bằng "Mại"). Thêm một chữ khắc chỉ khác kiểu đó vào giỏ trả 409. Các chữ khác nhau thật như "Năm" và "Nam" là hai dòng riêng.
 - Hai yêu cầu chạy cùng lúc gây xung đột (trùng dòng giỏ hàng, mã ưu đãi vừa hết lượt) trả 409 để thử lại. Lỗi database khác trả 500 với câu chung, không lộ nội dung SQL. Khi SQL Server chọn một yêu cầu làm nạn nhân của deadlock (hai yêu cầu chờ nhau), hàm `call()` tự chạy lại thủ tục, tối đa 3 lần.
-- Chưa làm: cổng thanh toán (ghi nhận kết quả VNPay hoặc MoMo, `sp_RecordPaymentResult`), bảo hành và lịch hẹn hậu mãi, đánh giá. Đơn trả trước hiện ở trạng thái thanh toán `Pending`.
+- Thanh toán là mô phỏng hoàn toàn: không có cổng thật. Đơn trả trực tuyến (VNPay, MoMo, chuyển khoản) phải thanh toán trong **15 phút** (`fn_PaymentTimeoutMinutes()`), quá hạn thì đơn thất bại: hủy, trả tồn kho, trả lượt voucher, thanh toán chuyển sang `Expired`. `PaymentDeadline` trong thông tin đơn là giờ hết hạn, để giao diện đếm ngược. Backend gọi `sp_ExpireUnpaidOrders` trước mỗi yêu cầu `/api/` nên không cần bộ hẹn giờ.
+- Chưa làm: bảo hành và lịch hẹn hậu mãi, đánh giá, hoàn tiền thật (hủy đơn đã trả tiền chỉ đổi thanh toán sang `Refunded`).
+
+### Đặt hàng không cần tài khoản
+
+Khách chưa đăng nhập vẫn đặt hàng được. **Số điện thoại là mã khách hàng**: một số là một khách. Số được lưu một kiểu duy nhất (`+84901234567` thành `0901234567`).
+
+| Địa chỉ | Việc làm |
+|---|---|
+| `POST /api/orders/guest` | Đặt hàng. Body: `fullName`, `phone`, `addressLine`, `ward`, `province`, `items` (tối đa 20 dòng, mỗi dòng `variantSku`, `quantity`, `engravingText`, `engravingStyle`), `paymentMethod`, `checkoutToken`, `voucherCode`, `note`. Giỏ của khách vãng lai nằm trong trình duyệt nên gửi kèm trong yêu cầu. Trả 201 (gửi lại cùng token trả 200). Số đã có tài khoản trả 409 với `reason: phone_has_account` |
+| `GET /api/orders/<mã đơn>?phone=<sđt>` | Tra cứu đơn bằng mã đơn và số điện thoại. Sai số hoặc sai mã đều trả 404 cùng một nội dung |
+| `POST /api/orders/<mã đơn>/cancel`, `/cancel/respond`, `/confirm-received`, `/pay` | Giống khách có tài khoản, gửi thêm `phone` trong body |
+
+- Khi khách vãng lai đăng ký tài khoản bằng đúng số đó, đơn, địa chỉ và thẻ bảo hành cũ tự thuộc về tài khoản (dòng khách hàng được gắn thêm `UserID`). Cần mã xác minh: gửi `otp` trong `POST /api/auth/register`. Thiếu mã trả 409 `reason: otp_required`, sai mã trả 400 `reason: otp_invalid`, thành công trả `linkedOrders` (số đơn nhận lại).
+- **Mã xác minh là mã giả `123456`** (hằng `DEMO_OTP` trong `backend/app/config.py`), vì cửa hàng không gửi SMS. Ai biết số điện thoại của khách vãng lai và mã này đều nhận được đơn cũ của số đó, nên đây chỉ dùng để demo. Muốn dùng thật phải gửi mã ngẫu nhiên qua SMS.
+- Khách vãng lai không có danh sách đơn (cần mã đơn). Admin thấy đơn của họ trong `GET /api/admin/orders` với `IsGuest: true`, tên người nhận và số điện thoại.
+- Các yêu cầu đặt hàng cùng một số điện thoại chạy lần lượt (khóa theo số, chờ tối đa 10 giây, quá thì trả 409), vì dùng chung một giỏ tạm. Đặt hàng thất bại thì không để lại khách, địa chỉ hay giỏ nào.
+- Số điện thoại được chuẩn hóa: `+84901234567`, `84901234567`, `0084901234567` và `0901234567` là một số.
+- **Rủi ro đã biết, chưa xử lý** (cần làm trước khi đưa lên mạng thật, thuộc nhóm bảo mật): mã đơn tăng dần nên đoán được; mã xác minh là mã giả; chưa giới hạn số lần thử theo địa chỉ IP hoặc số điện thoại; trả lời đăng ký cho biết một số điện thoại có đơn hay có tài khoản; số điện thoại nằm trong địa chỉ URL của `GET /api/orders/<mã đơn>?phone=` (nên dùng POST khi có thể).
 
 ### Hồ sơ, tra cứu và sản phẩm đã xem
 
 | Địa chỉ | Việc làm |
 |---|---|
-| `GET /api/profile`, `PATCH /api/profile` | Hồ sơ khách (cần đăng nhập khách). Sửa `fullName`, `phone`, `dateOfBirth` (`YYYY-MM-DD`, trước hôm nay), `defaultRingSize` (có trong bảng size nhẫn). Chỉ trường có trong body mới đổi. `null` hoặc `""` xóa số điện thoại, ngày sinh, size. Một trường sai thì không lưu gì. Email và vai trò không đổi được ở đây |
+| `GET /api/profile`, `PATCH /api/profile` | Hồ sơ khách (cần đăng nhập khách). Sửa `fullName`, `phone` (không trùng khách khác, trùng trả 409 `phone_in_use`), `dateOfBirth` (`YYYY-MM-DD`, trước hôm nay), `defaultRingSize` (có trong bảng size nhẫn). Chỉ trường có trong body mới đổi. `null` hoặc `""` xóa số điện thoại, ngày sinh, size. Một trường sai thì không lưu gì. Email và vai trò không đổi được ở đây |
 | `GET /api/categories` | Danh mục còn bán, kèm số sản phẩm (`ProductCount`). Thay `mock-data/categories.json` |
 | `GET /api/collections` | Bộ sưu tập kèm số sản phẩm, các danh mục (`Categories`) và tuổi vàng (`Materials`) có trong bộ sưu tập. Thay `mock-data/collections.json` |
 | `GET /api/ring-sizes` | Bảng quy đổi size nhẫn. Thay `mock-data/size-chart.json` |

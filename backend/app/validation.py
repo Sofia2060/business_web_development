@@ -6,6 +6,7 @@ from flask import request
 INT_MAX = 2_147_483_647  # largest value of a SQL Server INT column
 _NUMBER = re.compile(r"[0-9]{1,6}")  # ASCII digits only, short enough that page * limit cannot overflow
 _MONEY = re.compile(r"[0-9]{1,12}")  # fits DECIMAL(15,0), the type of every price column
+_PHONE = re.compile(r"\+?[0-9]{9,15}")  # digits, with a + only at the start (the CHECK constraints allow 9 to 15 characters)
 
 
 def body() -> dict:
@@ -36,6 +37,25 @@ def id_list(raw: str, max_items: int = 50) -> list[int] | None:
 def money(raw: str) -> int | None:
     """A query-string amount in VND (0 or more, up to 12 digits). None when it is not a plain whole number."""
     return int(raw) if _MONEY.fullmatch(raw) else None
+
+
+def normalize_phone(raw: str) -> str | None:
+    """A phone number as it is stored, or None when it is not valid. The phone is the customer id,
+    so one number must have one spelling: +84901234567, 84901234567 and 0084901234567 are all stored as 0901234567."""
+    phone = raw.strip()
+    if not _PHONE.fullmatch(phone) or len(phone) > 15:
+        return None
+    # Vietnamese numbers can be written with the country code in three ways, with or without the leading 0 after it.
+    if phone.startswith("+84"):
+        national = phone[3:]
+    elif phone.startswith("0084"):
+        national = phone[4:]
+    elif phone.startswith("84") and len(phone) == 11:
+        national = phone[2:]
+    else:
+        return phone
+    phone = "0" + national.removeprefix("0")
+    return phone if 9 <= len(phone) <= 15 else None
 
 
 def text(data: dict, key: str) -> str | None:

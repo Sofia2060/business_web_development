@@ -9,6 +9,10 @@ import pyodbc
 from .config import db_connection_string
 
 
+class LockBusy(Exception):
+    """Another request holds the lock this request needs and did not let go in time. The caller can try again."""
+
+
 class ProcError(Exception):
     """A business rule error raised by a stored procedure with THROW (error numbers 50000 and up).
     `message` is the Vietnamese text written in the procedure, safe to show to the user."""
@@ -32,6 +36,31 @@ def _connect(autocommit: bool = False):
     conn = pyodbc.connect(db_connection_string(), timeout=5, autocommit=autocommit)
     conn.timeout = 30
     return conn
+
+
+@contextmanager
+def named_lock(name: str, wait_ms: int = 10_000):
+    """Hold a SQL Server application lock while the block runs, so two requests for the same thing
+    (for example two orders from the same phone number) run one after the other instead of at the same time.
+    The lock belongs to a connection kept open for the block. It is released by name, because closing a pooled
+    connection only gives it back to the pool and the session (with its lock) stays alive."""
+    conn = _connect(autocommit=True)
+    held = False
+    try:
+        got = conn.cursor().execute(
+            "SET NOCOUNT ON; DECLARE @r INT; "
+            "EXEC @r = sp_getapplock @Resource = ?, @LockMode = 'Exclusive', @LockOwner = 'Session', @LockTimeout = ?; "
+            "SELECT @r;", (name, wait_ms)).fetchval()
+        if got < 0:
+            raise LockBusy(name)
+        held = True
+        yield
+    finally:
+        try:
+            if held:
+                conn.cursor().execute("EXEC sp_releaseapplock @Resource = ?, @LockOwner = 'Session'", (name,))
+        finally:
+            conn.close()
 
 
 def _clean(value):

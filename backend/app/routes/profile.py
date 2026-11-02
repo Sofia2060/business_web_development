@@ -2,15 +2,15 @@
 import re
 from datetime import date
 
+import pyodbc
 from flask import Blueprint, g, jsonify
 
 from ..auth import customer_required
 from ..db import query, transaction
-from ..validation import body, is_int, text, utf16_len
+from ..validation import body, is_int, normalize_phone, text, utf16_len
 
 bp = Blueprint("profile", __name__, url_prefix="/api/profile")
 
-PHONE_RE = re.compile(r"^[0-9+]{9,15}$")  # same rule as the Customers.Phone CHECK constraint
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 EARLIEST_BIRTH = date(1900, 1, 1)
 FIELDS = ("fullName", "phone", "dateOfBirth", "defaultRingSize")
@@ -50,8 +50,12 @@ def update_profile():
     if "phone" in changes:
         phone = text(changes, "phone")
         phone = phone.strip() if phone is not None else None
-        if phone is None or (phone and not PHONE_RE.match(phone)):
+        phone = normalize_phone(phone) if phone else phone
+        if phone is None:
             return jsonify(error="Invalid phone number"), 400
+        # The phone is the customer id, so it is unique. Taking over a guest's number is done at registration only.
+        if phone and query("SELECT 1 AS x FROM dbo.Customers WHERE Phone = ? AND CustomerID <> ?", (phone, g.customer_id)):
+            return jsonify(error="Phone number is already used", reason="phone_in_use"), 409
         columns["Phone"] = phone or None
     if "dateOfBirth" in changes:
         raw = changes["dateOfBirth"]
@@ -74,14 +78,17 @@ def update_profile():
         else:
             columns["DefaultRingSize"] = size
 
-    with transaction() as cur:
-        if "FullName" in columns:
-            cur.execute("UPDATE dbo.Users SET FullName = ?, UpdatedAt = SYSDATETIME() WHERE UserID = ?",
-                        (columns["FullName"], g.user["UserID"]))
-        customer_columns = {k: v for k, v in columns.items() if k != "FullName"}
-        if customer_columns:
-            # Column names come from the fixed keys above, never from the request.
-            sets = ", ".join(f"{name} = ?" for name in customer_columns)
-            cur.execute(f"UPDATE dbo.Customers SET {sets}, UpdatedAt = SYSDATETIME() WHERE CustomerID = ?",
-                        (*customer_columns.values(), g.customer_id))
+    try:
+        with transaction() as cur:
+            if "FullName" in columns:
+                cur.execute("UPDATE dbo.Users SET FullName = ?, UpdatedAt = SYSDATETIME() WHERE UserID = ?",
+                            (columns["FullName"], g.user["UserID"]))
+            customer_columns = {k: v for k, v in columns.items() if k != "FullName"}
+            if customer_columns:
+                # Column names come from the fixed keys above, never from the request.
+                sets = ", ".join(f"{name} = ?" for name in customer_columns)
+                cur.execute(f"UPDATE dbo.Customers SET {sets}, UpdatedAt = SYSDATETIME() WHERE CustomerID = ?",
+                            (*customer_columns.values(), g.customer_id))
+    except pyodbc.IntegrityError:    # the same number was taken by another request at the same moment
+        return jsonify(error="Phone number is already used", reason="phone_in_use"), 409
     return jsonify(_read(g.customer_id))

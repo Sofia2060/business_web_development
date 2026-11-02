@@ -8,7 +8,7 @@ import pyodbc
 import pytest
 
 from app.db import ProcError, call, query, transaction
-from test_orders import MID, add_to_cart, checkout, new_admin, new_customer, order_status
+from test_orders import MID, SMALL, add_to_cart, checkout, new_admin, new_customer, order_status
 
 SOON = lambda days=3: datetime.datetime.now() + datetime.timedelta(days=days)   # noqa: E731
 BIG = "NDINO131LDIA-VT-11"
@@ -18,8 +18,8 @@ BIG = "NDINO131LDIA-VT-11"
 def restock(db_ready):
     """The test database is shared by all test files, so give the products used here plenty of stock."""
     with transaction() as cur:
-        cur.execute("UPDATE dbo.ProductVariants SET StockQuantity = 100 WHERE VariantSKU IN (?, ?, ?)",
-                    (MID, "NC433-BT-9", BIG))
+        cur.execute("UPDATE dbo.ProductVariants SET StockQuantity = 100 WHERE VariantSKU IN (?, ?, ?, ?)",
+                    (MID, "NC433-BT-9", BIG, SMALL))
 
 
 def customer_id_of(code):
@@ -127,7 +127,7 @@ def test_callback_amount_must_match(db_ready):
 
 def test_keep_order_null_does_not_cancel_the_order(db_ready):
     client, addr = new_customer()
-    add_to_cart(client, MID)
+    add_to_cart(client, SMALL)
     code = checkout(client, addr).get_json()["OrderCode"]
     request_id = client.post(f"/api/orders/{code}/cancel", json={}).get_json()["RequestID"]
     expect(50045, "EXEC dbo.sp_RespondCancelPopup @RequestID = ?, @CustomerID = ?, @KeepOrder = ?",
@@ -300,10 +300,42 @@ def test_indexes_added_after_review_exist(db_ready):
     assert {"IX_Warranty_Order", "IX_CustomerAddresses_Cust", "IX_CancelReq_Order"} <= names
 
 
-def test_cancel_limit_message_follows_the_limit_function(db_ready):
-    message = query("SELECT dbo.fn_OnlineCancelLimit() AS limit")[0]["limit"]
+def test_cancel_message_shows_the_hotline_number_from_the_function(db_ready):
+    hotline = query("SELECT dbo.fn_HotlineNumber() AS n")[0]["n"]
     client, addr = new_customer()
     add_to_cart(client, BIG)
     code = checkout(client, addr).get_json()["OrderCode"]
     error = client.post(f"/api/orders/{code}/cancel", json={}).get_json()["error"]
-    assert f"{message:,}".replace(",", ".") in error                       # "5.000.000"
+    assert f"hotline {hotline} " in error
+
+
+def test_cancel_limit_is_two_million_and_the_payment_limit_is_fifteen_minutes(db_ready):
+    row = query("SELECT dbo.fn_OnlineCancelLimit() AS cancel_limit, dbo.fn_PaymentTimeoutMinutes() AS minutes")[0]
+    assert (row["cancel_limit"], row["minutes"]) == (2000000, 15)
+
+
+# ---------------- engraving columns ----------------
+
+@pytest.mark.parametrize("text,style", [("Love", "Gothic"), (None, "Classic"), ("0123456789ABCDEF", "Classic")])
+def test_cart_rejects_bad_engraving_data(db_ready, text, style):
+    client, _ = new_customer(with_address=False)
+    customer = customer_id_of_last()
+    with pytest.raises(pyodbc.Error):
+        with transaction() as cur:
+            cur.execute("INSERT INTO dbo.CartItems (CustomerID, VariantID, Quantity, EngravingText, EngravingStyle) "
+                        "SELECT ?, VariantID, 1, ?, ? FROM dbo.ProductVariants WHERE VariantSKU = ?",
+                        (customer, text, style, "NC433-BT-9"))
+
+
+def customer_id_of_last():
+    return query("SELECT MAX(CustomerID) AS c FROM dbo.Customers")[0]["c"]
+
+
+def test_the_database_itself_refuses_to_order_a_quote_only_item(db_ready):
+    client, addr = new_customer()
+    cust = query("SELECT MAX(CustomerID) AS c FROM dbo.Customers")[0]["c"]
+    with transaction() as cur:       # put it in the cart behind the API's back
+        cur.execute("INSERT INTO dbo.CartItems (CustomerID, VariantID, Quantity) "
+                    "SELECT ?, VariantID, 1 FROM dbo.ProductVariants WHERE VariantSKU = 'MDBZ036-VV'", (cust,))
+    expect(50014, "DECLARE @o INT; EXEC dbo.sp_PlaceOrder @CustomerID = ?, @AddressID = ?, @PaymentMethod = 'COD', "
+                  "@CheckoutToken = ?, @OrderID = @o OUTPUT", (cust, addr, str(uuid.uuid4())))
