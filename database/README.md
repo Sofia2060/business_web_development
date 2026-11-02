@@ -4,7 +4,7 @@ Thư mục này chứa toàn bộ script để tạo cơ sở dữ liệu SQL Se
 
 | File | Nội dung |
 |---|---|
-| `01_VinoraJewelry_SQLServer.sql` | Tạo database `VinoraJewelry`: 26 bảng, ràng buộc, chỉ mục, hàm, trigger, 12 thủ tục, 9 view; nạp 443 sản phẩm thật (crawl) và dữ liệu mẫu nhỏ |
+| `01_VinoraJewelry_SQLServer.sql` | Tạo database `VinoraJewelry`: 26 bảng, ràng buộc, chỉ mục, hàm, trigger, 14 thủ tục, 9 view; nạp 443 sản phẩm thật (crawl) và dữ liệu mẫu nhỏ |
 | `02_VinoraJewelry_FakeData.sql` | Sinh dữ liệu giả lập: 100 khách hàng, 300 đơn hàng, thanh toán, thẻ bảo hành, đánh giá, lịch hậu mãi… |
 
 > File 01 **xóa và tạo lại** database mỗi lần chạy. Chạy lại file 01 thì phải chạy lại file 02.
@@ -41,9 +41,9 @@ File 01 chạy khoảng 6 giây, file 02 khoảng 45 giây.
 | Bảng | Số dòng sau khi chạy 2 file (xấp xỉ) |
 |---|---|
 | Products / ProductVariants / ProductImages | 443 / 4.238 / 2.950 |
-| Users / Customers | 104 / 103 |
-| Orders / OrderCancellationRequests | 304 / 102 |
-| WarrantyRecords | ~330 (sinh tự động theo đơn đã nhận, thay đổi mỗi lần sinh) |
+| Users / Customers | 105 / 104 |
+| Orders / OrderCancellationRequests | 308 / 102 |
+| WarrantyRecords | ~340 (sinh tự động theo đơn đã nhận, thay đổi mỗi lần sinh) |
 | CustomerFeedbacks / AfterSalesServices | 102 / 103 |
 
 ## 3. Kết nối từ backend
@@ -78,6 +78,7 @@ Chuỗi kết nối ODBC được ghép trong `backend/app/config.py` (`db_conne
 |---|---|
 | `admin@vinora.vn` | Admin |
 | `minhanh@example.com`, `giahuy@example.com`, `thuha@example.com` | Customer (dữ liệu mẫu) |
+| `khachle@example.com` | Customer (khách vãng lai số `0933333333` đã đăng ký, mục 6.9 của file 01) |
 | 100 email dạng `ten.ho1xx@gmail.com`… | Customer (dữ liệu giả lập) |
 
 `PasswordHash` trong dữ liệu mẫu chỉ là **chuỗi minh họa, không đăng nhập được**. Sau khi chạy file 01 và 02, đặt mật khẩu thật cho tài khoản cần dùng bằng script (chạy ở gốc repo):
@@ -100,10 +101,15 @@ Backend **gọi thủ tục**, không tự viết lại logic (giá, tồn kho, 
 - Yêu cầu hủy còn chờ khách phản hồi sẽ tự chuyển sang `Closed` khi đơn được giao/nhận/hủy theo đường khác (ví dụ admin hủy).
 - **Hủy đơn (BRD5, FR13):**
   - Chỉ đơn `Pending`/`Confirmed` mới hủy được.
-  - Đơn có `TotalAmount` **trên 5.000.000đ không hủy được trên web**: `sp_RequestCancelOrder` báo lỗi 50029, giao diện hiện số hotline. Nhân viên nhận cuộc gọi thì admin hủy bằng `sp_UpdateOrderStatus @NewStatus='Cancelled', @Reason=N'Khách gọi hotline...'`. Ngưỡng nằm trong hàm `dbo.fn_OnlineCancelLimit()`.
-  - Đơn từ 5.000.000đ trở xuống: bấm "Hủy đơn" → `sp_RequestCancelOrder` **chưa hủy ngay** mà trả về mã voucher và số tiền voucher đang giảm để hiện **popup nhắc nhở** (ví dụ: *"Nếu hủy bây giờ, bạn sẽ mất voucher WELCOME5 đang giảm 190.000đ cho đơn này"*). Đơn không dùng voucher thì `@VoucherCode = NULL`, popup hiện câu nhắc chung.
+  - Đơn có `TotalAmount` (số khách phải trả, sau voucher) **từ 2.000.000đ trở lên, hoặc có sản phẩm khắc chữ, không tự hủy được trên web**: `sp_RequestCancelOrder` báo lỗi 50029 với câu "Khách hàng không thể tự hủy vì đơn hàng có giá trị cao hoặc có sản phẩm khắc chữ. Vui lòng gọi qua hotline [số] để được hỗ trợ". Số hotline lấy từ `dbo.fn_HotlineNumber()`. Nhân viên nhận cuộc gọi, hỏi tình hình chế tác rồi hủy bằng `sp_UpdateOrderStatus @NewStatus='Cancelled', @Reason=N'Khách gọi hotline...'`. Ngưỡng nằm trong hàm `dbo.fn_OnlineCancelLimit()`.
+  - **Đơn đang chế tác không ai hủy được** (lỗi 50049). Admin đánh dấu bắt đầu chế tác bằng `sp_StartOrderProduction` (cột `Orders.ProductionStartedAt`), chỉ với đơn `Confirmed`.
+  - Đơn dưới 2.000.000đ và không khắc chữ: bấm "Hủy đơn" → `sp_RequestCancelOrder` **chưa hủy ngay** mà trả về mã voucher và số tiền voucher đang giảm để hiện **popup nhắc nhở** (ví dụ: giá gốc 2.198.000đ, voucher `GIAM300K` còn 1.898.000đ: *"Nếu hủy bây giờ, bạn sẽ mất voucher GIAM300K đang giảm 300.000đ, đặt lại chỉ còn giá gốc"*). Đơn không dùng voucher thì `@VoucherCode = NULL`, popup hiện câu nhắc chung.
   - Khách chọn trong popup → `sp_RespondCancelPopup`: **giữ đơn** thì đơn giữ nguyên, không đổi tiền, chỉ đánh dấu `IsRetentionApplied = 1` để thống kê; **xác nhận hủy** thì hủy đơn, hoàn tồn kho, đơn đã thanh toán chuyển ngay `Payments.Status = 'Refunded'`. Việc chuyển tiền thật chưa có (xem mục 11). **Voucher đã áp không được hoàn lượt.**
-  - Cột `CancelChannel` trong `vw_CustomerOrderHistory` cho biết đơn hiện nút hủy (`'Web'`), dòng "Gọi hotline để hủy" (`'Hotline'`), hay không hủy được nữa (`NULL`).
+  - Cột `CancelChannel` trong `vw_CustomerOrderHistory` cho biết đơn hiện nút hủy (`'Web'`), dòng "Gọi hotline để hủy" (`'Hotline'`), hay không hủy được nữa (`NULL`: đã giao, đã hủy hoặc đang chế tác). View còn có `HasEngraving` và `PaymentDeadline`.
+- **Thanh toán trực tuyến có hạn 15 phút** (`dbo.fn_PaymentTimeoutMinutes()`). `sp_ExpireUnpaidOrders` hủy các đơn `Pending` trả bằng VNPay, MoMo hoặc chuyển khoản mà chưa thanh toán sau 15 phút: hoàn tồn kho, trả lượt voucher (đặt hàng thất bại), ghi nhật ký `PaymentExpired`. Backend gọi thủ tục này trước mỗi yêu cầu API. `sp_RecordPaymentResult` cũng gọi nó trước, nên tiền về muộn bị từ chối (lỗi 50050). Lần thanh toán quá hạn có `Payments.Status = 'Expired'` (khác `Failed` là thanh toán lỗi có mã giao dịch). Đơn COD và đơn đã trả tiền không bị hủy vì quá hạn.
+- **Sản phẩm chỉ báo giá** (`Products.IsQuoteOnly = 1`, 22 sản phẩm giá theo giá vàng ngày): `fn_GetCurrentPrice` trả `NULL`, nên view `vw_ProductCatalog` có `CurrentPrice` rỗng và `sp_PlaceOrder` báo lỗi 50014. Bảng `GoldPrices` vẫn dùng để nhân viên báo giá. Đặt `IsQuoteOnly = 0` để bán online theo giá vàng.
+- **Chữ khắc** (`CartItems`, `OrderItems`): `EngravingText` tối đa 15 ký tự, `EngravingStyle` là `Classic`, `Modern` hoặc `Handwritten` (chỉ có khi có chữ khắc). Hai dòng giỏ cùng chữ khắc nhưng khác kiểu chữ là hai dòng riêng. Giao diện dùng mã khác (`co-dien`, `hien-dai`, `viet-tay`): xem `docs/database/doi-chieu-giao-dien.md`.
+- **Khách vãng lai** (đặt hàng không có tài khoản): dòng `Customers` có `UserID = NULL` và bắt buộc có `Phone`. Số điện thoại là mã khách hàng nên **duy nhất** (`UX_Customers_Phone`). Khi khách đăng ký tài khoản bằng đúng số đó, backend gán `UserID` cho dòng này, nên đơn hàng, địa chỉ, thẻ bảo hành cũ tự thuộc về tài khoản.
 - Giá bán hiện hành luôn lấy qua `dbo.fn_GetCurrentPrice(ProductID)` hoặc view `vw_ProductCatalog` (có sản phẩm tính giá theo giá vàng).
 
 ## 6. Thủ tục (stored procedure)
@@ -111,11 +117,13 @@ Backend **gọi thủ tục**, không tự viết lại logic (giá, tồn kho, 
 | Thủ tục | Tham số (OUTPUT in đậm) | Dùng cho |
 |---|---|---|
 | `sp_PlaceOrder` | `@CustomerID, @AddressID, @PaymentMethod ('COD'/'BankTransfer'/'VNPay'/'MoMo'), @CheckoutToken UNIQUEIDENTIFIER, @ShippingFee=0, @VoucherCode=NULL, @Note=NULL,` **`@OrderID`** | Đặt hàng từ giỏ. Tạo `CheckoutToken = uuid4()` khi mở trang thanh toán; bấm lặp cùng token sẽ trả về cùng đơn |
-| `sp_RecordPaymentResult` | `@PaymentID, @IsSuccess BIT, @TransactionID, @ResponseCode=NULL, @Amount=NULL` (nếu truyền thì phải khớp số tiền đơn) | Callback cổng thanh toán sandbox (đã kiểm tra chữ ký) |
+| `sp_RecordPaymentResult` | `@PaymentID, @IsSuccess BIT, @TransactionID, @ResponseCode=NULL, @Amount=NULL` (nếu truyền thì phải khớp số tiền đơn) | Ghi kết quả thanh toán. Hiện backend gọi khi thanh toán mô phỏng thành công. Đơn đã hủy hoặc quá hạn báo lỗi 50050 |
+| `sp_ExpireUnpaidOrders` | `@Expired INT OUTPUT` (không bắt buộc) | Hủy đơn trả trực tuyến quá 15 phút chưa thanh toán. Backend gọi trước mỗi yêu cầu API |
 | `sp_RequestCancelOrder` | `@OrderID, @CustomerID, @Reason=NULL,` **`@RequestID, @VoucherCode, @VoucherDiscount`** | Khách bấm "Hủy đơn" (đơn ≤ 5 triệu). Dùng `@VoucherCode`, `@VoucherDiscount` để hiện popup nhắc nhở |
 | `sp_RespondCancelPopup` | `@RequestID, @CustomerID, @KeepOrder BIT` | Khách chọn trong popup: giữ đơn (1) hoặc xác nhận hủy (0) |
 | `sp_UpdateOrderStatus` | `@OrderID, @NewStatus, @AdminUserID, @Reason=NULL` | Admin xác nhận / giao / hủy đơn |
 | `sp_ConfirmOrderReceived` | `@OrderID, @CustomerID` | Nút "Đã nhận được hàng" |
+| `sp_StartOrderProduction` | `@OrderID, @AdminUserID` | Admin đánh dấu đơn đã xác nhận bắt đầu chế tác (từ đó không hủy được) |
 | `sp_BookAfterSalesService` | `@WarrantyCode, @CustomerID, @ServiceType ('Cleaning'/'Polishing'/'Replating'/'Resizing'), @PreferredDate, @NewRingSize=NULL, @CustomerNote=NULL,` **`@ServiceID`** | Đặt lịch hậu mãi |
 | `sp_ScheduleAfterSalesService` | `@ServiceID, @AdminUserID, @AppointmentDate` | Admin xác nhận/đổi lịch |
 | `sp_CompleteAfterSalesService` | `@ServiceID, @AdminUserID, @ResultNote=NULL, @PaidFee=50000` | Admin hoàn tất dịch vụ (tự trừ lượt) |
@@ -132,7 +140,10 @@ Thủ tục và API tương ứng của backend (xem code trong `backend/app/rou
 | `sp_ConfirmOrderReceived` | `POST /api/orders/<mã đơn>/confirm-received` |
 | `sp_UpdateOrderStatus` | `POST /api/admin/orders/<mã đơn>/status` |
 | `sp_TrackProductView` | `POST /api/recently-viewed` |
-| `sp_RecordPaymentResult`, 4 thủ tục hậu mãi | Chưa có API |
+| `sp_RecordPaymentResult` | `POST /api/orders/<mã đơn>/pay` (mô phỏng VNPay, MoMo), `POST /api/admin/orders/<mã đơn>/confirm-payment` (chuyển khoản) |
+| `sp_ExpireUnpaidOrders` | Tự gọi trước mỗi yêu cầu `/api/` |
+| `sp_StartOrderProduction` | `POST /api/admin/orders/<mã đơn>/start-production` |
+| 4 thủ tục hậu mãi | Chưa có API |
 
 Ví dụ gọi thủ tục có tham số OUTPUT bằng hàm `call()` (trích từ `backend/app/routes/orders.py`):
 
@@ -168,12 +179,15 @@ Thủ tục/trigger báo lỗi bằng `THROW` với mã 50xxx và thông báo ti
 | Mã | Ý nghĩa |
 |---|---|
 | 50001 / 50002 | Sửa đơn đã hoàn tất/hủy · chuyển trạng thái sai quy trình |
-| 50010 – 50016 | Đặt hàng: phương thức thanh toán, địa chỉ, giỏ trống, sản phẩm ngừng bán, thiếu giá vàng, **hết hàng**, mã ưu đãi không hợp lệ |
+| 50010 – 50016 | Đặt hàng: phương thức thanh toán, địa chỉ, giỏ trống, sản phẩm ngừng bán, sản phẩm chưa có giá (chỉ báo giá hoặc thiếu giá vàng), **hết hàng**, mã ưu đãi không hợp lệ |
 | 50017 | Không có giao dịch chờ thanh toán |
+| 50049 | Đơn đã bắt đầu chế tác nên không thể hủy (gợi ý HTTP 409) |
+| 50050 | Đơn đã hủy hoặc quá hạn thanh toán nên không ghi nhận được thanh toán (gợi ý HTTP 409) |
+| 50051 | Chỉ đánh dấu chế tác được cho đơn đã xác nhận và chưa bắt đầu chế tác (gợi ý HTTP 409) |
 | 50020 / 50021 / 50022 | Hủy đơn: không còn được hủy · không tìm thấy đơn · yêu cầu hủy (popup) không còn hiệu lực |
 | 50024 / 50025 / 50026 | Không có quyền admin · không tìm thấy đơn · chỉ xác nhận được đơn đang giao |
 | 50028 | Đơn hàng đã ở trạng thái này – không cho đặt lại cùng trạng thái (gợi ý trả HTTP 409) |
-| 50029 | Đơn trên 5.000.000đ không hủy được trên web – hiển thị hotline (gợi ý trả HTTP 403/409) |
+| 50029 | Đơn từ 2.000.000đ hoặc có khắc chữ không tự hủy được trên web, thông báo gọi hotline (HTTP 403) |
 | 50030 | Chỉ đánh giá đơn đã nhận |
 | 50031 – 50037 | Hậu mãi: thẻ không hợp lệ, thời gian hẹn, chỉnh size chỉ cho nhẫn, trùng lịch, trạng thái lịch không hợp lệ |
 | 50038 | Đơn thanh toán trực tuyến chưa thanh toán nên chưa xác nhận được (gợi ý HTTP 409) |
@@ -207,10 +221,8 @@ Thủ tục/trigger báo lỗi bằng `THROW` với mã 50xxx và thông báo ti
 | `SSL Provider: certificate chain was issued by an authority that is not trusted` khi chạy `sqlcmd` | Thêm `-C` vào lệnh. Backend đã tự đặt `TrustServerCertificate=yes` |
 | `Login failed for user` | Để `DB_USER` trống trong `.env` để dùng tài khoản Windows, hoặc điền `DB_USER` và `DB_PASSWORD` và bật SQL Server Authentication (SSMS → Server Properties → Security) |
 
-## 11. Điểm database chưa xử lý (thanh toán)
+## 11. Điểm database chưa xử lý
 
-Ba chỗ dưới đây chờ nhóm quyết định cách làm trước khi sửa script:
-
-1. **Tiền về sau khi đơn đã hủy.** Khi hủy đơn, lần thanh toán đang chờ bị đổi sang `Failed`. Nếu cổng báo thành công sau đó, `sp_RecordPaymentResult` báo lỗi 50017 và không lưu gì, nên khách mất tiền mà hệ thống không có dấu vết để hoàn.
-2. **Thanh toán lại và quá hạn.** Chỉ `sp_PlaceOrder` tạo dòng trong `Payments`. Khi thanh toán lỗi hoặc đóng trang, không có cách tạo lần thử mới. Giao diện hứa tự hủy đơn chưa trả sau 24 giờ nhưng database chưa có thủ tục làm việc này.
-3. **Trạng thái `Refunded`.** Hủy đơn đã trả tiền đặt `Refunded` ngay, trong khi thực tế chưa chuyển tiền. Giao diện cần hai bước: "Chờ hoàn tiền", rồi admin xác nhận "Đã hoàn tiền". Database cũng chưa có chỗ lưu số tài khoản nhận hoàn tiền của khách.
+1. **Hoàn tiền.** Hủy đơn đã trả tiền đặt `Payments.Status = 'Refunded'` ngay, vì thanh toán là mô phỏng và không có tiền thật để hoàn. Chưa có bước "Chờ hoàn tiền" rồi "Đã hoàn tiền", cũng chưa có chỗ lưu số tài khoản nhận hoàn của khách.
+2. **Thử thanh toán lại.** Khi quá 15 phút, đơn thất bại và khách đặt đơn mới. Thanh toán mô phỏng luôn thành công nên chưa có nhánh "thanh toán lỗi rồi thử lại trong 15 phút".
+3. **Mã xác minh số điện thoại** là mã giả `123456` ở backend (không nằm trong database). Chưa có bảng lưu mã thật và hạn dùng.

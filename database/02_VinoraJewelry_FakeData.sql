@@ -8,8 +8,8 @@
      lệ hoặc lấy từ dữ liệu đã có (sản phẩm, biến thể) để nhất quán.
    - Đơn hàng đi qua đúng quy trình trạng thái nên trigger tự tạo thẻ bảo hành
      và nhật ký; số tiền, thanh toán, yêu cầu hủy, đánh giá đều khớp nhau.
-   - Quy tắc hủy đơn: đơn có tổng thanh toán <= 5 triệu được hủy trên web (qua
-     popup nhắc nhở mất voucher); đơn trên 5 triệu chỉ hủy được qua hotline
+   - Quy tắc hủy đơn: đơn có tổng thanh toán dưới 2 triệu và không khắc chữ được
+     hủy trên web (qua popup nhắc nhở mất voucher); đơn từ 2 triệu chỉ hủy được qua hotline
      (admin hủy, không có yêu cầu hủy trên web).
    Số dòng sinh thêm:
      100: Users, Customers, CustomerAddresses, ProductCertificates, GoldPrices,
@@ -17,7 +17,7 @@
           CustomerFeedbacks, FeedbackAspects, AfterSalesServices
      300: Orders (cần >= 100 đơn đã nhận để có 100 đánh giá, và 100 đơn có
           yêu cầu hủy trên web: 30 xác nhận hủy + 70 giữ đơn sau popup;
-          thêm 15 đơn trên 5 triệu hủy qua hotline); OrderItems, Payments,
+          thêm 15 đơn từ 2 triệu hủy qua hotline); OrderItems, Payments,
           WarrantyRecords, AuditLogs sinh theo đơn hàng.
    Script chạy trong một transaction: lỗi ở bất kỳ bước nào sẽ hoàn tác toàn bộ.
    ===================================================================== */
@@ -204,7 +204,7 @@ BEGIN TRY
         FullName = CONCAT(h.v, N' ', d.v, N' ', t.v),
         Email    = CONCAT(t.a, '.', h.a, u.n + 100, '@', dm.v),
         Username = CASE WHEN u.r4 % 2 = 0 THEN CONCAT(t.a, h.a, u.n + 100) END,
-        Phone    = CONCAT(pf.v, RIGHT(CONCAT('0000000', u.r5 % 10000000), 7))
+        Phone    = CONCAT(pf.v, RIGHT(CONCAT('0000000', (u.r5 % 100000) * 100 + u.n - 1), 7))   -- khác nhau theo n: số điện thoại là mã khách hàng
     FROM @U u
     JOIN @Ho h      ON h.i  = u.r1 % 16 + 1
     JOIN @Dem d     ON d.i  = u.r2 % 14 + 1
@@ -246,12 +246,12 @@ BEGIN TRY
     WHERE v.IsActive = 1 AND p.Status = 'Active' AND dbo.fn_GetCurrentPrice(p.ProductID) IS NOT NULL;
     DECLARE @nV INT = (SELECT COUNT(*) FROM @V);
 
-    -- Nhóm biến thể giá thấp (<= 2,3 triệu): đơn 1–2 món luôn <= 5 triệu -> được hủy trên web
+    -- Nhóm biến thể giá thấp (<= 900.000đ): đơn 1–2 món (kể cả phí giao) luôn dưới 2 triệu -> được hủy trên web
     DECLARE @VLow TABLE (rn INT IDENTITY(1,1) PRIMARY KEY, VariantID INT, ProductID INT, RingSize TINYINT);
     INSERT INTO @VLow (VariantID, ProductID, RingSize)
-    SELECT VariantID, ProductID, RingSize FROM @V WHERE dbo.fn_GetCurrentPrice(ProductID) <= 2300000;
+    SELECT VariantID, ProductID, RingSize FROM @V WHERE dbo.fn_GetCurrentPrice(ProductID) <= 900000;
     DECLARE @nVLow INT = (SELECT COUNT(*) FROM @VLow);
-    -- Nhóm biến thể giá cao (>= 6 triệu): đơn trên 5 triệu -> chỉ hủy được qua hotline
+    -- Nhóm biến thể giá cao (>= 6 triệu): đơn từ 2 triệu -> chỉ hủy được qua hotline
     DECLARE @VHigh TABLE (rn INT IDENTITY(1,1) PRIMARY KEY, VariantID INT, ProductID INT, RingSize TINYINT);
     INSERT INTO @VHigh (VariantID, ProductID, RingSize)
     SELECT VariantID, ProductID, RingSize FROM @V WHERE dbo.fn_GetCurrentPrice(ProductID) >= 6000000;
@@ -270,10 +270,11 @@ BEGIN TRY
     JOIN @U u ON u.n = x.r0 % 100 + 1
     JOIN @V v ON v.rn = x.r1 % @nV + 1;
 
-    INSERT INTO dbo.CartItems (CustomerID, VariantID, Quantity, EngravingText, AddedAt)
+    INSERT INTO dbo.CartItems (CustomerID, VariantID, Quantity, EngravingText, EngravingStyle, AddedAt)
     SELECT TOP (100) c.CustomerID, c.VariantID,
            CASE WHEN c.r1 % 5 = 0 THEN 2 ELSE 1 END,
            CASE WHEN v.RingSize IS NOT NULL AND c.r2 % 4 = 0 THEN e.v END,
+           CASE WHEN v.RingSize IS NOT NULL AND c.r2 % 4 = 0 THEN CHOOSE(c.r4 % 3 + 1, 'Classic', 'Modern', 'Handwritten') END,
            DATEADD(MINUTE, -(c.r3 % 43200), @Now)
     FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY CustomerID, VariantID ORDER BY r4) AS dup FROM @Cart) c
     JOIN dbo.ProductVariants v ON v.VariantID = c.VariantID
@@ -305,8 +306,8 @@ BEGIN TRY
        7. Orders (300) + OrderItems
           Phân bố trạng thái: 210 Delivered, 15 Shipping, 15 Confirmed,
           15 Pending, 45 Cancelled
-          Luồng hủy: 30 đơn hủy trên web (<= 5 triệu), 15 đơn hủy qua hotline
-          (> 5 triệu), 70 đơn bấm hủy nhưng chọn giữ đơn sau popup (<= 5 triệu)
+          Luồng hủy: 30 đơn hủy trên web (dưới 2 triệu, không khắc chữ), 15 đơn hủy qua
+          hotline (từ 2 triệu), 70 đơn bấm hủy nhưng chọn giữ đơn sau popup (dưới 2 triệu, không khắc chữ)
        ================================================================= */
     DECLARE @O TABLE (n INT PRIMARY KEY, CustomerID INT,
                       r1 INT, r2 INT, r3 INT, r4 INT, r5 INT, r6 INT, r7 INT, r8 INT, r9 INT, r10 INT,
@@ -364,7 +365,7 @@ BEGIN TRY
 
     UPDATE i SET VariantID = v.VariantID, ProductID = v.ProductID,
                  Quantity = CASE WHEN o.Flow IS NULL AND i.r2 % 10 = 0 THEN 2 ELSE 1 END,
-                 Engraving = CASE WHEN v.RingSize IS NOT NULL AND i.r3 % 10 < 3 THEN e.v END
+                 Engraving = CASE WHEN v.RingSize IS NOT NULL AND i.r3 % 10 < 3 AND ISNULL(o.Flow, '') NOT IN ('WebCancel', 'Kept') THEN e.v END   -- đơn tự hủy được thì không khắc chữ
     FROM @I i
     JOIN @O o ON o.n = i.n
     CROSS APPLY (SELECT VariantID, ProductID, RingSize FROM @V    WHERE o.Flow IS NULL AND rn = i.r1 % @nV + 1
@@ -386,15 +387,16 @@ BEGIN TRY
                  WHERE v.IsActive = 1
                    AND o.CreatedAt BETWEEN v.StartAt AND v.EndAt AND v.MinOrderValue <= o.Subtotal
                  ORDER BY CHECKSUM(v.VoucherID, o.n, o.r10)) vc
-    WHERE o.r5 % 100 < 30 AND ISNULL(o.Flow, '') <> 'Hotline';   -- đơn hotline giữ nguyên > 5 triệu
+    WHERE o.r5 % 100 < 30 AND ISNULL(o.Flow, '') <> 'Hotline';   -- đơn hotline giữ nguyên >= 2 triệu
     UPDATE @O SET Discount = CASE WHEN DType = 'Percent' THEN ROUND(Subtotal * DValue / 100, -3) ELSE DValue END WHERE VoucherID IS NOT NULL;
     UPDATE @O SET Discount = DMax WHERE DMax IS NOT NULL AND Discount > DMax;
     UPDATE @O SET Discount = Subtotal WHERE Discount > Subtotal;
 
-    -- Kiểm tra luồng hủy khớp quy tắc 5 triệu
-    IF EXISTS (SELECT 1 FROM @O WHERE Flow IN ('WebCancel', 'Kept') AND Subtotal - Discount + ShipFee > @CancelLimit)
-       OR EXISTS (SELECT 1 FROM @O WHERE Flow = 'Hotline' AND Subtotal - Discount + ShipFee <= @CancelLimit)
-        THROW 51001, N'Dữ liệu giả lập không khớp quy tắc hủy đơn 5 triệu.', 1;
+    -- Kiểm tra luồng hủy khớp quy tắc hủy đơn: tự hủy khi dưới 2 triệu và không khắc chữ, còn lại gọi hotline
+    IF EXISTS (SELECT 1 FROM @O WHERE Flow IN ('WebCancel', 'Kept') AND Subtotal - Discount + ShipFee >= @CancelLimit)
+       OR EXISTS (SELECT 1 FROM @O o JOIN @I i ON i.n = o.n WHERE o.Flow IN ('WebCancel', 'Kept') AND i.Engraving IS NOT NULL)
+       OR EXISTS (SELECT 1 FROM @O WHERE Flow = 'Hotline' AND Subtotal - Discount + ShipFee < @CancelLimit)
+        THROW 51001, N'Dữ liệu giả lập không khớp quy tắc hủy đơn 2 triệu.', 1;
 
     UPDATE @O SET OrderCode = CONCAT('VN', FORMAT(CreatedAt, 'yyMMdd'), 'F', RIGHT(CONCAT('0000', n), 4));
 
@@ -409,9 +411,10 @@ BEGIN TRY
     UPDATE o SET OrderID = d.OrderID FROM @O o JOIN dbo.Orders d ON d.OrderCode = o.OrderCode;
 
     INSERT INTO dbo.OrderItems (OrderID, ProductID, VariantID, ProductNameSnap, SKUSnap, MaterialSnap, GoldColor, RingSize,
-                                EngravingText, Quantity, UnitPrice)
+                                EngravingText, EngravingStyle, Quantity, UnitPrice)
     SELECT o.OrderID, i.ProductID, i.VariantID, p.ProductName, v.VariantSKU, p.Material, v.GoldColor, v.RingSize,
-           i.Engraving, i.Quantity, i.UnitPrice
+           i.Engraving, CASE WHEN i.Engraving IS NOT NULL THEN CHOOSE(i.r1 % 3 + 1, 'Classic', 'Modern', 'Handwritten') END,
+           i.Quantity, i.UnitPrice
     FROM @I i
     JOIN @O o ON o.n = i.n
     JOIN dbo.ProductVariants v ON v.VariantID = i.VariantID
@@ -469,7 +472,7 @@ BEGIN TRY
         WHEN o.PayMethod = 'COD' AND o.PlanStatus = 'Delivered' THEN 'Success'
         WHEN o.PayMethod = 'COD' AND o.PlanStatus = 'Cancelled' THEN 'Failed'
         WHEN o.PayMethod = 'COD' THEN 'Pending'
-        WHEN o.PlanStatus IN ('Delivered', 'Shipping', 'Confirmed') THEN 'Success'
+        WHEN o.PlanStatus IN ('Delivered', 'Shipping', 'Confirmed', 'Pending') THEN 'Success'   -- đơn Pending trả trực tuyến: đã trả, chờ admin xác nhận (chưa trả quá 15 phút thì đã bị hủy)
         WHEN o.PlanStatus = 'Cancelled' AND o.r9 % 3 = 0 THEN 'Refunded'
         WHEN o.PlanStatus = 'Cancelled' THEN 'Failed'
         ELSE 'Pending' END AS Status) x;
@@ -477,7 +480,7 @@ BEGIN TRY
     /* =================================================================
        9. OrderCancellationRequests – 100 yêu cầu hủy trên web
           30 xác nhận hủy sau popup + 70 chọn giữ đơn sau popup.
-          15 đơn trên 5 triệu hủy qua hotline nên không có yêu cầu trên web.
+          15 đơn từ 2 triệu hủy qua hotline nên không có yêu cầu trên web.
        ================================================================= */
     INSERT INTO dbo.OrderCancellationRequests (OrderID, Reason, RequestedAt, Decision, DecidedAt)
     SELECT o.OrderID, rs.v, DATEADD(MINUTE, -3, o.CancelledAt), 'ConfirmedCancel', o.CancelledAt
