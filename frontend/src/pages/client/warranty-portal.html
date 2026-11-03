@@ -531,7 +531,7 @@
             <label class="nhan-truong" for="dl-anh">Ảnh tình trạng (không bắt buộc)</label>
             <input class="o-tep" id="dl-anh" type="file" accept="image/*" multiple>
             <div class="xem-anh-tai" id="dl-xem-anh"></div>
-            <p class="goi-y-truong">Tối đa 3 ảnh, mỗi ảnh dưới 5 MB, giúp showroom chuẩn bị trước khi bạn đến.</p>
+            <p class="goi-y-truong">Tối đa 3 ảnh, mỗi ảnh dưới 5 MB. Bản demo: ảnh chỉ xem trước trên máy bạn, chưa được gửi đi. Cửa hàng chỉ biết số ảnh bạn đã chọn, nên hãy mô tả tình trạng trong ô ghi chú.</p>
           </div>
           <div class="hang hang--quan"><button class="nut nut--chinh" type="submit">Gửi yêu cầu đặt lịch</button><button class="nut nut--chu" type="reset">Làm lại</button></div>
         </form>
@@ -546,10 +546,10 @@
     
     <div role="tabpanel" id="bang-tra" aria-labelledby="tab-tra" hidden>
       <section class="khoi-tk">
-        <div class="khoi-tk__dau"><div><p class="nhan-tren">Tra cứu</p><h2>Kiểm tra thẻ bảo hành</h2><p>Nhập mã in trên thẻ (bắt đầu bằng VNRA) để xem sản phẩm, ngày kích hoạt và quyền lợi.</p></div></div>
+        <div class="khoi-tk__dau"><div><p class="nhan-tren">Tra cứu</p><h2>Kiểm tra thẻ bảo hành</h2><p>Nhập mã in trên thẻ (bắt đầu bằng VNW) để xem sản phẩm và ngày kích hoạt.</p></div></div>
         <form class="o-nhap-kem-nut tra-cuu" id="form-tra-cuu" role="search">
           <label class="an-chu" for="o-tra-cuu">Mã thẻ bảo hành</label>
-          <input class="o-nhap" id="o-tra-cuu" name="ma" placeholder="VNRA 2608 1234 5678" autocomplete="off" spellcheck="false">
+          <input class="o-nhap" id="o-tra-cuu" name="ma" placeholder="VNW 2608 0001234-1" autocomplete="off" spellcheck="false">
           <button class="nut nut--chinh nut--nho" type="submit">Tra cứu</button>
         </form>
         <div id="kq-tra-cuu" aria-live="polite"></div>

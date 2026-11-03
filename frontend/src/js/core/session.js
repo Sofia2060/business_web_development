@@ -7,7 +7,8 @@
    2. VN.gioHang   - the cart: in the database for a customer, in this browser for a visitor without an account
    3. VN.uuDai     - voucher check
    4. VN.donHang   - orders: place, look up, pay, cancel, confirm receipt
-   5. VN.sanSang   - done when the account and the cart are loaded
+   5. VN.baoHanh, VN.lichHen - warranty cards and after-sales appointments
+   6. VN.sanSang   - done when the account and the cart are loaded
    ===================================================================== */
 (function () {
   'use strict';
@@ -417,10 +418,96 @@
     },
   };
 
-  /* ================= 5. READY ================= */
-  /** Done when the account and the cart are loaded. Pages that need them start with `await VN.sanSang`. */
+  /* ================= 5. WARRANTY CARDS AND APPOINTMENTS ================= */
+  const chuanMaThe = (ma) => String(ma || '').replace(/\s/g, '').toUpperCase();
+  /** The warranty cards of this visitor: a customer's account, or (a guest) the orders opened on this browser.
+   *  The database makes the cards when an order is delivered. Pages call nap() or napDon(ma), then read with the plain calls. */
+  VN.baoHanh = {
+    ds: [],
+    tatCa() { return this.ds; },
+    cuaToi() { return VN.taiKhoan.hienTai() ? this.ds : []; },
+    lay(ma) { ma = chuanMaThe(ma); return this.ds.find((t) => t.ma === ma) || null; },
+    theoDon(maDon) { return this.ds.filter((t) => t.donHang === maDon); },
+    /** Free turns left of a service (Infinity = no limit): the card's turns minus the used ones and the ones held by an open appointment */
+    conLai(the, ch, loai) {
+      const han = the.hanMuc[loai];
+      if (han === null || han === undefined) return Infinity;
+      const dangHen = VN.lichHen.ds.filter((l) => l.maBaoHanh === the.ma && l.loai === loai && l.dangMo).length;
+      return Math.max(0, han - (the.daDung[loai] || 0) - dangHen);
+    },
+    /** The services done on each card, from the completed appointments */
+    ghiLichSu() {
+      this.ds.forEach((t) => {
+        t.lichSuDichVu = VN.lichHen.ds.filter((l) => l.maBaoHanh === t.ma && l.trangThai === 'Completed')
+          .map((l) => ({ luc: l.hoanTatLuc, loai: l.loai, noiDung: l.mienPhi ? 'Miễn phí' : `Tính phí ${VN.tien(l.phi)}`, maLich: l.ma }));
+      });
+    },
+    async nap() {
+      await VN.duLieu.sanPham().catch(() => {});                 // product images for the cards
+      const u = VN.taiKhoan.hienTai();
+      if (u) {
+        const [cards] = await Promise.all([VN.api.get('/api/warranties'), VN.lichHen.nap()]);
+        this.ds = cards.map((r) => Object.assign(VN.theBaoHanhTuApi(r), { chuThe: u.hoTen }));
+      } else {
+        const nhom = await Promise.all(docDonKhach().map(async ({ ma, sdt }) => {
+          try {
+            const [cards, don] = await Promise.all([
+              VN.api.get(`/api/orders/${encodeURIComponent(ma)}/warranties?phone=${encodeURIComponent(sdt)}`), VN.donHang.napMot(ma).catch(() => null)]);
+            return cards.map((r) => Object.assign(VN.theBaoHanhTuApi(r), { sdtKhach: sdt, chuThe: don && don.nguoiNhan ? don.nguoiNhan.hoTen : '' }));
+          } catch (loi) { return []; }                            // an order that cannot be read is simply left out
+        }));
+        this.ds = nhom.flat();
+      }
+      this.ds.sort((a, b) => new Date(b.ngayKichHoat) - new Date(a.ngayKichHoat));
+      this.ghiLichSu();
+      VN.phatSuKien('bao-hanh');
+      return this.ds;
+    },
+    /** The cards of one order (a customer's, or a guest's with the phone of the order); they join the cards already loaded */
+    async napDon(maDon) {
+      await VN.duLieu.sanPham().catch(() => {});
+      const sdt = VN.donHang.soDienThoai(maDon); const u = VN.taiKhoan.hienTai();
+      const r = await VN.api.get(`/api/orders/${encodeURIComponent(maDon)}/warranties${sdt ? '?phone=' + encodeURIComponent(sdt) : ''}`);
+      const moi = r.map((x) => Object.assign(VN.theBaoHanhTuApi(x), { sdtKhach: sdt, chuThe: u ? u.hoTen : '' }));
+      this.ds = moi.concat(this.ds.filter((t) => t.donHang !== maDon));
+      this.ghiLichSu();
+      return moi;
+    },
+    /** Look a card up by its code (anyone can). Resolves to { WarrantyCode, IssueDate, Status, ProductName, ProductSKU, PolicyName } or throws a 404. */
+    traCuu(ma) { return VN.api.get('/api/warranties/' + encodeURIComponent(chuanMaThe(ma))); },
+  };
+
+  /** The after-sales appointments of the logged-in customer. A customer books and cancels; the shop confirms and completes. */
+  VN.lichHen = {
+    ds: [],
+    tatCa() { return this.ds; },
+    cuaToi() { return this.ds; },
+    async nap() {
+      this.ds = VN.taiKhoan.hienTai() ? (await VN.api.get('/api/after-sales')).map(VN.lichHenTuApi) : [];
+      VN.baoHanh.ghiLichSu();
+      VN.phatSuKien('lich-hen');
+      return this.ds;
+    },
+    /** d = { maBaoHanh, loai, ngay ('2026-12-01'), gio ('14:00'), sizeMoi, tenCuaHang, sdt, soAnh, ghiChu }. Resolves to the new appointment. */
+    async tao(d) {
+      const r = await VN.api.post('/api/after-sales', {
+        warrantyCode: d.maBaoHanh, serviceType: d.loai, preferredDate: `${d.ngay}T${d.gio}:00`, newRingSize: d.sizeMoi || null, note: VN.ghiChuLich(d),
+      });
+      await this.nap();
+      return this.ds.find((l) => l.id === r.ServiceID) || VN.lichHenTuApi(r);
+    },
+    /** Cancel an appointment that is not completed (the card loses no turn) */
+    async huy(ma) {
+      const l = this.ds.find((x) => x.ma === ma); if (!l) return;
+      await VN.api.post(`/api/after-sales/${l.id}/cancel`);
+      await this.nap();
+    },
+  };
+
+  /* ================= 6. READY ================= */
   /** True while the account or the cart could not be loaded from the server (and has not been loaded since) */
   VN.matKetNoi = () => VN.taiKhoan.khongRo || VN.gioHang.khongTai;
+  /** Done when the account and the cart are loaded. Pages that need them start with `await VN.sanSang`. */
   VN.sanSang = (async () => {
     try { await thuLai(() => VN.taiKhoan.nap()); } catch (loi) { console.error(loi); }
     // The cart of a visitor is read from this browser, so it is only worth reading when we know the visitor is one

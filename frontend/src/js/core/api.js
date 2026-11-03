@@ -225,6 +225,46 @@
     return ls.sort((a, b) => new Date(a.luc) - new Date(b.luc));
   };
 
+  /* ================= 3b. WARRANTY CARDS AND APPOINTMENTS ================= */
+  const DICH_VU_TRANG = { Cleaning: 'Cleaning', Polishing: 'Polishing', Replating: 'Polishing', Resizing: 'Resizing' };   // plating is shown with polishing
+  const LICH_DANG_MO = ['Pending', 'Confirmed', 'Rescheduled'];
+  /** A card of GET /api/warranties -> the card the pages use. hanMuc = the free turns of each service (null = no limit),
+   *  daDung = how many are used. */
+  VN.theBaoHanhTuApi = (r) => {
+    const sp = VN.duLieuDaTai && VN.duLieuDaTai.theoMa;
+    return {
+      ma: r.WarrantyCode, donHang: r.OrderCode, maSP: r.ProductSKU, tenSP: r.ProductName, anh: sp && sp[r.ProductSKU] ? sp[r.ProductSKU].anh[0] : '',
+      chatLieu: r.Material, mau: r.GoldColor || '', size: r.RingSize || null, khacChu: r.EngravingText || '', laNhan: !!r.IsRing,
+      ngayKichHoat: r.IssueDate, hieuLuc: 'Trọn đời', conHieuLuc: r.Status === 'Active',
+      daDung: { Cleaning: r.CleaningCount, Polishing: (r.PolishingQuota || 0) - r.PolishingCountLeft, Resizing: r.ResizingCount },
+      hanMuc: { Cleaning: r.CleaningQuota, Polishing: r.PolishingQuota, Resizing: r.ResizingQuota },
+      lichSuDichVu: [],
+    };
+  };
+  /** The showroom, the contact phone and the number of photos picked travel in the first line of the note of an appointment
+   *  (the database has no columns for them); the rest of the note is what the customer wrote. */
+  const docGhiChuLich = (ghiChu) => {
+    const [dau, ...con] = String(ghiChu || '').split('\n');
+    const m = /^Showroom: (.*?)(?: \| SĐT: (\d+))?(?: \| Ảnh chọn: (\d+) \(chưa lưu\))?$/.exec(dau);
+    return m ? { tenCuaHang: m[1], sdt: m[2] || '', soAnh: Number(m[3] || 0), ghiChu: con.join('\n') }
+      : { tenCuaHang: '', sdt: '', soAnh: 0, ghiChu: String(ghiChu || '') };
+  };
+  VN.ghiChuLich = ({ tenCuaHang, sdt, soAnh, ghiChu }) => {
+    const dau = [`Showroom: ${tenCuaHang}`, sdt ? `SĐT: ${sdt}` : '', soAnh ? `Ảnh chọn: ${soAnh} (chưa lưu)` : ''].filter(Boolean).join(' | ');
+    return ghiChu ? `${dau}\n${ghiChu}` : dau;
+  };
+  /** An appointment of GET /api/after-sales -> the appointment the pages use. The time shown is the one the shop confirmed,
+   *  or the one the customer asked for while nothing is confirmed. */
+  VN.lichHenTuApi = (r) => {
+    const luc = r.AppointmentDate || r.PreferredDate;
+    return Object.assign({
+      id: r.ServiceID, ma: 'LH' + r.ServiceID, maBaoHanh: r.WarrantyCode, loai: DICH_VU_TRANG[r.ServiceType], trangThai: r.Status,
+      dangMo: LICH_DANG_MO.includes(r.Status), ngayHen: luc.slice(0, 10), khungGio: luc.slice(11, 16), gioKhachChon: r.PreferredDate,
+      daDoiGio: !!r.AppointmentDate && r.AppointmentDate !== r.PreferredDate, sizeMoi: r.NewRingSize || null, taoLuc: r.CreatedAt,
+      tenSP: r.ProductName, ketQua: r.ResultNote || '', mienPhi: r.IsFreeOfCharge, phi: r.ServiceFee || 0, hoanTatLuc: r.CompletedAt || null,
+    }, docGhiChuLich(r.CustomerNote));
+  };
+
   /* ================= 4. SHOP DATA (VN.duLieu) ================= */
   const tepDuLieu = (ten) => (VN.duongDan.duLieu || '../../../mock-data/') + ten;
   const cache = {};

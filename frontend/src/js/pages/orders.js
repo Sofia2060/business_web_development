@@ -177,6 +177,7 @@
   const veChiTiet = async (ma) => {
     let don = null;
     try { don = await VN.donHang.napMot(ma); } catch (loi) { if (loi.trangThai === 0) VN.thongBao({ tieuDe: 'Chưa tải được đơn hàng', noiDung: VN.thoat(loi.message), loai: 'loi' }); }
+    if (don && don.trangThai === 'Delivered') await VN.baoHanh.napDon(ma).catch(() => {});      // thẻ bảo hành cho mốc "Bảo hành" của tiến trình đơn
     if ((VN.thamSo('ma') || '') !== ma) return;      // trong lúc tải, khách đã chuyển sang trang khác
     khuDs.hidden = true; khuCt.hidden = false; VN.$('#dh-tra-cuu').hidden = true; VN.$('#dh-lien-ket').hidden = true;
     VN.$('#dh-tieu-de').textContent = don ? `Đơn hàng ${don.ma}` : 'Không tìm thấy đơn hàng';

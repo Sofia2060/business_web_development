@@ -1,6 +1,7 @@
 """The shop pages read the API through adapters in frontend/src/js/core/api.js. This test feeds those adapters with
 real answers of the API (run by Node, no browser) and checks the shapes the pages rely on, so renaming a column or a
 field in the API cannot silently break the pages. Skipped when Node is not installed."""
+import datetime
 import json
 import re
 import shutil
@@ -12,7 +13,7 @@ import pytest
 
 from app.config import FRONTEND_DIR
 from app.db import query, transaction
-from test_orders import CHEAP, DEAL, MID, SMALL, add_to_cart, checkout, new_customer
+from test_orders import CHEAP, DEAL, MID, SMALL, add_to_cart, checkout, new_admin, new_customer
 from test_guest_orders import guest_order
 
 NODE = shutil.which("node")
@@ -58,6 +59,26 @@ def real_errors(customer, address_id):
     return answers
 
 
+APPOINTMENT_NOTE = "Showroom: Showroom Quận 1 | SĐT: 0901234567 | Ảnh chọn: 2 (chưa lưu)\nNhẫn bị xỉn nhẹ"      # as VN.ghiChuLich writes it
+
+
+def warranty_samples():
+    """The real answers of GET /api/warranties and GET /api/after-sales for a customer with a delivered ring and one booking."""
+    customer, address = new_customer()
+    assert add_to_cart(customer, RING).status_code == 201
+    code = checkout(customer, address).get_json()["OrderCode"]
+    admin = new_admin()
+    for status in ("Confirmed", "Shipping"):
+        assert admin.post(f"/api/admin/orders/{code}/status", json={"status": status}).status_code == 200
+    assert customer.post(f"/api/orders/{code}/confirm-received").status_code == 200
+    card = customer.get("/api/warranties").get_json()[0]
+    when = (datetime.datetime.now() + datetime.timedelta(days=3)).replace(hour=14, minute=0, second=0, microsecond=0)
+    res = customer.post("/api/after-sales", json={"warrantyCode": card["WarrantyCode"], "serviceType": "Polishing",
+                                                  "preferredDate": when.isoformat(), "note": APPOINTMENT_NOTE})
+    assert res.status_code == 201, res.get_json()
+    return customer.get("/api/warranties").get_json(), customer.get("/api/after-sales").get_json()
+
+
 @pytest.fixture(scope="module")
 def adapted(db_ready, tmp_path_factory):
     with transaction() as cur:
@@ -85,6 +106,7 @@ def adapted(db_ready, tmp_path_factory):
     samples["guestOrder"] = client.application.test_client().get(f"/api/orders/{res.get_json()['OrderCode']}",
                                                                   query_string={"phone": phone}).get_json()
     samples["errors"] = real_errors(client, address_id)
+    samples["warranties"], samples["services"] = warranty_samples()
     path = tmp_path_factory.mktemp("adapters") / "samples.json"
     path.write_text(json.dumps(samples), encoding="utf-8")
     run = subprocess.run([NODE, str(HARNESS), str(API_JS), str(path)], capture_output=True, text=True, encoding="utf-8", timeout=60)
@@ -167,9 +189,27 @@ def test_a_guest_order_keeps_the_phone_it_was_looked_up_with(adapted):
     assert order["thanhToan"]["phuongThuc"] == "COD" and order["sanPham"][0]["maBienThe"] == SMALL
 
 
+def test_a_warranty_card_in_page_shape(adapted):
+    (card,) = adapted["cards"]
+    assert card["ma"].startswith("VNW") and card["donHang"].startswith("VN") and card["maSP"] and card["tenSP"] and card["conHieuLuc"] is True
+    assert card["laNhan"] is True and card["size"] == 11 and card["chatLieu"] and card["hieuLuc"] == "Trọn đời"
+    assert card["hanMuc"] == {"Cleaning": None, "Polishing": 5, "Resizing": None}        # null = no limit
+    assert card["daDung"] == {"Cleaning": 0, "Polishing": 0, "Resizing": 0} and card["lichSuDichVu"] == []
+    assert card["anh"] and DATE.match(card["ngayKichHoat"][:10])
+
+
+def test_an_appointment_in_page_shape_and_its_note_reads_back(adapted):
+    (service,) = adapted["services"]
+    assert service["ma"] == f"LH{service['id']}" and service["trangThai"] == "Pending" and service["dangMo"] is True
+    assert service["loai"] == "Polishing" and service["maBaoHanh"].startswith("VNW") and service["khungGio"] == "14:00"
+    assert DATE.match(service["ngayHen"]) and service["daDoiGio"] is False and service["sizeMoi"] is None
+    assert (service["tenCuaHang"], service["sdt"], service["soAnh"], service["ghiChu"]) == ("Showroom Quận 1", "0901234567", 2, "Nhẫn bị xỉn nhẹ")
+    assert adapted["noteRoundTrip"] == APPOINTMENT_NOTE
+
+
 def test_the_pages_do_not_use_the_removed_demo_data():
     """The demo accounts and the browser-only order store are gone; a page that still calls them would break at run time."""
-    gone = re.compile(r"VN\.(demo|DEMO|otp|QUAN_TRI_DEMO|bamMatKhau)\b|VN\.donHang\.(tatCa|luuTatCa|tao\(\{\s*sanPham|doiSangCOD|ghiThanhToan)|VN\.gioHang\.(luu|ds\(\)\.find)")
+    gone = re.compile(r"VN\.(demo|DEMO|otp|QUAN_TRI_DEMO|bamMatKhau)\b|VN\.donHang\.(tatCa|luuTatCa|tao\(\{\s*sanPham|doiSangCOD|ghiThanhToan)|VN\.gioHang\.(luu|ds\(\)\.find)|VN\.baoHanh\.(kichHoatChoDon|ghiDichVu|taoMa|luuTatCa)|VN\.lichHen\.(capNhat|luuTatCa)")
     offenders = []
     for path in sorted((FRONTEND_DIR / "src" / "js").glob("*/*.js")):
         if path.parent.name == "admin":      # the admin pages are not connected yet: admin.js replaces tatCa() with an empty list

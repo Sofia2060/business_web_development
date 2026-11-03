@@ -9,8 +9,8 @@
   'use strict';
   const VN = window.Vinora;
 
-  /** Số chứng nhận suy từ mã thẻ bảo hành: VNRA260812345678 -> VNCN 2608 1234 5678 */
-  VN.soChungNhan = (maThe) => String(maThe || '').replace(/^VNRA(\d{4})(\d{4})(\d{4})$/, 'VNCN $1 $2 $3');
+  /** Số chứng nhận suy từ mã thẻ bảo hành: VNW26080001234-1 -> VNCN 2608 0001234-1 */
+  VN.soChungNhan = (maThe) => String(maThe || '').replace(/^VNW(\d{4})(\d{7})-(\d+)$/, 'VNCN $1 $2-$3');
 
   /**
    * tuyChon: { so, ngay, mau, size, khacChu } – khi xem từ thẻ bảo hành sẽ có số và ngày cấp thật;

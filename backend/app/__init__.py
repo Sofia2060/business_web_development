@@ -28,7 +28,7 @@ PROC_ERROR_STATUS = {
     50049: 409,                          # order is being crafted: nobody can cancel it
     50050: 409,                          # payment for an order that is cancelled or past the payment time limit
     50051: 409,                          # production can only start on a confirmed order
-    50031: 409, 50035: 409, 50036: 409, 50037: 409,   # after-sales: card not valid, appointment in the wrong status
+    50031: 409, 50034: 409, 50035: 409, 50036: 409, 50037: 409,   # after-sales: card not valid, an open appointment of the same type, wrong status
 }
 
 
@@ -96,7 +96,9 @@ def create_app() -> Flask:
         app.logger.exception("Database error")
         return jsonify(error="Database error. Please try again."), 500
 
-    from .routes import addresses, admin, admin_shop, auth, cart, catalog, orders, products, profile, recently_viewed, vouchers
-    for module in (products, catalog, auth, profile, admin, admin_shop, addresses, cart, vouchers, orders, recently_viewed):
+    from .routes import (addresses, admin, admin_shop, auth, cart, catalog, orders, products, profile, recently_viewed,
+                         vouchers, warranty)
+    for module in (products, catalog, auth, profile, admin, admin_shop, addresses, cart, vouchers, orders, warranty,
+                   recently_viewed):
         app.register_blueprint(module.bp)
     return app
