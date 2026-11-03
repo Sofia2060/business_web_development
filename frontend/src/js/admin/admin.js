@@ -20,6 +20,15 @@
   /** Ai thực hiện thao tác (ghi vào nhật ký đơn / phản ánh / lịch hẹn) */
   qt.boi = (vaiTro) => `${vaiTro || 'Cửa hàng'} (${qt.nguoi ? qt.nguoi.hoTen : 'Quản trị'})`;
 
+  /*
+   * CÁC TRANG QUẢN TRỊ CHƯA NỐI API (nhóm C8). Đơn hàng và tài khoản khách đã nằm trên máy chủ, còn các trang này vẫn đọc
+   * dữ liệu giả lập trong trình duyệt, nên hai hàm đọc cũ dưới đây trả về danh sách rỗng (để trang không báo lỗi)
+   * và đầu trang có dòng nhắc. Quản trị đơn thật hiện dùng API /api/admin/orders (xem README gốc).
+   */
+  VN.donHang.tatCa = () => [];
+  VN.donHang.tuHuyQuaHan = () => false;
+  VN.taiKhoan.ds = () => [];
+
   /* ---------- Tiện ích hiển thị ---------- */
   qt.nhanDon = (d) => { const t = VN.TRANG_THAI_DON[d.trangThai]; return `<span class="nhan ${t.lop}">${t.ten}</span>`; };
   qt.nhanTT = (d) => {
@@ -100,6 +109,8 @@
     VN.quanTri.dangXuat(); location.href = VN.url('taiKhoan');
   });
   const batDau = () => {
+    const noiDung = VN.$('#noi-dung');
+    if (noiDung) noiDung.insertAdjacentHTML('afterbegin', `<div class="hop-bao hop-bao--vang">${VN.bt('thong-tin')}<span>Trang quản trị đang chờ nối API (nhóm C8): chưa hiển thị đơn hàng và khách hàng thật trên máy chủ. Dữ liệu ở đây là dữ liệu mô phỏng trên trình duyệt.</span></div>`);
     veKhung();
     // Màn hình hẹp: menu cuộn ngang -> đưa mục đang mở vào giữa
     const dangMo = VN.$('.qt-ben__ds [aria-current="page"]');

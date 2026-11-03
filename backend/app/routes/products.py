@@ -88,6 +88,27 @@ def _filters(args) -> tuple[list[str], list]:
     return where, params
 
 
+def _add_card_details(items: list[dict]) -> None:
+    """Add what a product card shows to each row: Colors (gold colors of the active variants, in the order the
+    variants were created) and Images (the first two image URLs, the thumbnail first)."""
+    if not items:
+        return
+    ids = tuple(item["ProductID"] for item in items)
+    marks = ",".join("?" * len(ids))
+    colors: dict[int, list[str]] = {}
+    for row in query(f"SELECT ProductID, GoldColor FROM dbo.ProductVariants WHERE IsActive = 1 AND GoldColor IS NOT NULL "
+                     f"AND ProductID IN ({marks}) GROUP BY ProductID, GoldColor ORDER BY ProductID, MIN(VariantID)", ids):
+        colors.setdefault(row["ProductID"], []).append(row["GoldColor"])
+    images: dict[int, list[str]] = {}
+    for row in query(f"SELECT ProductID, ImageUrl FROM (SELECT ProductID, ImageUrl, ROW_NUMBER() OVER "
+                     f"(PARTITION BY ProductID ORDER BY IsThumbnail DESC, SortOrder) AS n FROM dbo.ProductImages "
+                     f"WHERE ProductID IN ({marks})) x WHERE n <= 2 ORDER BY ProductID, n", ids):
+        images.setdefault(row["ProductID"], []).append(row["ImageUrl"])
+    for item in items:
+        item["Colors"] = colors.get(item["ProductID"], [])
+        item["Images"] = images.get(item["ProductID"], [])
+
+
 @bp.get("")
 def list_products():
     """List active products.
@@ -95,6 +116,7 @@ def list_products():
     Query: page, limit, q (name search without accents), sort (featured, newest, price_asc, price_desc, discount),
     and filters that combine with AND: category, collection (comma separated ids), material (10K, 14K, ...),
     color (gold colors such as "Vàng Trắng"), minPrice, maxPrice (VND), onSale=1 (only discounted products).
+    Each item also has Colors, Images (first two), HasDescription and CreatedAt, so a page can draw cards from it.
     """
     page = page_number(request.args.get("page"), 1)
     limit = page_number(request.args.get("limit"), DEFAULT_LIMIT)
@@ -110,10 +132,12 @@ def list_products():
 
     total = query(f"SELECT COUNT(*) AS n FROM dbo.vw_ProductCatalog c WHERE {clause}", tuple(params))[0]["n"]
     items = query(
-        f"SELECT c.* FROM dbo.vw_ProductCatalog c JOIN dbo.Products p ON p.ProductID = c.ProductID "
+        f"SELECT c.*, p.CreatedAt, CAST(CASE WHEN p.Description IS NULL OR p.Description = N'' THEN 0 ELSE 1 END AS BIT) "
+        f"AS HasDescription FROM dbo.vw_ProductCatalog c JOIN dbo.Products p ON p.ProductID = c.ProductID "
         f"WHERE {clause} ORDER BY {SORTS[sort]} OFFSET ? ROWS FETCH NEXT ? ROWS ONLY",
         tuple(params) + ((page - 1) * limit, limit),
     )
+    _add_card_details(items)
     return jsonify(total=total, page=page, limit=limit, items=items)
 
 
@@ -121,7 +145,7 @@ def list_products():
 def get_product(sku: str):
     """Return one product with its images, stones and variants."""
     rows = query(
-        "SELECT c.*, p.Description, p.IsEngravable FROM dbo.vw_ProductCatalog c "
+        "SELECT c.*, p.Description, p.IsEngravable, p.CreatedAt FROM dbo.vw_ProductCatalog c "
         "JOIN dbo.Products p ON p.ProductID = c.ProductID WHERE c.SKU = ? AND c.Status = 'Active'",
         (sku,),
     )

@@ -68,7 +68,14 @@ def _clean(value):
     # so the JSON output holds plain numbers instead of strings. Dates become ISO text.
     if isinstance(value, Decimal):
         return int(value) if value == value.to_integral_value() else float(value)
-    if isinstance(value, (datetime, date)):
+    if isinstance(value, datetime):
+        # SQL Server gives local time without a zone. Add this machine's offset (the database and the app run in the
+        # same zone) so a browser in another zone still reads the right moment, for example the payment deadline.
+        try:
+            return value.astimezone().isoformat()
+        except (OSError, OverflowError, ValueError):    # a date the operating system cannot place in a zone
+            return value.isoformat()
+    if isinstance(value, date):
         return value.isoformat()
     return value
 

@@ -14,7 +14,12 @@ File này ghi các mã, trạng thái và quy tắc khác nhau giữa giao diệ
 | `canChonSize` | `RequiresRingSize` | |
 | Một dòng giỏ gồm `ma` + `mau` + `size` | `variantSku` | Lấy từ danh sách `variants` của `GET /api/products/<sku>` (có `GoldColor`, `RingSize`, `StockQuantity`) |
 | Mã đơn `VNR` + ngày + 4 ký tự | `VN` + ngày + 6 số, ví dụ `VN261102000017` | Giao diện chỉ hiển thị, không tách mã |
-| Mã thẻ bảo hành `VNRA` + tháng + 8 ký tự | `VNW` + tháng + 7 số + `-` + số thứ tự đơn vị | Hàm `soTheDep`, `soChungNhan` chỉ định dạng được mã `VNRA…`, cần sửa hoặc bỏ |
+| Mã thẻ bảo hành `VNRA` + tháng + 8 ký tự | `VNW` + tháng + 7 số + `-` + số thứ tự đơn vị | Hàm `soTheDep`, `soChungNhan` chỉ định dạng được mã `VNRA…`, cần sửa hoặc bỏ. Trang bảo hành còn dùng thẻ giả lập trên trình duyệt (nhóm C6) |
+| Mã ưu đãi `VINORA5`, `CHAOBAN200`, `FREESHIP` | `WELCOME5`, `GIAM300K`, `VINORA500K` | `mock-data/config.json` đã đổi theo database. Số tiền giảm do `POST /api/vouchers/check` tính, giao diện không tự tính |
+| Giao hàng: tiêu chuẩn và hỏa tốc (60.000 đ) | Chỉ giao tiêu chuẩn: 30.000 đ, miễn phí từ 2.000.000 đ | Đã bỏ hỏa tốc khỏi `config.json`. Phí do máy chủ tính |
+| Gói quà, lời nhắn thiệp, ghi chú | Cột `Note` của đơn (tối đa 500 ký tự) | Giao diện ghép ba phần thành một dòng ghi chú, ví dụ `Gói quà Vinora, thiệp: “Chúc mừng” \| Gọi trước khi giao` |
+| Email người nhận trong biểu mẫu thanh toán | Không có | Database không lưu nên đã bỏ ô này |
+| Địa chỉ người nhận gồm tỉnh, phường, số nhà | Một chuỗi `ShipAddress` | Trang đơn hàng hiển thị chuỗi đó trong `nguoiNhan.diaChi` |
 
 ## 2. Quy tắc đã chốt
 
@@ -30,7 +35,7 @@ File này ghi các mã, trạng thái và quy tắc khác nhau giữa giao diệ
 | Đối tượng | Giao diện | Database | Cách xử lý |
 |---|---|---|---|
 | Đơn hàng | `Pending`, `Shipping`, `Delivered`, `Cancelled` | Thêm `Confirmed` giữa `Pending` và `Shipping` | Giao diện thêm nhãn "Đã xác nhận". Nút "Xác nhận và giao" của admin gọi `Confirmed` rồi `Shipping`. Khách hủy được ở cả `Pending` và `Confirmed` |
-| Thanh toán | `Pending`, `Success`, `Failed`, `Expired`, `RefundPending`, `Refunded` | `Pending`, `Success`, `Failed`, `Expired`, `Refunded` | `Expired` đã có (đơn quá 15 phút chưa trả). `RefundPending` chưa có, xem file `database/README.md` mục 11 |
+| Thanh toán | `Pending`, `Success`, `Failed`, `Expired`, `RefundPending`, `Refunded` | `Pending`, `Success`, `Failed`, `Expired`, `Refunded` | `Expired` đã có (đơn quá 15 phút chưa trả). `RefundPending` chưa có, xem file `database/README.md` mục 11. Hủy đơn đã trả tiền: thanh toán chuyển thẳng sang `Refunded`, giao diện không còn hỏi tài khoản ngân hàng. Hủy đơn chưa trả: thanh toán thành `Failed`, giao diện hiện "Chưa thanh toán" |
 | Lịch hẹn | `Pending`, `Confirmed`, `Completed`, `Cancelled` | Thêm `Rescheduled` (cửa hàng đề xuất giờ khác với giờ khách chọn) | Giao diện thêm nhãn "Đã đổi giờ" |
 | Dịch vụ hậu mãi | `Cleaning`, `Polishing`, `Resizing` (hiển thị "Đánh bóng và xi mới" chung) | `Cleaning`, `Polishing`, `Replating`, `Resizing` | `Replating` hiện chung nhóm "Đánh bóng và xi mới". Các quyền lợi `CZ`, `Stone`, `Moissanite`, `Repair` không đặt lịch nên không có trong database |
 | Màu | `Vàng Vàng`, `Vàng Trắng`, `Vàng Hồng`, nhóm `Bạc` | Thêm `Bạc Trắng`, `Bạc Vàng` (nhóm `Bạc` gồm hai màu này) | Sản phẩm `BTPTB418` ghi màu "Bạc Hồng" trong file giao diện, database không có màu cho biến thể này |
@@ -49,8 +54,9 @@ Size 21 đến 24 và tồn kho là hai chỗ giao diện phải xử lý thêm:
 ## 5. Chưa có trong database
 
 - Lưu yêu cầu báo giá: form liên hệ (`Nhận báo giá`) hiện chỉ lưu trong trình duyệt (khóa `lienHe`), cửa hàng không nhận được. Cần bảng và API nhận yêu cầu liên hệ.
-- Ngày tạo thật của từng sản phẩm: cả 443 sản phẩm cùng một `CreatedAt`, nên sắp xếp "mới nhất" của API khác giao diện (giao diện có 48 ngày `ngayTao` khác nhau).
 - Danh sách yêu thích, phản ánh đơn hàng kèm ảnh, phản hồi của cửa hàng cho đánh giá.
-- Phương thức giao hàng (hỏa tốc 60.000 đ), mã miễn phí giao `FREESHIP`, gói quà.
+- Giao hỏa tốc (60.000 đ) và mã miễn phí giao `FREESHIP`: database không có, giao diện đã bỏ. Gói quà và lời nhắn thiệp chỉ nằm trong ghi chú của đơn.
+- Đổi sang thanh toán khi nhận hàng (COD) sau khi đã đặt đơn trả trước: chưa có API, nút đã bỏ khỏi giao diện.
+- Danh sách đơn của khách không có tài khoản: máy chủ không có, trình duyệt tự nhớ mã đơn và số điện thoại đã đặt hoặc đã tra cứu.
 - Hoàn tiền hai bước (`RefundPending`) và tài khoản ngân hàng nhận hoàn.
 - Gắn đơn vãng lai vào tài khoản đã có (hiện chỉ gắn lúc đăng ký).

@@ -227,3 +227,49 @@ def test_voucher_check_does_not_use_up_the_voucher(client, make_voucher):
     for _ in range(3):
         assert check(c, code).status_code == 200
     assert query("SELECT UsedCount FROM dbo.Vouchers WHERE VoucherCode = ?", (code,))[0]["UsedCount"] == 0
+
+
+# ---------------- the voucher check for a visitor without an account (the cart is in the browser) ----------------
+
+def guest_check(client, code, items):
+    return client.post("/api/vouchers/check", json={"code": code, "items": items})
+
+
+def test_a_guest_checks_a_voucher_with_the_lines_of_the_browser_cart(client):
+    res = guest_check(client, " welcome5 ", [{"variantSku": MID, "quantity": 1}])
+    assert res.status_code == 200 and res.get_json()["discount"] == 118000 and res.get_json()["subtotal"] == 2361000
+    twice = guest_check(client, "WELCOME5", [{"variantSku": MID, "quantity": 1}, {"variantSku": MID, "quantity": 1}])
+    assert twice.get_json()["subtotal"] == 4722000 and twice.get_json()["discount"] == 236000   # 5% of 4,722,000 = 236,100
+
+
+def test_a_guest_check_gives_the_same_discount_as_the_guest_order(client):
+    from test_guest_orders import guest_order
+    items = [{"variantSku": MID, "quantity": 1}]
+    promised = guest_check(client, "WELCOME5", items).get_json()["discount"]
+    _, order = guest_order(client, items=items, voucherCode="WELCOME5")
+    assert order.status_code == 201
+    charged = query("SELECT DiscountAmount FROM dbo.Orders WHERE OrderCode = ?", (order.get_json()["OrderCode"],))[0]
+    assert promised == charged["DiscountAmount"] == 118000
+
+
+@pytest.mark.parametrize("code,reason,status", [("NO-SUCH-CODE", "not_found", 404), ("VINORA500K", "min_order", 409)])
+def test_a_guest_voucher_that_cannot_be_used_says_why(client, code, reason, status):
+    res = guest_check(client, code, [{"variantSku": MID, "quantity": 1}])
+    assert res.status_code == status and res.get_json()["reason"] == reason
+
+
+def test_a_guest_check_refuses_bad_lines(client):
+    quote = query("SELECT TOP (1) v.VariantSKU FROM dbo.ProductVariants v JOIN dbo.Products p ON p.ProductID = v.ProductID "
+                  "WHERE p.IsQuoteOnly = 1 ORDER BY v.VariantID")[0]["VariantSKU"]
+    assert guest_check(client, "WELCOME5", [{"variantSku": "NO-SUCH-SKU", "quantity": 1}]).status_code == 404
+    res = guest_check(client, "WELCOME5", [{"variantSku": quote, "quantity": 1}])
+    assert res.status_code == 409 and res.get_json()["reason"] == "quote_only"
+    for items in ([], "x", [1], [{"variantSku": MID, "quantity": 0}], [{"quantity": 1}], [{"variantSku": MID}] * 21):
+        assert guest_check(client, "WELCOME5", items).status_code == 400, items
+    assert client.post("/api/vouchers/check", json={"code": "WELCOME5"}).status_code == 401      # no login, no items
+
+
+def test_a_logged_in_customer_is_checked_against_the_cart_not_the_items_they_send(client):
+    c, _ = customer_with_cart(quantity=2)
+    res = c.post("/api/vouchers/check", json={"code": "WELCOME5", "items": [{"variantSku": MID, "quantity": 1}]})
+    assert res.get_json()["subtotal"] == 4722000

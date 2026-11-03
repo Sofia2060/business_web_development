@@ -100,3 +100,17 @@ def test_named_lock_makes_a_second_holder_wait_and_then_give_up(db_ready):
             pass
     with named_lock("pytest-lock-1", wait_ms=200):          # free again once the first holder is done
         pass
+
+
+def test_dates_from_the_database_carry_the_zone_of_this_machine():
+    # SQL Server gives local time with no zone; the API adds the offset so a browser elsewhere reads the same moment.
+    from datetime import date, datetime
+
+    from app.db import _clean
+    moment = datetime(2026, 11, 3, 14, 15, 0)
+    text = _clean(moment)
+    assert text == moment.astimezone().isoformat()
+    assert datetime.fromisoformat(text).utcoffset() == moment.astimezone().utcoffset()
+    assert datetime.fromisoformat(text).replace(tzinfo=None) == moment           # the wall clock time is unchanged
+    assert _clean(date(2000, 1, 31)) == "2000-01-31"                              # a plain date stays a plain date
+    assert _clean(datetime(1900, 1, 1)).startswith("1900-01-01T00:00:00")         # never fails, even for very old dates

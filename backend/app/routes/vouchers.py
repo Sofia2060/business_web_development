@@ -1,10 +1,11 @@
-"""Check a voucher code against the logged-in customer's cart, before placing the order."""
-from flask import Blueprint, g, jsonify
+"""Check a voucher code against the customer's cart (or a guest's browser cart), before placing the order."""
+from flask import Blueprint, jsonify
 
-from ..auth import customer_required
+from ..auth import current_user
 from ..db import query
 from ..validation import body, text
-from .cart import cart_subtotal
+from .cart import cart_subtotal, read_line
+from .orders import MAX_GUEST_LINES
 
 bp = Blueprint("vouchers", __name__, url_prefix="/api/vouchers")
 
@@ -32,17 +33,54 @@ def _problem(row: dict | None, subtotal: int) -> str | None:
     return None
 
 
+def _guest_subtotal(items) -> tuple[int | None, tuple[dict, int] | None]:
+    """Price of the lines a guest sends in place of a cart. Returns (subtotal, None) or (None, (error body, status))."""
+    if not isinstance(items, list) or not 1 <= len(items) <= MAX_GUEST_LINES or not all(isinstance(i, dict) for i in items):
+        return None, ({"error": f"items must be a list of 1 to {MAX_GUEST_LINES} lines"}, 400)
+    lines = []
+    for number, item in enumerate(items, start=1):
+        line, error = read_line(item)
+        if error:
+            return None, ({"error": f"Item {number}: {error}"}, 400)
+        lines.append(line)
+    skus = sorted({line[0] for line in lines})
+    prices = {row["VariantSKU"]: row["Price"] for row in query(
+        f"SELECT v.VariantSKU, dbo.fn_GetCurrentPrice(v.ProductID) AS Price FROM dbo.ProductVariants v "
+        f"JOIN dbo.Products p ON p.ProductID = v.ProductID WHERE v.IsActive = 1 AND p.Status = 'Active' "
+        f"AND v.VariantSKU IN ({','.join('?' * len(skus))})", tuple(skus))}
+    for number, line in enumerate(lines, start=1):
+        if line[0] not in prices:
+            return None, ({"error": f"Item {number}: Variant not found"}, 404)
+        if prices[line[0]] is None:
+            return None, ({"error": f"Item {number}: This product is sold by quote only. Please contact the shop.",
+                           "reason": "quote_only"}, 409)
+    return sum(prices[sku] * quantity for sku, quantity, _, _ in lines), None
+
+
 @bp.post("/check")
-@customer_required
 def check_voucher():
     """Body: {"code": "WELCOME5"}. Answers with the discount this voucher would give on the current cart.
-    The real discount is fixed again by sp_PlaceOrder when the order is placed."""
-    code = (text(body(), "code") or "").strip()
+    A logged-in customer is checked against the cart in the database. A visitor without an account sends the cart of
+    the browser as "items" (the same lines as in a guest order). The real discount is fixed again by sp_PlaceOrder
+    when the order is placed."""
+    data = body()
+    code = (text(data, "code") or "").strip()
     if not code or len(code) > MAX_CODE:
         return jsonify(error="code is required"), 400
-    subtotal = cart_subtotal(g.customer_id)
-    if not subtotal:
-        return jsonify(error="The cart is empty"), 400
+    user = current_user()
+    if user is not None:
+        customer = query("SELECT CustomerID FROM dbo.Customers WHERE UserID = ?", (user["UserID"],))
+        if not customer:
+            return jsonify(error="Customer account required"), 403
+        subtotal = cart_subtotal(customer[0]["CustomerID"])
+        if not subtotal:
+            return jsonify(error="The cart is empty"), 400
+    elif "items" not in data:
+        return jsonify(error="Login required, or send the cart lines as items"), 401
+    else:
+        subtotal, failure = _guest_subtotal(data["items"])
+        if failure:
+            return jsonify(failure[0]), failure[1]
 
     # The percent discount is worked out in SQL with the same rounding as sp_PlaceOrder (to the nearest 1,000).
     rows = query(

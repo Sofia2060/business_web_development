@@ -3,7 +3,8 @@
    - Mỗi dòng phân biệt theo mã + màu + size + chữ khắc; đổi size / màu / chữ khắc ngay trong giỏ
    - Tăng giảm số lượng (tối đa theo cấu hình), xóa có hoàn tác
    - Kiểm tra lại giá & khả năng bán trước khi thanh toán (FR10)
-   - Mã ưu đãi, tiến độ miễn phí giao hàng, gói quà & thiệp – tính tiền bằng VN.tinhTien (NFR5)
+   - Mã ưu đãi (máy chủ kiểm tra và tính tiền giảm), tiến độ miễn phí giao hàng, gói quà & thiệp – tính tiền bằng VN.tinhTien (NFR5)
+   - Khách có tài khoản: giỏ nằm trong database; khách chưa đăng nhập: giỏ nằm trên trình duyệt này
    ===================================================================== */
 (function () {
   'use strict';
@@ -13,60 +14,81 @@
 
   const KY_TU_KHAC = /^[\p{L}\p{M}\p{N} &.,\-♥∞+'’]*$/u;
   const TEN_KIEU = { 'co-dien': 'Cổ điển', 'hien-dai': 'Hiện đại', 'viet-tay': 'Viết tay' };
-  const tt = { ch: null, sp: null, dong: [], tc: VN.tuyChonGio.doc() };
+  const tt = { ch: null, sp: null, dong: [], tc: VN.tuyChonGio.doc(), uuDai: null, loiMa: '', daKiemTra: '' };
   const dsDong = VN.$('#ds-dong-gio');
 
-  VN.duLieu.coBan().then(({ sp, ch }) => {
+  Promise.all([VN.duLieu.coBan(), VN.sanSang]).then(([{ sp, ch }]) => {
     tt.sp = sp; tt.ch = ch;
     veMaUuDai();
     khoiTaoGoiQua();
     ve();
     window.addEventListener('vinora:gio', () => ve());
+    window.addEventListener('vinora:tai-khoan', () => ve());
   }).catch((loi) => {
     console.error(loi);
     VN.thongBao({ tieuDe: 'Chưa tải được dữ liệu sản phẩm', noiDung: 'Vui lòng kiểm tra kết nối mạng rồi tải lại trang.', loai: 'loi' });
   });
 
   /* ================= HIỂN THỊ ================= */
-  let dangVe = false;
+  /** Mã ưu đãi đang dùng: hỏi máy chủ khi mã hoặc tiền hàng đổi (máy chủ tính số tiền giảm và cho biết lý do nếu mã không dùng được) */
+  const kiemTraMaDangDung = async () => {
+    const ma = tt.tc.maUuDai;
+    const tamTinh = tt.dong.reduce((t, d) => t + d.donGia * d.soLuong, 0);
+    if (!ma || !tt.dong.length) { tt.uuDai = null; tt.loiMa = ''; tt.daKiemTra = ''; return; }
+    const dau = `${ma}|${tamTinh}`;
+    if (dau === tt.daKiemTra) return;
+    tt.daKiemTra = dau;
+    try { tt.uuDai = await VN.uuDai.kiemTra(ma); tt.loiMa = ''; } catch (loi) { tt.uuDai = null; tt.loiMa = loi.message; }
+  };
+
+  let dangVe = false; let veLai = false;
   const ve = async () => {
-    if (dangVe) return; dangVe = true;
-    // Ghi nhớ phần tử đang được focus để trả lại sau khi vẽ lại
-    const dangFocus = document.activeElement && document.activeElement.closest('.dong-gio')
-      ? { khoa: document.activeElement.closest('.dong-gio').dataset.khoa, vaiTro: document.activeElement.dataset.vaiTro } : null;
+    if (dangVe) { veLai = true; return; }     // đang vẽ: vẽ lại một lần nữa khi xong, để không mất thay đổi mới
+    dangVe = true;
+    try {
+      // Ghi nhớ phần tử đang được focus để trả lại sau khi vẽ lại
+      const dangFocus = document.activeElement && document.activeElement.closest('.dong-gio')
+        ? { khoa: document.activeElement.closest('.dong-gio').dataset.khoa, vaiTro: document.activeElement.dataset.vaiTro } : null;
 
-    const goc = VN.gioHang.ds();
-    tt.dong = await VN.gioHang.chiTiet();
-    // FR10: gỡ các dòng không còn bán trực tuyến
-    if (tt.dong.length < goc.length) {
-      const conLai = new Set(tt.dong.map((d) => d.khoa));
-      const bo = goc.filter((d) => !conLai.has(VN.gioHang.khoa(d)));
-      VN.gioHang.luu(goc.filter((d) => conLai.has(VN.gioHang.khoa(d))));
-      const hop = VN.$('#gh-thong-bao');
-      hop.hidden = false;
-      hop.innerHTML = `${VN.bt('canh-bao')}<span>${bo.length} sản phẩm (${bo.map((d) => VN.thoat(d.ma)).join(', ')}) không còn bán trực tuyến hoặc đổi sang giá theo ngày nên đã được gỡ khỏi giỏ.</span>`;
-    }
-    const co = tt.dong.length > 0;
-    trang.hidden = !co;
-    VN.$('#gio-trong').hidden = co;
-    const tong = tt.dong.reduce((t, d) => t + d.soLuong, 0);
-    VN.$('#gh-dem').textContent = co ? `(${tong})` : '';
-    trang.removeAttribute('aria-busy');
+      const goc = VN.gioHang.ds();
+      tt.dong = await VN.gioHang.chiTiet();
+      // FR10: gỡ các dòng không còn bán trực tuyến
+      if (tt.dong.length < goc.length) {
+        const conLai = new Set(tt.dong.map((d) => d.khoa));
+        const bo = goc.filter((d) => !conLai.has(VN.gioHang.khoa(d)));
+        VN.gioHang.goBo(bo.map((d) => VN.gioHang.khoa(d))).catch(() => {});
+        const hop = VN.$('#gh-thong-bao');
+        hop.hidden = false;
+        hop.innerHTML = `${VN.bt('canh-bao')}<span>${bo.length} sản phẩm (${bo.map((d) => VN.thoat(d.ma)).join(', ')}) không còn bán trực tuyến hoặc đổi sang giá theo ngày nên đã được gỡ khỏi giỏ.</span>`;
+      }
+      // Màu, size còn lại và khả năng khắc chữ của từng sản phẩm nằm ở trang chi tiết của máy chủ
+      await Promise.all(tt.dong.map((d) => VN.duLieu.chiTietSanPham(d.ma).then((ct) => { d.ct = ct; }).catch(() => {})));
+      await kiemTraMaDangDung();
+      const co = tt.dong.length > 0;
+      trang.hidden = !co;
+      VN.$('#gio-trong').hidden = co;
+      const tong = tt.dong.reduce((t, d) => t + d.soLuong, 0);
+      VN.$('#gh-dem').textContent = co ? `(${tong})` : '';
+      trang.removeAttribute('aria-busy');
 
-    dsDong.innerHTML = tt.dong.map(htmlDong).join('');
-    veTien();
-    veGoiY();
-    if (dangFocus) {
-      const el = VN.$(`.dong-gio[data-khoa="${CSS.escape(dangFocus.khoa)}"] [data-vai-tro="${dangFocus.vaiTro}"]`);
-      if (el && !el.disabled) el.focus();
+      dsDong.innerHTML = tt.dong.map(htmlDong).join('');
+      veTien();
+      veGoiY();
+      if (dangFocus) {
+        const el = VN.$(`.dong-gio[data-khoa="${CSS.escape(dangFocus.khoa)}"] [data-vai-tro="${dangFocus.vaiTro}"]`);
+        if (el && !el.disabled) el.focus();
+      }
+    } finally {
+      dangVe = false;
+      if (veLai) { veLai = false; ve(); }
     }
-    dangVe = false;
   };
 
   const htmlDong = (d) => {
     const s = d.sp; const ch = tt.ch;
     const laNhan = s.canChonSize;
-    const coKhac = (ch.khacChu.apDungDanhMuc || []).includes(s.danhMuc);
+    const ct = d.ct;
+    const coKhac = !!(ct && ct.khacDuoc);
     const k = VN.thoat(d.khoa);
     let tuyChon = '';
     if (s.mau.length > 1) {
@@ -74,8 +96,10 @@
         ${s.mau.map((m) => `<option${m === d.mau ? ' selected' : ''}>${VN.thoat(m)}</option>`).join('')}</select></label>`;
     }
     if (laNhan) {
-      let opt = '';
-      for (let n = ch.sizeNhan.nhoNhat; n <= ch.sizeNhan.lonNhat; n++) opt += `<option value="${n}"${Number(d.size) === n ? ' selected' : ''}>${n}</option>`;
+      // Chỉ các size có trong kho cho màu của dòng này (size đang chọn luôn có trong danh sách)
+      const dsSize = ct ? ct.bienThe.filter((v) => v.size && (!d.mau || v.mau === d.mau)).map((v) => v.size) : [];
+      if (d.size && !dsSize.includes(Number(d.size))) dsSize.push(Number(d.size));
+      const opt = dsSize.sort((a, b) => a - b).map((n) => `<option value="${n}"${Number(d.size) === n ? ' selected' : ''}>${n}</option>`).join('');
       tuyChon += `<label class="dong-gio__chon"><span>Size</span><select class="o-chon" data-doi-size data-vai-tro="size" aria-label="Đổi size nhẫn cho ${VN.thoat(s.ten)}">${opt}</select></label>`;
     }
     let khac = '';
@@ -97,6 +121,7 @@
           <div class="dong-gio__don-gia"><span class="an-chu">Đơn giá</span>${VN.giaHtml(s)}</div>
           ${tuyChon ? `<div class="dong-gio__tuy-chon">${tuyChon}</div>` : ''}
           ${khac}
+          ${d.tonKho !== undefined && d.soLuong > d.tonKho ? `<p class="loi-truong" role="alert">${d.tonKho > 0 ? `Chỉ còn ${d.tonKho} sản phẩm, vui lòng giảm số lượng.` : 'Lựa chọn này tạm hết hàng.'}</p>` : ''}
         </div>
         <div class="dong-gio__sl" role="cell">
           <span class="nhan-o">Số lượng</span>
@@ -111,21 +136,21 @@
       </li>`;
   };
 
-  /* Tóm tắt tiền – dùng chung công thức VN.tinhTien */
+  /* Tóm tắt tiền – dùng chung công thức VN.tinhTien; số tiền giảm của mã do máy chủ tính */
   const veTien = () => {
-    const ch = tt.ch; const t = VN.tinhTien(tt.dong, ch, { maUuDai: tt.tc.maUuDai });
+    const ch = tt.ch; const t = VN.tinhTien(tt.dong, ch, { giam: tt.uuDai ? tt.uuDai.discount : 0 });
     const sl = tt.dong.reduce((a, d) => a + d.soLuong, 0);
     VN.$('#gh-tien').innerHTML = `
       <div><dt>Tạm tính <span>(${sl} sản phẩm)</span></dt><dd class="so-deu">${VN.tien(t.tamTinh)}</dd></div>
-      ${t.uuDai && t.giam ? `<div class="dong-tien__giam"><dt>Ưu đãi <span class="nhan nhan--vang nhan--tron">${VN.thoat(t.uuDai.ma)}</span></dt><dd class="so-deu">−${VN.tien(t.giam)}</dd></div>` : ''}
+      ${tt.uuDai && t.giam ? `<div class="dong-tien__giam"><dt>Ưu đãi <span class="nhan nhan--vang nhan--tron">${VN.thoat(tt.uuDai.code)}</span></dt><dd class="so-deu">−${VN.tien(t.giam)}</dd></div>` : ''}
       <div><dt>Phí giao hàng <span>(tiêu chuẩn, ước tính)</span></dt><dd class="so-deu">${t.phiGiao ? VN.tien(t.phiGiao) : '<span class="chu-ngoc">Miễn phí</span>'}</dd></div>
       <div class="dong-tien__tong"><dt>Tổng cộng</dt><dd class="so-deu">${VN.tien(t.tong)}</dd></div>`;
     // Mã ưu đãi đang áp dụng
     const loi = VN.$('#loi-ma');
-    if (tt.tc.maUuDai && t.loi) { loi.innerHTML = `${VN.bt('canh-bao', 'bt--nho')}<span>${t.loi}</span>`; }
-    else if (t.uuDai) { loi.innerHTML = `<span class="chu-ngoc">${VN.bt('dau-tich', 'bt--nho')} Đã áp dụng ${VN.thoat(t.uuDai.ma)}: ${VN.thoat(t.uuDai.moTa)}. <button type="button" class="lien-ket" data-bo-ma>Bỏ mã</button></span>`; }
+    if (tt.tc.maUuDai && tt.loiMa) { loi.innerHTML = `${VN.bt('canh-bao', 'bt--nho')}<span>${VN.thoat(tt.loiMa)}</span>`; }
+    else if (tt.uuDai) { loi.innerHTML = `<span class="chu-ngoc">${VN.bt('dau-tich', 'bt--nho')} Đã áp dụng ${VN.thoat(tt.uuDai.code)}: ${VN.thoat(tt.uuDai.name)}. <button type="button" class="lien-ket" data-bo-ma>Bỏ mã</button></span>`; }
     else loi.innerHTML = '';
-    VN.$('#o-ma').closest('.truong').classList.toggle('co-loi', !!(tt.tc.maUuDai && t.loi));
+    VN.$('#o-ma').closest('.truong').classList.toggle('co-loi', !!(tt.tc.maUuDai && tt.loiMa));
     VN.$$('#ds-ma [data-ma]').forEach((b) => {
       const u = ch.maUuDai.find((x) => x.ma === b.dataset.ma);
       const du = t.tamTinh >= (u.donToiThieu || 0);
@@ -145,22 +170,30 @@
   /* ================= THAO TÁC TRÊN DÒNG ================= */
   const khoaCua = (el) => el.closest('.dong-gio').dataset.khoa;
   const dongTheoKhoa = (k) => tt.dong.find((d) => d.khoa === k);
+  /** Thực hiện một thao tác trên giỏ; lỗi (hết hàng, mất mạng…) được báo rồi giỏ được tải lại cho khớp với máy chủ */
+  const thucHien = async (viec) => {
+    try { await viec(); } catch (loi) {
+      VN.thongBao({ tieuDe: 'Chưa cập nhật được giỏ hàng', noiDung: VN.thoat(loi.message), loai: 'loi' });
+      VN.gioHang.nap().catch(() => {});
+    }
+  };
   dsDong.addEventListener('click', (e) => {
     const b = e.target.closest('button'); if (!b) return;
     const k = khoaCua(b); const d = dongTheoKhoa(k); if (!d) return;
     if (b.dataset.sl) {
-      VN.gioHang.datSoLuong(k, Math.max(1, Math.min(tt.ch.soLuongToiDaMoiDong, d.soLuong + Number(b.dataset.sl))));
+      thucHien(() => VN.gioHang.datSoLuong(k, Math.max(1, Math.min(tt.ch.soLuongToiDaMoiDong, d.soLuong + Number(b.dataset.sl)))));
     } else if (b.hasAttribute('data-xoa')) {
-      const viTri = VN.gioHang.ds().findIndex((x) => VN.gioHang.khoa(x) === k);
-      const li = b.closest('.dong-gio'); li.classList.add('dang-xoa');
-      setTimeout(() => {
-        const da = VN.gioHang.xoa(k);
-        if (da) VN.thongBao({ tieuDe: 'Đã xóa khỏi giỏ hàng', noiDung: VN.thoat(d.sp.ten), hanhDong: { chu: 'Hoàn tác', khiBam: () => VN.gioHang.khoiPhuc(da, viTri) } });
-      }, 200);
+      b.closest('.dong-gio').classList.add('dang-xoa');
+      setTimeout(() => thucHien(async () => {
+        const da = await VN.gioHang.xoa(k);
+        if (da) VN.thongBao({ tieuDe: 'Đã xóa khỏi giỏ hàng', noiDung: VN.thoat(d.sp.ten), hanhDong: { chu: 'Hoàn tác', khiBam: () => thucHien(() => VN.gioHang.khoiPhuc(da)) } });
+      }), 200);
     } else if (b.hasAttribute('data-sua-khac')) moHopKhac(d);
     else if (b.hasAttribute('data-bo-khac')) {
-      VN.gioHang.capNhatDong(k, { khacChu: '', kieuChu: '' }, tt.ch.soLuongToiDaMoiDong);
-      VN.thongBao({ tieuDe: 'Đã bỏ chữ khắc', noiDung: VN.thoat(d.sp.ten) });
+      thucHien(async () => {
+        await VN.gioHang.capNhatDong(k, { khacChu: '', kieuChu: '' }, tt.ch.soLuongToiDaMoiDong);
+        VN.thongBao({ tieuDe: 'Đã bỏ chữ khắc', noiDung: VN.thoat(d.sp.ten) });
+      });
     }
   });
   dsDong.addEventListener('change', (e) => {
@@ -168,12 +201,14 @@
     if (el.matches('[data-o-sl]')) {
       const n = Math.max(1, Math.min(tt.ch.soLuongToiDaMoiDong, Math.round(Number(el.value) || 1)));
       if (Number(el.value) > tt.ch.soLuongToiDaMoiDong) VN.thongBao({ tieuDe: `Tối đa ${tt.ch.soLuongToiDaMoiDong} sản phẩm cho mỗi lựa chọn`, noiDung: 'Liên hệ hotline nếu bạn cần đặt số lượng lớn.' });
-      VN.gioHang.datSoLuong(k, n);
+      thucHien(() => VN.gioHang.datSoLuong(k, n));
     } else if (el.matches('[data-doi-size]')) {
-      VN.gioHang.capNhatDong(k, { size: Number(el.value) }, tt.ch.soLuongToiDaMoiDong);
-      VN.thongBao({ tieuDe: `Đã đổi sang size ${el.value}`, loai: 'thanh-cong', thoiGian: 2200 });
+      thucHien(async () => {
+        await VN.gioHang.capNhatDong(k, { size: Number(el.value) }, tt.ch.soLuongToiDaMoiDong);
+        VN.thongBao({ tieuDe: `Đã đổi sang size ${el.value}`, loai: 'thanh-cong', thoiGian: 2200 });
+      });
     } else if (el.matches('[data-doi-mau]')) {
-      VN.gioHang.capNhatDong(k, { mau: el.value }, tt.ch.soLuongToiDaMoiDong);
+      thucHien(() => VN.gioHang.capNhatDong(k, { mau: el.value }, tt.ch.soLuongToiDaMoiDong));
     }
   });
 
@@ -203,9 +238,11 @@
     const chu = oChu.value.normalize('NFC').replace(/\s+/g, ' ').trim();
     if (!chu) { VN.baoLoiTruong(oChu, 'Vui lòng nhập nội dung khắc (hoặc chọn “Bỏ khắc” trong giỏ hàng).'); return; }
     if (!KY_TU_KHAC.test(chu)) { VN.baoLoiTruong(oChu, 'Có ký tự không khắc được. Chỉ dùng chữ, số, khoảng trắng và & . , - ♥ ∞'); return; }
-    VN.gioHang.capNhatDong(dongDangSua.khoa, { khacChu: chu, kieuChu: formKhac.kieu.value }, tt.ch.soLuongToiDaMoiDong);
     VN.dongHopThoai(hopKhac);
-    VN.thongBao({ tieuDe: 'Đã lưu chữ khắc', noiDung: `“${VN.thoat(chu)}” · ${TEN_KIEU[formKhac.kieu.value]}`, loai: 'thanh-cong' });
+    thucHien(async () => {
+      await VN.gioHang.capNhatDong(dongDangSua.khoa, { khacChu: chu, kieuChu: formKhac.kieu.value }, tt.ch.soLuongToiDaMoiDong);
+      VN.thongBao({ tieuDe: 'Đã lưu chữ khắc', noiDung: `“${VN.thoat(chu)}” · ${TEN_KIEU[formKhac.kieu.value]}`, loai: 'thanh-cong' });
+    });
   });
 
   /* ================= MÃ ƯU ĐÃI ================= */
@@ -215,24 +252,25 @@
         <strong>${VN.thoat(u.ma)}</strong><small>${VN.thoat(u.moTa)}</small></button>`).join('');
     if (tt.tc.maUuDai) VN.$('#o-ma').value = tt.tc.maUuDai;
   };
-  const apDungMa = (ma) => {
+  const apDungMa = async (ma) => {
     ma = String(ma || '').trim().toUpperCase();
-    const t = VN.tinhTien(tt.dong, tt.ch, { maUuDai: ma });
     VN.$('#o-ma').value = ma;
     if (!ma) { VN.baoLoiTruong(VN.$('#o-ma'), 'Vui lòng nhập mã ưu đãi.'); return; }
-    if (t.loi && !tt.ch.maUuDai.some((u) => u.ma === ma)) {
-      VN.$('#loi-ma').innerHTML = `${VN.bt('canh-bao', 'bt--nho')}<span>${t.loi}</span>`;
+    try {
+      const kq = await VN.uuDai.kiemTra(ma);           // máy chủ kiểm tra mã và tính số tiền giảm
+      tt.tc = VN.tuyChonGio.ghi({ maUuDai: kq.code });
+      tt.uuDai = kq; tt.loiMa = ''; tt.daKiemTra = `${kq.code}|${kq.subtotal}`;
+      veTien();
+      VN.thongBao({ tieuDe: `Đã áp dụng mã ${kq.code}`, noiDung: `Bạn được giảm ${VN.tien(kq.discount)}.`, loai: 'thanh-cong' });
+    } catch (loi) {
+      VN.$('#loi-ma').innerHTML = `${VN.bt('canh-bao', 'bt--nho')}<span>${VN.thoat(loi.message)}</span>`;
       VN.$('#o-ma').closest('.truong').classList.add('co-loi');
-      return;
     }
-    tt.tc = VN.tuyChonGio.ghi({ maUuDai: ma });
-    veTien();
-    if (!t.loi) VN.thongBao({ tieuDe: `Đã áp dụng mã ${ma}`, noiDung: t.giam ? `Bạn được giảm ${VN.tien(t.giam)}.` : 'Đơn hàng được miễn phí giao hàng.', loai: 'thanh-cong' });
   };
   VN.$('#form-ma').addEventListener('submit', (e) => { e.preventDefault(); apDungMa(VN.$('#o-ma').value); });
   VN.$('#form-ma').addEventListener('click', (e) => {
     const the = e.target.closest('[data-ma]'); if (the) { apDungMa(the.dataset.ma); return; }
-    if (e.target.closest('[data-bo-ma]')) { tt.tc = VN.tuyChonGio.ghi({ maUuDai: '' }); VN.$('#o-ma').value = ''; veTien(); }
+    if (e.target.closest('[data-bo-ma]')) { tt.tc = VN.tuyChonGio.ghi({ maUuDai: '' }); tt.uuDai = null; tt.loiMa = ''; tt.daKiemTra = ''; VN.$('#o-ma').value = ''; veTien(); }
   });
   VN.$('#o-ma').addEventListener('input', () => { VN.$('#o-ma').closest('.truong').classList.remove('co-loi'); });
 

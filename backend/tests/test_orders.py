@@ -606,3 +606,19 @@ def test_a_quote_only_product_cannot_be_put_in_the_cart(client):
     res = add_to_cart(c, "MDBZ036-VV")                 # 24K pendant priced by the gold price of the day
     assert res.status_code == 409 and res.get_json()["reason"] == "quote_only"
     assert c.get("/api/cart").get_json()["items"] == []
+
+
+def test_order_list_carries_the_items_of_each_order(client):
+    c, addr = new_customer()
+    first = place(c, addr, SMALL, quantity=2)["OrderCode"]
+    second = place(c, addr, MID)["OrderCode"]
+    listed = c.get("/api/orders").get_json()
+    assert [o["OrderCode"] for o in listed] == [second, first]               # newest first
+    assert all("OrderID" not in o for o in listed)                            # the internal id stays inside
+    by_code = {o["OrderCode"]: o["items"] for o in listed}
+    assert [(i["ProductSKU"], i["Quantity"], i["LineTotal"]) for i in by_code[first]] == [("PSMEOTHANTAI", 2, 278000)]
+    assert [(i["SKUSnap"], i["Quantity"]) for i in by_code[second]] == [(MID, 1)]
+    one = by_code[second][0]
+    assert {"ProductNameSnap", "MaterialSnap", "GoldColor", "RingSize", "EngravingText", "EngravingStyle",
+            "UnitPrice"} <= one.keys()
+    assert c.get(f"/api/orders/{second}").get_json()["items"][0]["ProductNameSnap"] == one["ProductNameSnap"]

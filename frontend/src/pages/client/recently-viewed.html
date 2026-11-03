@@ -457,8 +457,6 @@
       </select>
     </div>
   </div>
-  <p class="hop-bao dx-meo" id="dx-meo" hidden><svg class="bt"><use href="#i-luoi"></use></svg><span>Đánh dấu <strong>So sánh</strong> trên tối đa 3 sản phẩm để đặt cạnh nhau chất liệu, trọng lượng, đá và giá.</span></p>
-
   <div id="dx-ket-qua" aria-live="polite" aria-busy="true">
     <div class="luoi-sp"></div>
   </div>
@@ -466,7 +464,7 @@
   <div class="trong-rong dx-trong" id="dx-trong" hidden>
     <div class="trong-rong__bieu-tuong"><svg class="bt"><use href="#i-dong-ho"></use></svg></div>
     <h2 class="t-2">Bạn chưa xem sản phẩm nào</h2>
-    <p>Các mẫu bạn mở xem sẽ được lưu tại đây để tiện quay lại, so sánh và chọn món ưng ý nhất.</p>
+    <p>Các mẫu bạn mở xem sẽ được lưu tại đây để tiện quay lại và chọn món ưng ý nhất.</p>
     <div class="hang hang--giua hang--quan">
       <a class="nut nut--chinh" href="products.html">Khám phá trang sức</a>
       <a class="nut nut--vien" href="products.html?nhom=nhan">Xem bộ sưu tập nhẫn</a>
@@ -489,29 +487,6 @@
   </div>
 </section>
 
-
-<div class="khay-so-sanh" id="khay-so-sanh" aria-hidden="true">
-  <div class="khung khay-so-sanh__khung">
-    <p class="khay-so-sanh__chu"><strong>So sánh</strong><span id="ss-dem" class="so-deu">0/3 sản phẩm</span></p>
-    <ul class="khay-so-sanh__ds" id="ss-ds"></ul>
-    <div class="khay-so-sanh__nut">
-      <button class="nut nut--chu" type="button" id="ss-bo">Bỏ chọn</button>
-      <button class="nut nut--chinh nut--nho" type="button" id="ss-mo" disabled>So sánh ngay</button>
-    </div>
-  </div>
-</div>
-
-<dialog class="hop-thoai hop-thoai--rong hop-so-sanh" id="hop-so-sanh" aria-labelledby="ss-td">
-  <div class="hop-thoai__than">
-    <button class="nut-bt hop-thoai__dong" type="button" data-dong aria-label="Đóng"><svg class="bt"><use href="#i-dong"></use></svg></button>
-    <div class="hop-thoai__dau">
-      <p class="nhan-tren">So sánh mẫu trang sức</p>
-      <h2 class="hop-thoai__tieu-de" id="ss-td">Đặt cạnh nhau để chọn đúng món</h2>
-    </div>
-    <label class="lua-chon ss-khac-biet"><input type="checkbox" id="ss-khac-biet"> <span>Chỉ hiện thông số khác nhau</span></label>
-    <div class="bang-boc ss-bang-boc"><table class="bang bang-so-sanh" id="ss-bang"></table></div>
-  </div>
-</dialog>
 
   </main>
 
@@ -627,6 +602,8 @@
   </dialog>
 
   <script src="../../js/core/common.js" defer></script>
+  <script src="../../js/core/api.js" defer></script>
+  <script src="../../js/core/session.js" defer></script>
   <script src="../../js/pages/recently-viewed.js" defer></script>
 </body>
 </html>

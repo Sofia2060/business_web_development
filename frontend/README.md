@@ -4,15 +4,11 @@ Không cần Python/Flask. Chỉ gồm HTML + CSS + JavaScript + dữ liệu JSO
 Các trang không dùng `<!DOCTYPE html>` và thẻ `<meta>` (khung nhìn điện thoại được thêm bằng một đoạn script nhỏ trong `<head>`).
 
 ## Cách mở
-Cách chính (có API và database): chạy `uv run python backend/run.py` ở gốc repo rồi mở `http://127.0.0.1:5000/`. Flask phục vụ thư mục này, xem README ở gốc repo.
+Chạy `uv run python backend/run.py` ở gốc repo rồi mở `http://127.0.0.1:5000/`. Flask phục vụ thư mục này và API ở cùng một địa chỉ, xem README ở gốc repo.
 
-Cách chỉ xem giao diện giả lập (không cần database):
-1. Mở thư mục `frontend` bằng VS Code.
-2. Cài tiện ích **Live Server** (Ritwick Dey) nếu chưa có.
-3. Chuột phải `index.html` (ở gốc `frontend/`) → **Open with Live Server**. File này tự chuyển tới `src/pages/client/index.html`.
-
-> Phải mở thư mục `frontend` làm gốc server, vì các trang dùng đường dẫn tương đối `../../../mock-data/` và `../../../public/`.
-> Không bấm đúp mở file `.html` trực tiếp (đường dẫn `file://`): trình duyệt chặn AJAX đọc `mock-data/*.json` và `stores.xml`, trang sẽ không có sản phẩm.
+> Các trang khách lấy sản phẩm, tài khoản, giỏ hàng và đơn hàng từ API (`/api/...`), nên không còn chạy riêng bằng Live Server hay bấm đúp file `.html`.
+> Chỉ còn đọc từ thư mục `mock-data/`: `config.json` (nhãn và quy tắc hiển thị), `size-chart.json`, `provinces.json`, `stores.xml`.
+> `categories.json`, `collections.json` không còn trang nào đọc, `products.json` chỉ còn trang quản trị sản phẩm đọc (nhóm C8). Giữ lại vì test đối chiếu dữ liệu API với dữ liệu gốc; sẽ xóa ở bước dọn dẹp (C9).
 
 ## Cấu trúc
 ```

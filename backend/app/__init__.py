@@ -1,5 +1,6 @@
 import os
 import posixpath
+from datetime import timedelta
 
 import pyodbc
 from dotenv import load_dotenv
@@ -43,6 +44,7 @@ def create_app() -> Flask:
     if not app.secret_key or len(app.secret_key) < 32:
         raise RuntimeError("SECRET_KEY is missing or shorter than 32 characters. Copy .env.example to .env and set a random value.")
     app.config["SESSION_COOKIE_SAMESITE"] = "Lax"  # blocks the cookie on cross-site POSTs
+    app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=14)  # for "remember me" logins
     app.config["MAX_CONTENT_LENGTH"] = 16 * 1024  # reject huge request bodies
 
     @app.before_request

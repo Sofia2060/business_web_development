@@ -22,7 +22,7 @@
   const kichThuocDa = VN.kichThuocDa;
   const demKyTu = (chu) => Array.from(chu).length;
 
-  const tt = { sp: null, ch: null, bangSize: null, anh: [], viTri: 0, dangKhac: false, size: null, mau: '', soLuong: 1, toiDa: 5, toiDaKhac: 15 };
+  const tt = { sp: null, ch: null, bangSize: null, anh: [], viTri: 0, dangKhac: false, size: null, mau: '', soLuong: 1, toiDa: 5, toiDaKhac: 15, tonKho: null, sizeLuu: null, dangThem: false };
   const el = {
     noiDung: VN.$('#ct-noi-dung'), khung: VN.$('#tv-khung'), anh: VN.$('#tv-anh'),
     nho: VN.$('#tv-nho .thu-vien__nho-cuon'), cham: VN.$('#tv-cham'), dem: VN.$('#tv-dem'),
@@ -31,13 +31,18 @@
   };
 
   /* ================= 1. TẢI DỮ LIỆU (AJAX) ================= */
-  Promise.all([VN.duLieu.coBan(), VN.duLieu.bangSize()]).then(([coBan, bangSize]) => {
+  Promise.all([VN.duLieu.coBan(), VN.duLieu.bangSize(), VN.sanSang]).then(async ([coBan, bangSize]) => {
     const { sp, ch } = coBan;
-    const s = sp.theoMa[maYeuCau] || sp.ds.find((x) => x.ma.toLowerCase() === maYeuCau.toLowerCase());
-    if (!s) { khongTimThay(sp.ds); return; }
+    const goc = sp.theoMa[maYeuCau] || sp.ds.find((x) => x.ma.toLowerCase() === maYeuCau.toLowerCase());
+    if (!goc) { khongTimThay(sp.ds); return; }
+    // Danh sách chỉ có 2 ảnh mỗi sản phẩm; trang chi tiết lấy đủ ảnh, mô tả, đá và các biến thể (màu, size, tồn kho)
+    let ct;
+    try { ct = await VN.duLieu.chiTietSanPham(goc.ma); } catch (loi) { if (loi.trangThai === 404) { khongTimThay(sp.ds); return; } throw loi; }
+    const s = Object.assign(goc, { anh: ct.anh, moTa: ct.moTa, coMoTa: ct.coMoTa, da: ct.da, bienThe: ct.bienThe, khacDuoc: ct.khacDuoc, mau: ct.mau });
     Object.assign(tt, { sp: s, ch, bangSize, toiDa: ch.soLuongToiDaMoiDong || 5, toiDaKhac: ch.khacChu.toiDaKyTu || 15 });
 
     VN.daXem.ghi(s.ma);
+    if (VN.taiKhoan.hienTai()) VN.api.post('/api/recently-viewed', { sku: s.ma }).catch(() => {});   // khách có tài khoản: máy chủ cũng ghi nhận
     veDauTrang(s);
     veGia(s, ch);
     veThongSo(s, ch);
@@ -56,7 +61,7 @@
     el.noiDung.removeAttribute('aria-busy');
   }).catch((loi) => {
     console.error(loi);
-    VN.thongBao({ tieuDe: 'Chưa tải được dữ liệu sản phẩm', noiDung: 'Vui lòng kiểm tra kết nối mạng rồi tải lại trang.', loai: 'loi' });
+    VN.thongBao({ tieuDe: 'Chưa tải được dữ liệu sản phẩm', noiDung: VN.thoat(loi.message || 'Vui lòng kiểm tra kết nối mạng rồi tải lại trang.'), loai: 'loi' });
   });
 
   /* Sản phẩm không tồn tại -> trạng thái rỗng + gợi ý sản phẩm mới */
@@ -100,10 +105,10 @@
     if (s.coTheMua) {
       khung.innerHTML = VN.giaHtml(s, true)
         + (s.giaCu ? `<span class="nhan nhan--do">Tiết kiệm ${VN.tien(s.giaCu - s.giaBan)}${s.giam ? ` · −${s.giam}%` : ''}</span>` : '')
-        + `<p class="thong-tin__gia-phu">${s.canChonSize ? `Giá áp dụng cho mọi size từ ${ch.sizeNhan.nhoNhat} đến ${ch.sizeNhan.lonNhat} · ` : ''}Miễn phí giao hàng cho đơn từ <strong>${VN.tien(ch.giaoHang.mienPhiTu)}</strong></p>`;
+        + `<p class="thong-tin__gia-phu">${s.canChonSize ? `Giá áp dụng cho mọi size · ` : ''}Miễn phí giao hàng cho đơn từ <strong>${VN.tien(ch.giaoHang.mienPhiTu)}</strong></p>`;
     } else {
-      khung.innerHTML = `<p class="gia-cong-lon"><span>Giá vàng theo ngày</span><small>+ tiền công</small><strong>${VN.tien(s.gia)}</strong></p>
-        <p class="thong-tin__gia-phu">Trang sức vàng ${VN.thoat(s.chatLieu)} được tính theo giá vàng niêm yết tại thời điểm mua và trọng lượng thực tế, cộng tiền công chế tác.</p>`;
+      khung.innerHTML = `<p class="gia-cong-lon"><span>Giá vàng theo ngày</span><strong>Liên hệ báo giá</strong></p>
+        <p class="thong-tin__gia-phu">Trang sức vàng ${VN.thoat(s.chatLieu)} được tính theo giá vàng niêm yết tại thời điểm mua và trọng lượng thực tế, cộng tiền công chế tác. Cửa hàng báo giá chính xác khi bạn liên hệ.</p>`;
     }
     VN.$$('[data-mien-phi]').forEach((x) => { x.textContent = VN.tien(ch.giaoHang.mienPhiTu); });
   };
@@ -339,7 +344,29 @@
   if (document.fonts) document.fonts.ready.then(() => { if (tt.dangKhac) veKhac(); });
 
   /* ================= 5. MÀU, SIZE, SỐ LƯỢNG ================= */
-  const chonSize = (k) => {
+  /* Các biến thể (màu + size) và tồn kho lấy từ máy chủ */
+  const sizeCuaMau = () => (tt.sp.bienThe || []).filter((v) => v.size && (!tt.mau || v.mau === tt.mau)).sort((a, b) => a.size - b.size);
+  const veDsSize = () => {
+    const ds = sizeCuaMau();
+    VN.$('#ds-size').innerHTML = ds.map((v) => {
+      const het = v.tonKho <= 0; const luu = v.size === tt.sizeLuu;
+      return `<label><input class="an-chu" type="radio" name="size" value="${v.size}"${het ? ' disabled' : ''} aria-label="Size ${v.size}${het ? ' (hết hàng)' : ''}${luu ? ' (size đã lưu)' : ''}"><span class="chip${luu ? ' la-size-luu' : ''}${het ? ' het-hang' : ''}"${luu ? ' title="Size đã lưu trong tài khoản"' : ''}>${v.size}</span></label>`;
+    }).join('');
+    if (tt.size && !ds.some((v) => v.size === tt.size && v.tonKho > 0)) { tt.size = null; VN.$('#ten-size-chon').textContent = '(bắt buộc)'; }
+    else if (tt.size) VN.$(`#ds-size input[value="${tt.size}"]`).checked = true;
+    if (tt.sizeLuu && ds.some((v) => v.size === tt.sizeLuu && v.tonKho > 0)) {
+      VN.$('#goi-y-size').innerHTML = `Size đã lưu trong tài khoản: <button type="button" class="lien-ket" data-chon-size="${tt.sizeLuu}">chọn size ${tt.sizeLuu}</button> · Chỉnh size miễn phí trọn đời tại cửa hàng.`;
+    }
+  };
+  const chonSize = (k, imLang = false) => {
+    const v = sizeCuaMau().find((x) => x.size === k);
+    if (!v || v.tonKho <= 0) {     // size chưa có hoặc hết hàng: nhắc và nêu các size đang có
+      if (!imLang) {
+        const co = sizeCuaMau().filter((x) => x.tonKho > 0).map((x) => x.size);
+        VN.thongBao({ tieuDe: v ? `Size ${k} tạm hết hàng` : `Mẫu này chưa có size ${k}`, noiDung: co.length ? `Size đang có: ${co.join(', ')}. Liên hệ hotline nếu bạn cần size khác.` : 'Mẫu này tạm hết hàng.', loai: 'loi' });
+      }
+      return;
+    }
     tt.size = k;
     const r = VN.$(`#ds-size input[value="${k}"]`); if (r) r.checked = true;
     const dong = (tt.bangSize.bangSize || []).find((d) => d.size === k);
@@ -347,12 +374,27 @@
     VN.$('#loi-size').innerHTML = '';
     VN.$('#nhom-size').classList.remove('co-loi');
     VN.$$('.bang-size tbody tr').forEach((tr) => tr.classList.toggle('dang-chon', Number(tr.dataset.size) === k));
+    capNhatTonKho();
+  };
+  /* Biến thể đang chọn (nhẫn: cần đã chọn size) và tồn kho của nó */
+  const bienTheDangChon = () => (tt.sp.bienThe || []).find((v) => (!tt.mau || v.mau === tt.mau) && (!tt.sp.canChonSize || v.size === tt.size)) || null;
+  const capNhatTonKho = () => {
+    const v = tt.sp.canChonSize && !tt.size ? null : bienTheDangChon();
+    tt.tonKho = v ? v.tonKho : null;           // null: chưa biết (nhẫn chưa chọn size)
+    const het = !!v && v.tonKho <= 0;
+    ['#nut-them-gio', '#nut-mua-ngay'].forEach((chon) => { const nut = VN.$(chon); if (nut) nut.disabled = het; });
+    const ghiChu = VN.$('#ton-kho-ct');
+    ghiChu.hidden = !v || v.tonKho > tt.toiDa;
+    ghiChu.classList.toggle('ton-kho--het', het);
+    ghiChu.textContent = het ? 'Lựa chọn này tạm hết hàng.' : v ? `Chỉ còn ${v.tonKho} sản phẩm.` : '';
+    datSoLuong(tt.soLuong);
   };
   const datSoLuong = (n) => {
-    n = Math.max(1, Math.min(tt.toiDa, Math.round(Number(n) || 1)));
+    const tran = tt.tonKho ? Math.min(tt.toiDa, tt.tonKho) : tt.toiDa;
+    n = Math.max(1, Math.min(tran, Math.round(Number(n) || 1)));
     tt.soLuong = n; el.soLuong.value = n;
     VN.$('[data-dem="-1"]', el.form).disabled = n <= 1;
-    VN.$('[data-dem="1"]', el.form).disabled = n >= tt.toiDa;
+    VN.$('[data-dem="1"]', el.form).disabled = n >= tran;
   };
 
   const veLuaChon = (s, ch) => {
@@ -363,7 +405,7 @@
       tt.mau = s.mau.includes(mauUrl) ? mauUrl : s.mau[0];
       VN.$('#ds-mau').innerHTML = s.mau.map((m) => `<label><input class="an-chu" type="radio" name="mau" value="${VN.thoat(m)}"${m === tt.mau ? ' checked' : ''}><span class="chip"><span class="cham-mau ${VN.lopMau(m)}"></span>${VN.thoat(m)}</span></label>`).join('');
       VN.$('#ten-mau-chon').textContent = tt.mau;
-      VN.$('#ds-mau').addEventListener('change', (e) => { tt.mau = e.target.value; VN.$('#ten-mau-chon').textContent = tt.mau; if (el.batKhac.checked) veKhac(); });
+      VN.$('#ds-mau').addEventListener('change', (e) => { tt.mau = e.target.value; VN.$('#ten-mau-chon').textContent = tt.mau; if (el.batKhac.checked) veKhac(); if (tt.sp.canChonSize) veDsSize(); capNhatTonKho(); });
     }
     if (!s.coTheMua) {
       // Sản phẩm tính theo giá vàng ngày: không đặt trực tuyến, chuyển sang nhận báo giá
@@ -374,24 +416,18 @@
       return;
     }
     VN.$('#khu-mua').hidden = false;
-    // Size nhẫn (FR7)
+    // Size nhẫn (FR7): chỉ các size có trong kho cho màu đang chọn
     if (s.canChonSize) {
       VN.$('#nhom-size').hidden = false;
-      const { nhoNhat, lonNhat } = ch.sizeNhan;
       const u = VN.taiKhoan.hienTai();
-      const sizeLuu = u && u.sizeNhan ? Number(u.sizeNhan) : null;
-      let html = '';
-      for (let k = nhoNhat; k <= lonNhat; k++) {
-        html += `<label><input class="an-chu" type="radio" name="size" value="${k}" aria-label="Size ${k}${k === sizeLuu ? ' (size đã lưu)' : ''}"><span class="chip${k === sizeLuu ? ' la-size-luu' : ''}"${k === sizeLuu ? ' title="Size đã lưu trong tài khoản"' : ''}>${k}</span></label>`;
-      }
-      VN.$('#ds-size').innerHTML = html;
-      if (sizeLuu) VN.$('#goi-y-size').innerHTML = `Size đã lưu trong tài khoản: <button type="button" class="lien-ket" data-chon-size="${sizeLuu}">chọn size ${sizeLuu}</button> · Chỉnh size miễn phí trọn đời tại cửa hàng.`;
+      tt.sizeLuu = u && u.sizeNhan ? Number(u.sizeNhan) : null;
       VN.$('#ds-size').addEventListener('change', (e) => chonSize(Number(e.target.value)));
+      veDsSize();
       const sizeUrl = Number(VN.thamSo('size'));
-      if (sizeUrl >= nhoNhat && sizeUrl <= lonNhat) chonSize(sizeUrl);
+      if (sizeUrl) chonSize(sizeUrl, true);
     }
     // Khắc chữ: chỉ áp dụng cho danh mục nhẫn trong cấu hình
-    if ((ch.khacChu.apDungDanhMuc || []).includes(s.danhMuc)) {
+    if (s.khacDuoc) {
       VN.$('#nhom-khac').hidden = false;
       el.oKhac.maxLength = tt.toiDaKhac;
       VN.$('#dem-khac').textContent = `0/${tt.toiDaKhac}`;
@@ -399,6 +435,7 @@
     }
     el.soLuong.max = tt.toiDa;
     datSoLuong(1);
+    capNhatTonKho();
   };
 
   VN.$$('[data-dem]', el.form).forEach((b) => b.addEventListener('click', () => datSoLuong(tt.soLuong + Number(b.dataset.dem))));
@@ -421,20 +458,24 @@
   };
 
   let henNut;
-  const themVaoGio = (muaNgay) => {
-    if (!tt.sp || !tt.sp.coTheMua || !kiemTraLuaChon()) return;
+  const themVaoGio = async (muaNgay) => {
+    if (!tt.sp || !tt.sp.coTheMua || tt.dangThem || !kiemTraLuaChon()) return;
     const dong = { ma: tt.sp.ma, soLuong: tt.soLuong };
     if (tt.mau) dong.mau = tt.mau;
     if (tt.sp.canChonSize) dong.size = tt.size;
     if (el.batKhac.checked) { dong.khacChu = layChuKhac(); dong.kieuChu = kieuChu(); }
-    const { vuotMuc } = VN.gioHang.them(dong, tt.toiDa);
+    tt.dangThem = true;
+    let kq;
+    try { kq = await VN.gioHang.them(dong, tt.toiDa); }
+    catch (loi) { VN.thongBao({ tieuDe: 'Chưa thêm được vào giỏ', noiDung: VN.thoat(loi.message), loai: 'loi' }); return; }
+    finally { tt.dangThem = false; }
     if (muaNgay) { location.href = VN.url('thanhToan'); return; }
     const nut = VN.$('#nut-them-gio');
     nut.classList.add('da-them'); VN.$('span', nut).textContent = 'Đã thêm vào giỏ'; VN.$('use', nut).setAttribute('href', '#i-dau-tich');
     clearTimeout(henNut);
     henNut = setTimeout(() => { nut.classList.remove('da-them'); VN.$('span', nut).textContent = 'Thêm vào giỏ hàng'; VN.$('use', nut).setAttribute('href', '#i-tui'); }, 2400);
     VN.moGioMini();
-    if (vuotMuc) VN.thongBao({ tieuDe: `Tối đa ${tt.toiDa} sản phẩm cho mỗi lựa chọn`, noiDung: 'Số lượng trong giỏ đã được điều chỉnh về mức tối đa. Liên hệ hotline nếu bạn cần đặt nhiều hơn.' });
+    if (kq.vuotMuc) VN.thongBao({ tieuDe: `Tối đa ${tt.toiDa} sản phẩm cho mỗi lựa chọn`, noiDung: 'Số lượng trong giỏ đã được điều chỉnh về mức tối đa. Liên hệ hotline nếu bạn cần đặt nhiều hơn.' });
   };
   el.form.addEventListener('submit', (e) => { e.preventDefault(); themVaoGio(false); });
   VN.$('#nut-mua-ngay').addEventListener('click', () => themVaoGio(true));
@@ -443,7 +484,7 @@
   const ganThanhMua = (s) => {
     const thanh = VN.$('#thanh-mua'); const nut = VN.$('#thanh-mua-nut');
     VN.$('#thanh-mua-ten').textContent = s.ten;
-    VN.$('#thanh-mua-gia').textContent = s.coTheMua ? VN.tien(s.giaBan) : 'Giá vàng theo ngày';
+    VN.$('#thanh-mua-gia').textContent = s.coTheMua ? VN.tien(s.giaBan) : 'Liên hệ báo giá';
     nut.textContent = s.coTheMua ? 'Thêm vào giỏ' : 'Nhận báo giá';
     nut.addEventListener('click', () => { if (s.coTheMua) themVaoGio(false); else location.href = VN.url('lienHe', { sanpham: s.ma }); });
     // Theo dõi bằng sự kiện cuộn (gộp theo khung hình) để bắt cả khi người dùng cuộn rất nhanh
@@ -588,8 +629,8 @@
     if (capNhat) setTimeout(capNhat, 60);
   };
   const veGoiY = (s, ds) => {
-    const khac = ds.filter((x) => x.ma !== s.ma);
-    const gan = (a, b) => Math.abs(a.gia - s.gia) - Math.abs(b.gia - s.gia);
+    const khac = ds.filter((x) => x.ma !== s.ma && x.coTheMua);
+    const gan = (a, b) => Math.abs(a.gia - (s.gia || 0)) - Math.abs(b.gia - (s.gia || 0));
     const cungBst = khac.filter((x) => x.boSuuTap === s.boSuuTap).sort((a, b) => (b.danhMuc === s.danhMuc) - (a.danhMuc === s.danhMuc) || gan(a, b));
     const cungLoai = khac.filter((x) => x.danhMuc === s.danhMuc && x.boSuuTap !== s.boSuuTap).sort(gan);
     const coBst = cungBst.length >= 4 && s.bst && s.bst.ten;

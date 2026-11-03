@@ -377,3 +377,30 @@ def test_a_quote_only_line_stops_the_guest_order_and_leaves_nothing(client):
     assert res.status_code == 409 and res.get_json()["error"].startswith("Item 2:")
     assert res.get_json()["reason"] == "quote_only"
     assert customer_row(phone) is None
+
+
+# ---------------- a gift: the parcel goes to another phone, the buyer keeps the lookup phone ----------------
+
+def test_a_gift_goes_to_another_phone_while_the_buyer_keeps_the_phone_for_lookups(client):
+    buyer = unique_phone()
+    receiver = unique_phone()
+    _, res = guest_order(client, buyer, recipientPhone="+84" + receiver[1:])        # any spelling is accepted
+    assert res.status_code == 201
+    code = res.get_json()["OrderCode"]
+    assert query("SELECT ShipPhone FROM dbo.Orders WHERE OrderCode = ?", (code,))[0]["ShipPhone"] == receiver
+    assert customer_row(buyer) is not None and customer_row(receiver) is None        # the buyer is the customer
+    assert client.get(f"/api/orders/{code}", query_string={"phone": buyer}).status_code == 200
+    assert client.get(f"/api/orders/{code}", query_string={"phone": receiver}).status_code == 404
+    # the same address for another receiver is another address, and an empty value means "the buyer"
+    _, same = guest_order(client, buyer, recipientPhone="")
+    assert same.status_code == 201
+    shipped = {r["Phone"] for r in query("SELECT Phone FROM dbo.CustomerAddresses WHERE CustomerID = ?",
+                                         (customer_row(buyer)["CustomerID"],))}
+    assert shipped == {receiver, buyer}
+
+
+@pytest.mark.parametrize("bad", ["12345", "abc", 912345678, ["0912345678"]])
+def test_a_bad_recipient_phone_is_refused_and_nothing_is_created(client, bad):
+    phone, res = guest_order(client, recipientPhone=bad)
+    assert res.status_code == 400 and "recipientPhone" in res.get_json()["error"]
+    assert customer_row(phone) is None

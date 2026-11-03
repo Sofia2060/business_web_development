@@ -531,7 +531,7 @@
           </div>
         </div>
         <div class="hop-huy__nut">
-          <button class="nut nut--chinh" type="button" data-dong-huy>Giữ lại đơn hàng</button>
+          <button class="nut nut--chinh" type="button" data-giu-don>Giữ lại đơn hàng</button>
           <button class="nut nut--vien" type="button" data-van-huy>Tôi vẫn muốn hủy</button>
         </div>
       </div>
@@ -551,31 +551,25 @@
       </div>
 
       
-      <fieldset class="hop-huy__hoan" data-huy-hoan hidden>
-        <legend class="nhan-truong">Tài khoản nhận hoàn tiền <span class="bat-buoc">*</span></legend>
-        <p class="hop-bao hop-bao--vang"><svg class="bt"><use href="#i-thong-tin"></use></svg><span data-huy-hoan-chu></span></p>
-        <div class="luoi-truong">
-          <div class="truong ca-hang">
-            <label class="nhan-truong" for="huy-ngan-hang">Ngân hàng</label>
-            <select class="o-chon" id="huy-ngan-hang" name="nganHang"></select>
-          </div>
-          <div class="truong">
-            <label class="nhan-truong" for="huy-so-tk">Số tài khoản</label>
-            <input class="o-nhap so-deu" id="huy-so-tk" name="soTaiKhoan" inputmode="numeric" autocomplete="off" maxlength="19" placeholder="Ví dụ: 0071000123456">
-          </div>
-          <div class="truong">
-            <label class="nhan-truong" for="huy-chu-tk">Tên chủ tài khoản</label>
-            <input class="o-nhap" id="huy-chu-tk" name="chuTaiKhoan" autocomplete="off" maxlength="60" placeholder="NGUYEN MINH ANH">
-          </div>
-        </div>
-      </fieldset>
-      <p class="chu-nho chu-phu" data-huy-khong-hoan hidden><svg class="bt bt--nho"><use href="#i-thong-tin"></use></svg> Đơn chưa thanh toán nên không phát sinh hoàn tiền.</p>
+      <p class="chu-nho chu-phu" data-huy-ghi-chu-tien></p>
 
       <div class="hop-thoai__hanh-dong">
         <button class="nut nut--vien nut--nho" type="button" data-dong-huy>Giữ đơn hàng</button>
-        <button class="nut nut--nguy nut--nho" type="submit">Xác nhận hủy đơn</button>
+        <button class="nut nut--chinh nut--nho" type="submit">Tiếp tục</button>
       </div>
     </form>
+
+    <!-- Đơn từ 2.000.000 ₫ hoặc có khắc chữ: không tự hủy được trên website, gọi hotline -->
+    <section class="hop-huy__buoc hop-thoai__than hop-huy__kq" data-buoc-huy="hotline" hidden>
+      <span class="hop-huy__kq-bt" aria-hidden="true"><svg class="bt bt--lon"><use href="#i-dien-thoai"></use></svg></span>
+      <h2 class="hop-thoai__tieu-de">Vui lòng gọi hotline để hủy đơn</h2>
+      <p class="chu-phu" data-huy-hotline-chu></p>
+      <p class="chu-nho chu-phu">Đơn đang được chế tác thì không thể hủy.</p>
+      <div class="hop-thoai__hanh-dong">
+        <button class="nut nut--vien nut--nho" type="button" data-dong-huy>Đóng</button>
+        <a class="nut nut--chinh nut--nho" data-huy-goi href="tel:">Gọi hotline</a>
+      </div>
+    </section>
 
     
     <section class="hop-huy__buoc hop-thoai__than hop-huy__kq" data-buoc-huy="ket-qua" hidden>
@@ -757,6 +751,8 @@
   </dialog>
 
   <script src="../../js/core/common.js" defer></script>
+  <script src="../../js/core/api.js" defer></script>
+  <script src="../../js/core/session.js" defer></script>
   
 <script src="../../js/components/complaint.js" defer></script>
 <script src="../../js/components/cancel-order.js" defer></script>

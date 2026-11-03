@@ -26,7 +26,6 @@
   const ve = async () => {
     VN.donHang.tuHuyQuaHan();
     const don = VN.donHang.tatCa(); const pa = VN.hoTro.tatCa(); const lich = VN.lichHen.tatCa(); const dg = VN.danhGia.tatCa();
-    VN.$('#qt-chua-co-du-lieu').hidden = don.length > 0;
     VN.$('#qt-hom-nay').textContent = `${VN.thu(new Date())}, ${VN.ngay(new Date())}`;
     const bayNgay = Date.now() - 7 * 86400000;
     const doanhThu = don.filter(daThu).reduce((t, d) => t + d.tongTien, 0);
@@ -70,11 +69,6 @@
       : `<tbody><tr><td>${qt.trong('Chưa có sản phẩm nào được bán.')}</td></tr></tbody>`;
   };
 
-  VN.$('#qt-tao-mau').addEventListener('click', async () => {
-    await VN.demo.khoiPhuc();
-    VN.thongBao({ tieuDe: 'Đã tạo dữ liệu mẫu', noiDung: 'Tài khoản demo@vinora.vn / Vinora@2026 đã có 5 đơn hàng.', loai: 'thanh-cong' });
-    ve(); qt.veKhung();
-  });
   ['vinora:don-hang', 'vinora:ho-tro', 'vinora:lich-hen'].forEach((ten) => window.addEventListener(ten, VN.chongDoi(ve, 80)));
   window.addEventListener('storage', VN.chongDoi((e) => { if (/^vinora\./.test(e.key || '')) ve(); }, 120));
   ve();

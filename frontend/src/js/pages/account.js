@@ -1,7 +1,7 @@
 /* =====================================================================
    TÀI KHOẢN – Đăng ký / Đăng nhập (FR1, FR2), hồ sơ, sổ địa chỉ, size nhẫn mặc định,
-   liên kết đơn hàng đặt bằng số điện thoại (xác minh OTP), đổi mật khẩu.
-   Ghi chú tích hợp: VN.taiKhoan.* đang lưu bằng localStorage, back-end thay bằng API.
+   đổi mật khẩu. Dữ liệu lấy từ API qua VN.taiKhoan (session.js).
+   Đơn hàng đặt không cần tài khoản được liên kết lúc đăng ký (số điện thoại + mã xác minh).
    ===================================================================== */
 (function () {
   'use strict';
@@ -13,17 +13,17 @@
   /* Chỉ chuyển tiếp đến đường dẫn nội bộ (chống chuyển hướng mở) */
   const tiep = (() => {
     const t = VN.thamSo('tiep');
-    return t && /^\/(?!\/)/.test(t) ? t : '';
+    return t && /^\/(?![\/\\])/.test(t) ? t : '';     // "/\host" is read as "//host" by browsers
   })();
   /* Ô đăng nhập dùng chung: trang quản trị chuyển về đây khi chưa đăng nhập quản trị */
-  const tiepQuanTri = /quan-?tri/.test(tiep);
+  const tiepQuanTri = /quan-?tri|\/admin\//.test(tiep);
 
   /* ================= TIỆN ÍCH BIỂU MẪU ================= */
   const loiForm = (form, thongDiep) => {
     const hop = VN.$('[data-loi-form]', form);
     if (!hop) return;
     hop.hidden = !thongDiep;
-    hop.innerHTML = thongDiep ? `${VN.bt('canh-bao')}<span>${thongDiep}</span>` : '';
+    hop.innerHTML = thongDiep ? `${VN.bt('canh-bao')}<span>${VN.thoat(thongDiep)}</span>` : '';
   };
   const kiemTra = (input, dieuKien, thongDiep) => {
     const sai = !dieuKien;
@@ -94,17 +94,16 @@
     const nut = VN.$('[type="submit"]', formDn);
     dangXuLy(nut, true, 'Đang đăng nhập');
     try {
-      // Phân quyền theo email: tài khoản quản trị -> trang quản trị, còn lại -> tài khoản khách hàng
-      if (formDn.email.value.trim().toLowerCase() === VN.QUAN_TRI_DEMO.email) {
-        await VN.quanTri.dangNhap(formDn.email.value, formDn.matKhau.value);
+      // Máy chủ cho biết vai trò: quản trị -> trang quản trị, còn lại -> tài khoản khách hàng
+      const nguoi = await VN.taiKhoan.dangNhap(formDn.email.value, formDn.matKhau.value, formDn.ghiNho.checked);
+      if (nguoi.vaiTro === 'admin') {
         VN.thongBao({ tieuDe: 'Đăng nhập quản trị thành công', loai: 'thanh-cong' });
         setTimeout(() => { location.href = tiepQuanTri ? tiep : VN.url('qtTongQuan'); }, 400);
         return;
       }
-      const nguoi = await VN.taiKhoan.dangNhap(formDn.email.value, formDn.matKhau.value, formDn.ghiNho.checked);
       sauKhiVao(nguoi, false);
     } catch (loi) {
-      loiForm(formDn, /quản trị/.test(loi.message) ? 'Email hoặc mật khẩu chưa đúng. Vui lòng kiểm tra lại.' : loi.message);
+      loiForm(formDn, loi.message);
       dangXuLy(nut, false, 'Đăng nhập');
       formDn.matKhau.select();
     }
@@ -137,18 +136,25 @@
     const nut = VN.$('[type="submit"]', formDk);
     dangXuLy(nut, true, 'Đang tạo tài khoản');
     try {
-      const nguoi = await VN.taiKhoan.dangKy({ hoTen: formDk.hoTen.value, email: formDk.email.value, matKhau: mk, sdt: VN.chuanSdt(formDk.sdt.value) });
-      if (formDk.sizeNhan.value) VN.taiKhoan.capNhat({ sizeNhan: Number(formDk.sizeNhan.value) });
-      // Có đơn đặt bằng số này khi chưa có tài khoản -> ở lại trang tài khoản để xác minh và liên kết
-      const n = VN.donHang.chuaLienKet(nguoi.sdt).length;
-      if (n) {
-        VN.thongBao({ tieuDe: 'Tạo tài khoản thành công', noiDung: `Tìm thấy ${n} đơn hàng đặt bằng số điện thoại này. Xác minh số điện thoại để liên kết vào tài khoản.`, loai: 'thanh-cong', thoiGian: 7000 });
-        setTimeout(() => location.replace(VN.url('taiKhoan', { lienket: 1 })), 900);
+      const nguoi = await VN.taiKhoan.dangKy({
+        hoTen: formDk.hoTen.value.trim(), email: formDk.email.value, matKhau: mk, sdt: VN.chuanSdt(formDk.sdt.value),
+        otp: formDk.otp.value.trim(), sizeNhan: formDk.sizeNhan.value ? Number(formDk.sizeNhan.value) : null,
+      });
+      // Số điện thoại này từng đặt hàng không cần tài khoản: máy chủ đã chuyển các đơn đó vào tài khoản mới
+      if (nguoi.donDaLienKet) {
+        VN.thongBao({ tieuDe: 'Tạo tài khoản thành công', noiDung: `Đã liên kết ${nguoi.donDaLienKet} đơn hàng đặt bằng số điện thoại này vào tài khoản.`, loai: 'thanh-cong', thoiGian: 7000 });
+        setTimeout(() => location.replace(VN.url('donHang')), 900);
         return;
       }
       sauKhiVao(nguoi, true);
     } catch (loi) {
-      loiForm(formDk, loi.message);
+      if (loi.lyDo === 'otp_required' || loi.lyDo === 'otp_invalid') {
+        VN.$('#dk-khung-otp').hidden = false;
+        VN.$('#dk-otp-goi-y').textContent = `Cửa hàng chưa gửi tin nhắn thật: bản demo dùng mã 123456 cho số ${VN.anSdt(formDk.sdt.value)}.`;
+        VN.baoLoiTruong(formDk.otp, loi.lyDo === 'otp_invalid' ? loi.message : '');
+        loiForm(formDk, loi.lyDo === 'otp_required' ? loi.message : '');
+        formDk.otp.focus();
+      } else loiForm(formDk, loi.message);
       dangXuLy(nut, false, 'Tạo tài khoản');
     }
   });
@@ -164,57 +170,25 @@
     f.ngaySinh.max = VN.ngayIso(new Date());
     VN.dienChonSize(f.sizeNhan, u.sizeNhan);
     veDiaChi();
-    veLienKet();
-    if (VN.thamSo('lienket') || location.hash === '#khoi-lien-ket') setTimeout(() => VN.$('#khoi-lien-ket').scrollIntoView({ behavior: 'smooth' }), 300);
   };
-
-  /* ---------- Liên kết đơn hàng theo số điện thoại (OTP mô phỏng) ---------- */
-  const formLk = VN.$('#form-lien-ket');
-  const veLienKet = () => {
-    const u = VN.taiKhoan.hienTai();
-    if (!formLk.sdt.value) formLk.sdt.value = u.sdt || '';
-    const sdt = formLk.sdt.value;
-    const ds = VN.sdtHopLe(sdt) ? VN.donHang.chuaLienKet(sdt) : [];
-    const goiY = VN.$('#lk-goi-y');
-    goiY.hidden = !ds.length;
-    goiY.innerHTML = ds.length ? `${VN.bt('hop-hang')}<span>Tìm thấy <strong>${ds.length} đơn hàng</strong> đặt bằng số <strong class="so-deu">${VN.thoat(VN.anSdt(sdt))}</strong> chưa nằm trong tài khoản. Gửi mã xác minh để liên kết.</span>` : '';
-  };
-  formLk.sdt.addEventListener('input', VN.chongDoi(() => { VN.$('#lk-buoc-otp').hidden = true; veLienKet(); }, 250));
-  VN.$('#lk-gui-ma').addEventListener('click', () => {
-    if (!kiemTra(formLk.sdt, VN.sdtHopLe(formLk.sdt.value), 'Số điện thoại gồm 10 số, bắt đầu bằng 03, 05, 07, 08 hoặc 09.')) { formLk.sdt.focus(); return; }
-    VN.otp.gui(formLk.sdt.value);
-    VN.$('#lk-buoc-otp').hidden = false;
-    VN.$('#lk-gui-ma').textContent = 'Gửi lại mã';
-    VN.$('#lk-otp-goi-y').innerHTML = `Mã đã gửi qua SMS tới <span class="so-deu">${VN.thoat(VN.anSdt(formLk.sdt.value))}</span>, hiệu lực 5 phút.`;
-    formLk.otp.value = ''; formLk.otp.focus();
-  });
-  formLk.addEventListener('submit', (e) => {
-    e.preventDefault();
-    const loi = VN.otp.kiemTra(formLk.sdt.value, formLk.otp.value);
-    if (!kiemTra(formLk.otp, !loi, loi)) { formLk.otp.select(); return; }
-    const kq = VN.taiKhoan.lienKetSdt(formLk.sdt.value);
-    VN.$('#lk-buoc-otp').hidden = true; VN.$('#lk-gui-ma').textContent = 'Gửi mã xác minh';
-    veLienKet();
-    VN.thongBao(kq.soDon
-      ? { tieuDe: `Đã liên kết ${kq.soDon} đơn hàng${kq.soThe ? ` và ${kq.soThe} thẻ bảo hành` : ''}`, noiDung: `<a href="${VN.url('donHang')}">Xem đơn hàng của tôi</a>`, loai: 'thanh-cong', thoiGian: 6000 }
-      : { tieuDe: 'Đã xác minh số điện thoại', noiDung: 'Chưa có đơn hàng nào đặt bằng số này cần liên kết.' });
-  });
 
   const formHs = VN.$('#form-ho-so');
   xoaLoiKhiNhap(formHs);
-  formHs.addEventListener('submit', (e) => {
+  formHs.addEventListener('submit', async (e) => {
     e.preventDefault();
     const ok = [
       kiemTra(formHs.hoTen, formHs.hoTen.value.trim().split(/\s+/).length >= 2, 'Vui lòng nhập đầy đủ họ và tên.'),
       kiemTra(formHs.sdt, VN.sdtHopLe(formHs.sdt.value), 'Số điện thoại gồm 10 số, bắt đầu bằng 03, 05, 07, 08 hoặc 09.'),
     ].every(Boolean);
     if (!ok) return;
-    const u = VN.taiKhoan.capNhat({
-      hoTen: formHs.hoTen.value.trim(), sdt: formHs.sdt.value.replace(/[\s.]/g, ''), ngaySinh: formHs.ngaySinh.value,
-      sizeNhan: formHs.sizeNhan.value ? Number(formHs.sizeNhan.value) : null,
-    });
-    VN.$$('[data-ten-goi]').forEach((el) => { el.textContent = VN.taiKhoan.tenGoi(u); });
-    VN.thongBao({ tieuDe: 'Đã lưu hồ sơ', noiDung: u.sizeNhan ? `Size nhẫn mặc định: ${u.sizeNhan}.` : '', loai: 'thanh-cong' });
+    try {
+      const u = await VN.taiKhoan.capNhat({
+        hoTen: formHs.hoTen.value.trim(), sdt: VN.chuanSdt(formHs.sdt.value), ngaySinh: formHs.ngaySinh.value,
+        sizeNhan: formHs.sizeNhan.value ? Number(formHs.sizeNhan.value) : null,
+      });
+      VN.$$('[data-ten-goi]').forEach((el) => { el.textContent = VN.taiKhoan.tenGoi(u); });
+      VN.thongBao({ tieuDe: 'Đã lưu hồ sơ', noiDung: u.sizeNhan ? `Size nhẫn mặc định: ${u.sizeNhan}.` : '', loai: 'thanh-cong' });
+    } catch (loi) { VN.thongBao({ tieuDe: 'Chưa lưu được hồ sơ', noiDung: VN.thoat(loi.message), loai: 'loi' }); }
   });
 
   /* ---------- Sổ địa chỉ ---------- */
@@ -234,10 +208,6 @@
       </article>`).join('')
       : '<div class="trong-rong trong-rong--nho"><div class="trong-rong__bieu-tuong">' + VN.bt('ghim') + '</div><p>Chưa có địa chỉ nào. Thêm địa chỉ để thanh toán nhanh hơn.</p></div>';
   };
-  const luuDs = (ds) => {
-    if (ds.length && !ds.some((d) => d.macDinh)) ds[0].macDinh = true;
-    VN.taiKhoan.capNhat({ diaChi: ds }); veDiaChi();
-  };
   const moHopDiaChi = async (dc) => {
     formDc.reset();
     VN.$$('.truong.co-loi', formDc).forEach((t) => t.classList.remove('co-loi'));
@@ -253,18 +223,21 @@
     formDc.hoTen.focus();
   };
   VN.$('#nut-them-dia-chi').addEventListener('click', () => moHopDiaChi(null));
+  const baoLoi = (tieuDe, loi) => VN.thongBao({ tieuDe, noiDung: VN.thoat(loi.message), loai: 'loi' });
   VN.$('#ds-dia-chi').addEventListener('click', async (e) => {
-    const u = VN.taiKhoan.hienTai(); const ds = (u.diaChi || []).slice();
+    const ds = VN.taiKhoan.hienTai().diaChi || [];
     const sua = e.target.closest('[data-sua-dc]'); const md = e.target.closest('[data-mac-dinh-dc]'); const xoa = e.target.closest('[data-xoa-dc]');
-    if (sua) moHopDiaChi(ds.find((d) => d.id === sua.dataset.suaDc));
-    if (md) { ds.forEach((d) => { d.macDinh = d.id === md.dataset.macDinhDc; }); luuDs(ds); VN.thongBao({ tieuDe: 'Đã đặt địa chỉ mặc định', loai: 'thanh-cong' }); }
+    if (sua) moHopDiaChi(ds.find((d) => String(d.id) === sua.dataset.suaDc));
+    if (md) {
+      try { await VN.taiKhoan.datDiaChiMacDinh(md.dataset.macDinhDc); veDiaChi(); VN.thongBao({ tieuDe: 'Đã đặt địa chỉ mặc định', loai: 'thanh-cong' }); } catch (loi) { baoLoi('Chưa đặt được địa chỉ mặc định', loi); }
+    }
     if (xoa) {
       const dongY = await VN.xacNhan({ nhan: 'Sổ địa chỉ', tieuDe: 'Xóa địa chỉ này?', noiDung: 'Địa chỉ đã dùng cho các đơn trước vẫn được giữ trong đơn hàng.', chuDongY: 'Xóa', nguy: true });
-      if (dongY) { luuDs(ds.filter((d) => d.id !== xoa.dataset.xoaDc)); VN.thongBao({ tieuDe: 'Đã xóa địa chỉ' }); }
+      if (dongY) { try { await VN.taiKhoan.xoaDiaChi(xoa.dataset.xoaDc); veDiaChi(); VN.thongBao({ tieuDe: 'Đã xóa địa chỉ' }); } catch (loi) { baoLoi('Chưa xóa được địa chỉ', loi); } }
     }
   });
   hopDc.addEventListener('click', (e) => { if (e.target.closest('[data-dong]')) VN.dongHopThoai(hopDc); });
-  formDc.addEventListener('submit', (e) => {
+  formDc.addEventListener('submit', async (e) => {
     e.preventDefault();
     const ok = [
       kiemTra(formDc.hoTen, formDc.hoTen.value.trim().length >= 2, 'Vui lòng nhập tên người nhận.'),
@@ -274,14 +247,14 @@
       kiemTra(formDc.diaChi, formDc.diaChi.value.trim().length >= 3, 'Vui lòng nhập số nhà, tên đường.'),
     ].every(Boolean);
     if (!ok) { VN.$('.co-loi input, .co-loi select', formDc).focus(); return; }
-    const u = VN.taiKhoan.hienTai(); let ds = (u.diaChi || []).slice();
-    const dc = { id: formDc.id.value || 'DC' + Date.now().toString(36).toUpperCase(), hoTen: formDc.hoTen.value.trim(), sdt: formDc.sdt.value.replace(/[\s.]/g, ''), tinh: formDc.tinh.value, phuongXa: formDc.phuongXa.value.trim(), diaChi: formDc.diaChi.value.trim(), macDinh: formDc.macDinh.checked };
-    if (dc.macDinh) ds.forEach((d) => { d.macDinh = false; });
-    const i = ds.findIndex((d) => d.id === dc.id);
-    if (i > -1) ds[i] = dc; else ds.push(dc);
-    luuDs(ds);
-    VN.dongHopThoai(hopDc);
-    VN.thongBao({ tieuDe: i > -1 ? 'Đã cập nhật địa chỉ' : 'Đã thêm địa chỉ mới', loai: 'thanh-cong' });
+    const id = formDc.id.value ? Number(formDc.id.value) : null;
+    const dc = { hoTen: formDc.hoTen.value.trim(), sdt: VN.chuanSdt(formDc.sdt.value), tinh: formDc.tinh.value, phuongXa: formDc.phuongXa.value.trim(), diaChi: formDc.diaChi.value.trim(), macDinh: formDc.macDinh.checked };
+    try {
+      await VN.taiKhoan.luuDiaChi(dc, id);
+      veDiaChi();
+      VN.dongHopThoai(hopDc);
+      VN.thongBao({ tieuDe: id ? 'Đã cập nhật địa chỉ' : 'Đã thêm địa chỉ mới', loai: 'thanh-cong' });
+    } catch (loi) { baoLoi('Chưa lưu được địa chỉ', loi); }
   });
 
   /* ---------- Đổi mật khẩu ---------- */
@@ -305,13 +278,14 @@
 
 
   /* ================= KHỞI TẠO ================= */
-  const u = VN.taiKhoan.hienTai();
-  if (tiepQuanTri) {
-    if (VN.quanTri.hienTai()) { location.replace(tiep); return; }
-    veXacThuc();                        // cần đăng nhập quản trị, kể cả khi đang đăng nhập tài khoản khách
-  } else if (u) {
-    if (tiep) { location.replace(tiep); return; }
-    if (u.email === VN.DEMO.email) VN.demo.damBaoDuLieu(u.id);
-    veTaiKhoan(u);
-  } else veXacThuc();
+  VN.sanSang.then(() => {
+    const u = VN.taiKhoan.hienTai();
+    if (tiepQuanTri) {
+      if (VN.quanTri.hienTai()) { location.replace(tiep); return; }
+      veXacThuc();                        // cần đăng nhập quản trị, kể cả khi đang đăng nhập tài khoản khách
+    } else if (u) {
+      if (tiep) { location.replace(tiep); return; }
+      veTaiKhoan(u);
+    } else veXacThuc();
+  });
 })();

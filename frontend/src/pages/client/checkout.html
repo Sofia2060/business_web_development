@@ -480,7 +480,6 @@
       <div class="luoi-truong" id="tt-dia-chi-moi">
         <div class="truong"><label class="nhan-truong" for="tt-ho-ten">Họ tên người nhận <span class="bat-buoc">*</span></label><input class="o-nhap" id="tt-ho-ten" name="hoTen" autocomplete="name" required></div>
         <div class="truong"><label class="nhan-truong" for="tt-sdt">Số điện thoại <span class="bat-buoc">*</span></label><input class="o-nhap" id="tt-sdt" name="sdt" type="tel" inputmode="tel" autocomplete="tel" required></div>
-        <div class="truong ca-hang"><label class="nhan-truong" for="tt-email">Email nhận xác nhận đơn hàng <span class="chu-phu">(không bắt buộc)</span></label><input class="o-nhap" id="tt-email" name="email" type="email" inputmode="email" autocomplete="email"></div>
         <div class="truong"><label class="nhan-truong" for="tt-tinh">Tỉnh / Thành phố <span class="bat-buoc">*</span></label><select class="o-chon" id="tt-tinh" name="tinh" required></select></div>
         <div class="truong"><label class="nhan-truong" for="tt-phuong">Phường / Xã <span class="bat-buoc">*</span></label><input class="o-nhap" id="tt-phuong" name="phuongXa" placeholder="Ví dụ: Phường Linh Xuân" required></div>
         <div class="truong ca-hang"><label class="nhan-truong" for="tt-dia-chi">Số nhà, tên đường <span class="bat-buoc">*</span></label><input class="o-nhap" id="tt-dia-chi" name="diaChi" autocomplete="address-line1" placeholder="Ví dụ: 669 Quốc lộ 1" required></div>
@@ -501,7 +500,7 @@
 
     
     <section class="khoi-tt" aria-labelledby="td-thanh-toan">
-      <div class="khoi-tt__dau"><span class="khoi-tt__so">3</span><div><h2 id="td-thanh-toan">Phương thức thanh toán</h2><p>Thanh toán trực tuyến cần hoàn tất trong <strong>24 giờ</strong> kể từ lúc đặt, quá hạn đơn tự hủy.</p></div></div>
+      <div class="khoi-tt__dau"><span class="khoi-tt__so">3</span><div><h2 id="td-thanh-toan">Phương thức thanh toán</h2><p>Thanh toán trực tuyến cần hoàn tất trong <strong>15 phút</strong> kể từ lúc đặt, quá hạn đơn tự hủy.</p></div></div>
       <fieldset class="ds-the-chon" id="tt-ds-thanh-toan"><legend class="an-chu">Chọn phương thức thanh toán</legend></fieldset>
       <p class="loi-truong" id="tt-loi-thanh-toan" role="alert"></p>
     </section>
@@ -719,6 +718,8 @@
   </dialog>
 
   <script src="../../js/core/common.js" defer></script>
+  <script src="../../js/core/api.js" defer></script>
+  <script src="../../js/core/session.js" defer></script>
   
 <script src="../../js/pages/payment-gateway.js" defer></script>
 <script src="../../js/pages/checkout.js" defer></script>

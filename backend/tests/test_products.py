@@ -143,7 +143,8 @@ def test_price_sort(client, sort, reverse):
 
 def test_newest_sort_and_featured_default(client):
     newest = list_all(client, "sort=newest")["items"]
-    assert [i["ProductID"] for i in newest] == sorted((i["ProductID"] for i in newest), reverse=True)   # same created time
+    expected = query("SELECT TOP (100) ProductID FROM dbo.Products ORDER BY CreatedAt DESC, ProductID DESC")   # real dates
+    assert [i["ProductID"] for i in newest] == [r["ProductID"] for r in expected]
     # Featured is the default: products that have a description come first.
     first_page = client.get("/api/products").get_json()["items"]
     described = query("SELECT ProductID FROM dbo.Products WHERE Description IS NOT NULL")
@@ -245,3 +246,47 @@ def test_turning_the_flag_off_sells_the_product_at_the_gold_price(client):
         with transaction() as cur:
             cur.execute("UPDATE dbo.Products SET IsQuoteOnly = 1 WHERE SKU = ?", (QUOTE_SKU,))
     assert client.get(f"/api/products/{QUOTE_SKU}").get_json()["CurrentPrice"] is None
+
+
+# ---------------- what a product card needs: colours, two images, description flag, creation date ----------------
+
+def all_items(client):
+    """Every product of the list, read page by page the way the shop pages load the catalog."""
+    items = []
+    for page in range(1, 6):
+        items += client.get(f"/api/products?limit=100&page={page}").get_json()["items"]
+    return items
+
+
+def test_list_items_carry_colors_two_images_and_the_card_fields(client):
+    ring = {i["SKU"]: i for i in all_items(client)}["NDINO131LDIA"]
+    assert ring["Colors"] == ["Vàng Trắng"]
+    assert len(ring["Images"]) == 2 and ring["Images"][0] == ring["ThumbnailUrl"]      # the thumbnail comes first
+    assert ring["HasDescription"] is False
+    assert ring["CreatedAt"].startswith("2024-04-22")
+
+
+def test_colors_follow_the_active_variants_in_creation_order(client):
+    items = all_items(client)
+    expected = {}
+    for row in query("SELECT ProductID, GoldColor FROM dbo.ProductVariants WHERE IsActive = 1 AND GoldColor IS NOT NULL "
+                     "GROUP BY ProductID, GoldColor ORDER BY ProductID, MIN(VariantID)"):
+        expected.setdefault(row["ProductID"], []).append(row["GoldColor"])
+    assert {i["ProductID"]: i["Colors"] for i in items if i["Colors"]} == expected
+    assert any(len(colors) >= 3 for colors in expected.values())           # some products come in three colours
+    assert any(not i["Colors"] for i in items)                              # and some have no colour at all
+
+
+def test_every_product_has_images_and_the_description_flag_matches_the_database(client):
+    items = all_items(client)
+    assert len(items) == 443 and all(1 <= len(i["Images"]) <= 2 for i in items)
+    flags = [i["HasDescription"] for i in items]
+    with_text = query("SELECT COUNT(*) AS n FROM dbo.Products WHERE Description IS NOT NULL AND Description <> N''")[0]["n"]
+    assert set(flags) == {True, False} and flags.count(True) == with_text
+
+
+def test_products_have_their_real_creation_dates(client):
+    assert len(query("SELECT DISTINCT CAST(CreatedAt AS DATE) AS d FROM dbo.Products")) == 48
+    assert client.get("/api/products/NDINO131LDIA").get_json()["CreatedAt"].startswith("2024-04-22")
+    newest = client.get("/api/products?sort=newest&limit=1").get_json()["items"][0]["SKU"]
+    assert query("SELECT TOP (1) SKU FROM dbo.Products ORDER BY CreatedAt DESC, ProductID DESC")[0]["SKU"] == newest
