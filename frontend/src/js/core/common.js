@@ -201,10 +201,11 @@
   /** Đơn thanh toán trực tuyến phải trả tiền trong 15 phút, quá hạn máy chủ tự hủy đơn (fn_PaymentTimeoutMinutes) */
   VN.HAN_THANH_TOAN_PHUT = 15;
   VN.TEN_THANH_TOAN = { COD: 'Thanh toán khi nhận hàng', BANK: 'Chuyển khoản VietQR', VNPAY: 'Cổng VNPay', MOMO: 'Ví MoMo' };
-  VN.TEN_DICH_VU = { Cleaning: 'Làm sạch', Polishing: 'Đánh bóng & xi mới', Resizing: 'Chỉnh size nhẫn' };
+  VN.TEN_DICH_VU = { Cleaning: 'Làm sạch', Polishing: 'Đánh bóng & xi mới', Replating: 'Đánh bóng & xi mới', Resizing: 'Chỉnh size nhẫn' };
   VN.TRANG_THAI_LICH = {
     Pending: { ten: 'Chờ xác nhận', lop: 'nhan--cam' },
     Confirmed: { ten: 'Đã xác nhận', lop: 'nhan--xanh' },
+    Rescheduled: { ten: 'Đã đổi giờ', lop: 'nhan--vang' },
     Completed: { ten: 'Hoàn tất', lop: 'nhan--ngoc' },
     Cancelled: { ten: 'Đã hủy', lop: 'nhan--do' },
   };

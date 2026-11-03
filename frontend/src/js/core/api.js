@@ -220,7 +220,7 @@
     them(r.ConfirmedAt, 'Cửa hàng xác nhận đơn hàng.', 'Cửa hàng', 'Confirmed');
     them(r.ProductionStartedAt, 'Cửa hàng bắt đầu chế tác đơn hàng.', 'Cửa hàng', 'Confirmed');
     them(r.ShippedAt, 'Cửa hàng bàn giao đơn hàng cho đơn vị vận chuyển.', 'Cửa hàng', 'Shipping');
-    them(r.DeliveredAt, 'Khách hàng xác nhận đã nhận hàng.', 'Khách hàng', 'Delivered');
+    them(r.DeliveredAt, 'Đơn hàng đã được giao thành công.', 'Hệ thống', 'Delivered');     // the order does not record who confirmed it
     them(r.CancelledAt, `Đơn hàng đã hủy${r.CancelReason ? '. Lý do: ' + r.CancelReason : ''}.`, 'Hệ thống', 'Cancelled');
     return ls.sort((a, b) => new Date(a.luc) - new Date(b.luc));
   };

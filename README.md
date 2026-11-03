@@ -53,7 +53,7 @@ business_web_development/
 │   │   ├── __init__.py
 │   │   ├── config.py
 │   │   ├── models/            # User, Customer, Product, Order, Warranty...
-│   │   ├── routes/            # auth, products, cart, orders, warranty, admin
+│   │   ├── routes/            # auth, products, cart, orders, admin (đơn), admin_shop (khách, sản phẩm, đánh giá, bảo hành, lịch hẹn)
 │   │   ├── services/          # nghiệp vụ: hủy đơn, kích hoạt bảo hành, phí giao hàng
 │   │   ├── schemas/           # kiểm tra dữ liệu vào/ra
 │   │   ├── templates/         # Jinja templates (nếu dùng server-side render)
@@ -115,7 +115,9 @@ Cách một trang dùng: `await VN.sanSang`, đọc trạng thái bằng hàm th
 - **Thanh toán trực tuyến** (VNPay, MoMo) là mô phỏng: cổng giả trên trang gọi `POST /api/orders/<mã>/pay`. Phải xong trong 15 phút, trang kết quả và trang đơn hàng đếm ngược. Hết giờ máy chủ tự hủy đơn.
 - **Hủy đơn.** Nút "Hủy đơn" theo `CancelChannel`: `Web` thì hiện bước chọn lý do rồi popup nhắc mất voucher (giữ hoặc hủy); `Hotline` thì hiện hướng dẫn gọi hotline; đơn đang chế tác không có nút.
 - **Giờ.** API trả giờ kèm múi giờ của máy chạy backend (`2026-11-03T14:15:00+07:00`), nên đồng hồ đếm ngược đúng ở mọi múi giờ. Database và backend phải chạy cùng múi giờ.
-- **Trang quản trị** chưa nối API (nhóm C8): các trang vẫn mở được, đầu trang có dòng nhắc, dữ liệu là dữ liệu mô phỏng nên chưa thấy đơn thật. Quản trị đơn thật hiện dùng API `/api/admin/orders`.
+- **Trang quản trị (nhóm C8).** Sáu trong bảy trang đã nối API: **Đơn hàng**, **Tổng quan**, **Khách hàng**, **Đánh giá**, **Bảo hành và lịch hẹn**, **Sản phẩm**. Đơn hàng và lịch hẹn được nạp một lần khi mở trang (`admin.js` giữ trong `qt.don` và `qt.lich`, đơn nạp 100 đơn mỗi lần gọi). Mở một đơn thì gọi thêm `GET /api/admin/orders/<mã>`. Trang **Phản ánh** vẫn đọc dữ liệu mô phỏng trong trình duyệt vì database chưa có bảng phản ánh (đầu trang có dòng nhắc). Database cũng chưa có: hoàn tiền hai bước (`RefundPending`), ghi chú nội bộ của đơn, phản hồi của cửa hàng cho đánh giá, khung giờ và showroom của lịch hẹn (chỉ có một mốc ngày giờ). Các trang này chỉ cập nhật khi tải lại hoặc sau thao tác của admin.
+- **Giá và trạng thái sản phẩm** sửa ở trang Sản phẩm, lưu thẳng vào database (`PATCH /api/admin/products/<sku>`). Cửa hàng giữ danh mục 5 phút trong trình duyệt (`sessionStorage`), nên khách thấy giá mới sau tối đa 5 phút.
+- **Luồng xử lý đơn ở trang admin:** Chờ xử lý → *Xác nhận đơn* (`Confirmed`) → *Bắt đầu chế tác* (không bắt buộc, từ đó không ai hủy được) → *Bàn giao vận chuyển* (`Shipping`) → *Giao thành công* (`Delivered`, kích hoạt thẻ bảo hành, đơn COD ghi nhận đã thu tiền). Đơn chuyển khoản phải bấm *Xác nhận đã nhận tiền* trước. Hủy đơn được khi `Pending` hoặc `Confirmed` chưa chế tác.
 - **Bảo hành, đặt lịch, đánh giá, phản ánh, yêu thích, đã xem:** còn lưu trong `localStorage`, chờ nhóm C6 và C7. Database đã tạo thẻ bảo hành thật khi khách xác nhận nhận hàng, nhưng trang bảo hành chưa đọc chúng.
 - Kiểm tra: `backend/tests/test_frontend_adapters.py` chạy các hàm đổi dữ liệu của `api.js` bằng Node trên câu trả lời thật của API (bỏ qua nếu máy chưa cài Node).
 
@@ -214,10 +216,20 @@ Các API này cần đăng nhập bằng tài khoản khách (`Customer`). Tài 
 | `POST /api/orders/<mã đơn>/pay` | Thanh toán mô phỏng cho đơn VNPay hoặc MoMo, luôn thành công (`sp_RecordPaymentResult`). Đơn đã hủy hoặc quá 15 phút trả 409. Đơn COD và chuyển khoản trả 400 |
 | `POST /api/orders/<mã đơn>/cancel/respond` | Khách chọn trong popup (`sp_RespondCancelPopup`): `keepOrder: true` giữ đơn, `keepOrder: false` hủy đơn, trả tồn kho, mất voucher |
 | `POST /api/orders/<mã đơn>/confirm-received` | Xác nhận đã nhận hàng (`sp_ConfirmOrderReceived`). Chỉ khi đơn đang giao. Database tự tạo thẻ bảo hành |
-| `GET /api/admin/orders` | Admin xem mọi đơn. Tham số `status`, `page`, `limit` |
+| `GET /api/admin/orders` | Admin xem mọi đơn, mỗi đơn kèm `items`, `PaymentDeadline`, `PaidAt`. Tham số `status`, `page`, `limit` (tối đa 100) |
+| `GET /api/admin/orders/<mã đơn>` | Admin xem một đơn đầy đủ (cùng dạng `GET /api/orders/<mã>`) kèm khối `customer` (tên, email, số điện thoại, `IsGuest`) |
 | `POST /api/admin/orders/<mã đơn>/status` | Admin đổi trạng thái (`sp_UpdateOrderStatus`): `Confirmed`, `Shipping`, `Delivered`, `Cancelled`. Nhảy bước trả 409. Hủy đơn đã bắt đầu chế tác trả 409 |
 | `POST /api/admin/orders/<mã đơn>/confirm-payment` | Admin xác nhận đã nhận tiền chuyển khoản (mô phỏng, không nối ngân hàng). Chỉ đơn `BankTransfer` |
 | `POST /api/admin/orders/<mã đơn>/start-production` | Admin đánh dấu đã bắt đầu chế tác đơn (`sp_StartOrderProduction`). Từ lúc này không ai hủy được đơn. Chỉ đơn đã xác nhận |
+| `GET /api/admin/customers` | Mọi khách (có tài khoản và khách vãng lai): số đơn `OrderCount`, đã trả `TotalPaid` (chỉ thanh toán thành công), đơn gần nhất, số thẻ bảo hành |
+| `GET /api/admin/feedbacks` | Mọi đánh giá, mới nhất trước, kèm nhãn `SentimentLabel` (chỉ cửa hàng thấy) và các yếu tố `aspects` |
+| `GET /api/admin/warranties` | Mọi thẻ bảo hành kèm chủ thẻ, lượt đánh bóng còn lại, số lần làm sạch và chỉnh size |
+| `GET /api/admin/services` | Mọi lịch hẹn hậu mãi, mới nhất trước |
+| `POST /api/admin/services/<id>/schedule` | Xác nhận lịch hẹn (`sp_ScheduleAfterSalesService`). Không gửi gì: xác nhận giờ khách chọn (`Confirmed`). Gửi `appointmentDate` (giờ tương lai): đề xuất giờ khác (`Rescheduled`) |
+| `POST /api/admin/services/<id>/complete` | Hoàn tất dịch vụ (`sp_CompleteAfterSalesService`): trừ một lượt của thẻ, miễn phí hay tính phí do database quyết định. Tùy chọn `resultNote`. Lịch chưa xác nhận hoặc đã xong trả 409 |
+| `POST /api/admin/services/<id>/cancel` | Cửa hàng hủy lịch chưa hoàn tất (`sp_CancelAfterSalesService`), khách không mất lượt |
+| `GET /api/admin/products` | Mọi sản phẩm, cả đã ẩn và ngừng bán, kèm số đã bán (không tính đơn hủy) |
+| `PATCH /api/admin/products/<sku>` | Đổi `price`, `originalPrice` (null bỏ giảm giá), `status` (`Active`, `Hidden`, `Discontinued`). Giá chỉ cho sản phẩm giá cố định, sản phẩm giá theo vàng trả 409 |
 
 Điểm cần nhớ:
 - `checkoutToken` là một UUID do trình duyệt tạo cho mỗi lần thanh toán. Gửi lại cùng token (bấm đúp, mạng chậm) thì nhận lại đúng đơn cũ với mã 200, không tạo đơn thứ hai.
@@ -273,7 +285,7 @@ Khách chưa đăng nhập vẫn đặt hàng được. **Số điện thoại l
 uv run pytest
 ```
 
-Test nằm trong `backend/tests/` (521 test, chạy khoảng bốn phút). Test không đụng vào dữ liệu thật. Mỗi lần chạy, `backend/tests/conftest.py` dựng lại một database riêng tên `VinoraJewelry_Test` từ file `database/01_*.sql` (mất khoảng 5 giây). Cần quyền tạo database trên SQL Server. Nếu không kết nối được, các test bị bỏ qua và pytest in lý do.
+Test nằm trong `backend/tests/` (557 test, chạy khoảng bốn phút). Test không đụng vào dữ liệu thật. Mỗi lần chạy, `backend/tests/conftest.py` dựng lại một database riêng tên `VinoraJewelry_Test` từ file `database/01_*.sql` (mất khoảng 5 giây). Cần quyền tạo database trên SQL Server. Nếu không kết nối được, các test bị bỏ qua và pytest in lý do.
 
 ## Quy ước
 

@@ -239,20 +239,19 @@ def list_orders():
     return jsonify(orders)
 
 
-@bp.get("/<code>")
-@customer_or_guest
-def get_order(code: str):
-    """One of my orders. A guest sends ?phone=<the phone used for the order>."""
+def order_detail(code: str, customer_id: int | None = None):
+    """The full order with its items and payments, or None. customer_id limits it to that customer's orders;
+    the admin routes pass None to read any order."""
+    owner, params = ("AND o.CustomerID = ?", (code, customer_id)) if customer_id is not None else ("", (code,))
     rows = query(
         "SELECT o.OrderID, o.OrderCode, o.OrderStatus, o.ShipRecipientName, o.ShipPhone, o.ShipAddress, o.Subtotal, "
         "o.DiscountAmount, v.VoucherCode, o.IsRetentionApplied, o.ShippingFee, o.TotalAmount, o.Note, o.CancelReason, "
         "o.CreatedAt, o.ConfirmedAt, o.ShippedAt, o.DeliveredAt, o.CancelledAt, o.ProductionStartedAt, "
         "h.PaymentDeadline, h.HasEngraving, h.CancelChannel "
         "FROM dbo.Orders o LEFT JOIN dbo.Vouchers v ON v.VoucherID = o.VoucherID "
-        "JOIN dbo.vw_CustomerOrderHistory h ON h.OrderID = o.OrderID WHERE o.OrderCode = ? AND o.CustomerID = ?",
-        (code, g.customer_id))
+        f"JOIN dbo.vw_CustomerOrderHistory h ON h.OrderID = o.OrderID WHERE o.OrderCode = ? {owner}", params)
     if not rows:
-        return jsonify(error="Order not found"), 404
+        return None
     order = rows[0]
     order["items"] = query(
         "SELECT oi.ProductNameSnap, oi.SKUSnap, oi.MaterialSnap, oi.GoldColor, oi.RingSize, oi.EngravingText, oi.EngravingStyle, "
@@ -269,6 +268,16 @@ def get_order(code: str):
                                       "VoucherDiscount": order["DiscountAmount"], "Subtotal": order["Subtotal"],
                                       "TotalAmount": order["TotalAmount"]} if pending else None)
     del order["OrderID"]
+    return order
+
+
+@bp.get("/<code>")
+@customer_or_guest
+def get_order(code: str):
+    """One of my orders. A guest sends ?phone=<the phone used for the order>."""
+    order = order_detail(code, g.customer_id)
+    if not order:
+        return jsonify(error="Order not found"), 404
     return jsonify(order)
 
 

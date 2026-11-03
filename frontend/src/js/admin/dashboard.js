@@ -7,6 +7,7 @@
   const VN = window.Vinora; const qt = VN.qt;
   if (!qt || qt.chan || !VN.$('#qt-so-lieu')) return;
 
+  let danhGia = [];      // đánh giá của khách (GET /api/admin/feedbacks)
   /** Doanh thu ghi nhận: đơn đã thanh toán và không bị hoàn tiền */
   const daThu = (d) => d.thanhToan.trangThai === 'Success';
   const ngayThu = (d) => new Date(d.thanhToan.luc || d.ngayNhan || d.ngayDat);
@@ -24,13 +25,12 @@
   };
 
   const ve = async () => {
-    VN.donHang.tuHuyQuaHan();
-    const don = VN.donHang.tatCa(); const pa = VN.hoTro.tatCa(); const lich = VN.lichHen.tatCa(); const dg = VN.danhGia.tatCa();
+    const don = VN.donHang.tatCa(); const pa = VN.hoTro.tatCa(); const lich = qt.lich; const dg = danhGia;
     VN.$('#qt-hom-nay').textContent = `${VN.thu(new Date())}, ${VN.ngay(new Date())}`;
     const bayNgay = Date.now() - 7 * 86400000;
     const doanhThu = don.filter(daThu).reduce((t, d) => t + d.tongTien, 0);
     const choXuLy = don.filter((d) => d.trangThai === 'Pending');
-    const diemTb = dg.length ? dg.reduce((t, x) => t + x.soSao, 0) / dg.length : 0;
+    const diemTb = dg.length ? dg.reduce((t, x) => t + x.RatingStar, 0) / dg.length : 0;
     const o = [
       ['', 'Doanh thu đã thu', VN.tien(doanhThu), `${don.filter(daThu).length} đơn đã thanh toán`, VN.url('qtDonHang')],
       ['xanh', 'Đơn mới 7 ngày', don.filter((d) => new Date(d.ngayDat) >= bayNgay).length, `${don.length} đơn từ trước đến nay`, VN.url('qtDonHang')],
@@ -43,11 +43,11 @@
 
     const viec = [
       ['qr', 'Đơn chuyển khoản chờ xác nhận tiền', choXuLy.filter((d) => d.thanhToan.phuongThuc === 'BANK' && d.thanhToan.trangThai !== 'Success').length, VN.url('qtDonHang', { tt: 'Pending' })],
-      ['xe-giao', 'Đơn sẵn sàng giao (COD / đã thanh toán)', choXuLy.filter((d) => !qt.chuaTra(d)).length, VN.url('qtDonHang', { tt: 'Pending' })],
-      ['doi-tra', 'Yêu cầu hoàn tiền chờ chuyển khoản', don.filter((d) => d.thanhToan.trangThai === 'RefundPending').length, VN.url('qtDonHang', { tt: 'hoan-tien' })],
+      ['xe-giao', 'Đơn sẵn sàng xác nhận (COD / đã thanh toán)', choXuLy.filter((d) => !qt.chuaTra(d)).length, VN.url('qtDonHang', { tt: 'Pending' })],
+      ['hop-hang', 'Đơn đã xác nhận, chờ bàn giao', don.filter((d) => d.trangThai === 'Confirmed').length, VN.url('qtDonHang', { tt: 'Confirmed' })],
       ['chat', 'Phản ánh chưa xử lý xong', pa.filter((x) => x.trangThai !== 'Resolved').length, VN.url('qtPhanAnh')],
-      ['lich', 'Lịch hẹn chờ xác nhận', lich.filter((l) => l.trangThai === 'Pending').length, VN.url('qtBaoHanh')],
-      ['sao', 'Đánh giá chưa phản hồi', dg.filter((x) => !x.phanHoi).length, VN.url('qtDanhGia')],
+      ['lich', 'Lịch hẹn chờ xác nhận', lich.filter((l) => l.Status === 'Pending').length, VN.url('qtBaoHanh')],
+      ['sao', 'Đánh giá tiêu cực', dg.filter((x) => x.SentimentLabel === 'Negative').length, VN.url('qtDanhGia')],
     ];
     VN.$('#qt-viec').innerHTML = viec.map(([bt, ten, n, url]) => `<li><a href="${url}">${VN.bt(bt)}<span>${ten}</span><b class="${n ? '' : 'khong'}">${n}</b></a></li>`).join('');
 
@@ -71,5 +71,5 @@
 
   ['vinora:don-hang', 'vinora:ho-tro', 'vinora:lich-hen'].forEach((ten) => window.addEventListener(ten, VN.chongDoi(ve, 80)));
   window.addEventListener('storage', VN.chongDoi((e) => { if (/^vinora\./.test(e.key || '')) ve(); }, 120));
-  ve();
+  qt.sanSang.then(() => VN.api.get('/api/admin/feedbacks')).then((ds) => { danhGia = ds; ve(); }).catch(qt.baoLoiTai);
 })();
