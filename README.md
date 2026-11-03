@@ -25,7 +25,7 @@ business_web_development/
 │   └── api/                   # mô tả endpoint
 │
 ├── frontend/                  # giao diện
-│   ├── index.html             # chuyển hướng tới trang chủ (gốc cho Live Server)
+│   ├── index.html             # chuyển hướng tới trang chủ
 │   ├── README.md
 │   ├── public/                # tài nguyên phục vụ nguyên trạng
 │   │   ├── fonts/
@@ -46,7 +46,7 @@ business_web_development/
 │   │       ├── core/          # hàm chung, API client, storage
 │   │       ├── components/
 │   │       └── pages/         # JS riêng từng trang
-│   └── mock-data/             # JSON/XML mẫu khi chưa có back-end
+│   └── mock-data/             # config, size-chart, provinces (.json), stores.xml: vài dữ liệu tĩnh các trang còn đọc
 │
 ├── backend/                   # Python (Flask)
 │   ├── app/
@@ -276,9 +276,9 @@ Khách chưa đăng nhập vẫn đặt hàng được. **Số điện thoại l
 | Địa chỉ | Việc làm |
 |---|---|
 | `GET /api/profile`, `PATCH /api/profile` | Hồ sơ khách (cần đăng nhập khách). Sửa `fullName`, `phone` (không trùng khách khác, trùng trả 409 `phone_in_use`), `dateOfBirth` (`YYYY-MM-DD`, trước hôm nay), `defaultRingSize` (có trong bảng size nhẫn). Chỉ trường có trong body mới đổi. `null` hoặc `""` xóa số điện thoại, ngày sinh, size. Một trường sai thì không lưu gì. Email và vai trò không đổi được ở đây |
-| `GET /api/categories` | Danh mục còn bán, kèm số sản phẩm (`ProductCount`). Thay `mock-data/categories.json` |
-| `GET /api/collections` | Bộ sưu tập kèm số sản phẩm, các danh mục (`Categories`) và tuổi vàng (`Materials`) có trong bộ sưu tập. Thay `mock-data/collections.json` |
-| `GET /api/ring-sizes` | Bảng quy đổi size nhẫn. Thay `mock-data/size-chart.json` |
+| `GET /api/categories` | Danh mục còn bán, kèm số sản phẩm (`ProductCount`). Thay file `categories.json` cũ (đã xóa) |
+| `GET /api/collections` | Bộ sưu tập kèm số sản phẩm, các danh mục (`Categories`) và tuổi vàng (`Materials`) có trong bộ sưu tập. Thay file `collections.json` cũ (đã xóa) |
+| `GET /api/ring-sizes` | Bảng quy đổi size nhẫn. Các trang vẫn đọc `mock-data/size-chart.json`, chưa dùng API này |
 | `GET /api/gold-prices` | Giá vàng đang có hiệu lực cho từng tuổi vàng (đồng một chỉ), cao nhất trước |
 | `POST /api/vouchers/check` | Kiểm tra mã giảm giá với giỏ hàng hiện tại. Khách đăng nhập: tính trên giỏ trong database. Khách chưa đăng nhập gửi giỏ của trình duyệt trong `items` (cùng dạng với đơn không tài khoản), thiếu cả đăng nhập lẫn `items` trả 401. Body: `code`. Thành công trả `discount`. Mã không có, đã tắt hoặc chưa tới ngày trả 404. Hết hạn, hết lượt hoặc chưa đủ tiền tối thiểu trả 409 kèm `reason` (`expired`, `used_up`, `min_order`). Cách tính giống `sp_PlaceOrder`; việc đặt hàng mới là lúc giảm giá được chốt |
 | `POST /api/recently-viewed` | Ghi nhận khách vừa mở một sản phẩm. Body: `sku`. Trả 204 (`sp_TrackProductView`) |

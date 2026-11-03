@@ -36,7 +36,7 @@ def test_html_is_served_as_utf8_so_vietnamese_text_is_not_garbled(client):
 @pytest.mark.parametrize("path,kind", [
     ("/src/css/base/variables.css", "text/css"),
     ("/src/js/core/common.js", "javascript"),
-    ("/mock-data/products.json", "application/json"),
+    ("/mock-data/config.json", "application/json"),
     ("/public/fonts/fonts.css", "text/css"),
     ("/public/images/logo/favicon.svg", "image/svg+xml"),
 ])

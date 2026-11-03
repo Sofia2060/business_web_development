@@ -28,7 +28,7 @@ File này ghi các mã, trạng thái và quy tắc khác nhau giữa giao diệ
    - API trả `IsQuoteOnly: true` và `CurrentPrice: null` cho các sản phẩm này. Danh sách và trang chi tiết vẫn có (ảnh, màu, size, trọng lượng).
    - Bộ lọc giá và `onSale` không khớp chúng. Khi sắp xếp theo giá chúng luôn nằm cuối. Giao diện đã làm đúng như vậy (`coTheMua`, giá rỗng xếp cuối), nên chỉ cần lấy `coTheMua = !IsQuoteOnly` từ API thay cho `loaiGia !== 'gia_cong'`.
    - Thêm vào giỏ hoặc đặt hàng sản phẩm này: API trả 409 với `reason: quote_only`. Database cũng chặn (lỗi 50014).
-   - Giao diện giữ nút "Nhận báo giá" và "Gọi hotline". Số trong `products.json` của 22 sản phẩm này là tiền công, không hiển thị như giá bán. Giá cũ giảm 10% của `MDZ076`, `MDZ081`, `MDZ091` cũng bỏ.
+   - Giao diện giữ nút "Nhận báo giá" và "Gọi hotline". Số trong file `products.json` cũ (đã xóa khi nối API) của 22 sản phẩm này là tiền công, không hiển thị như giá bán. Giá cũ giảm 10% của `MDZ076`, `MDZ081`, `MDZ091` cũng bỏ.
    - Bảng giá vàng (`GoldPrices`) vẫn dùng để nhân viên báo giá. Muốn bán online lại: đặt `IsQuoteOnly = 0`, giá tự tính theo giá vàng.
 
 ## 3. Trạng thái

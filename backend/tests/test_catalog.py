@@ -1,6 +1,6 @@
 """Tests for the lookup endpoints (categories, collections, ring sizes, gold prices) and the voucher check.
-The shop's old JSON files in frontend/mock-data/ are used as a second source of truth: the API must give
-the same names and counts, so the pages can switch from the files to the API without a visible change.
+The tables below are what the shop's old JSON files said (they were removed once the pages used the API): the API
+must give the same names and counts. The ring size chart is still checked against frontend/mock-data/size-chart.json.
 Voucher data used (database/01_*.sql): WELCOME5 gives 5% for goods from 2,000,000 VND (max 1,000,000),
 VINORA500K gives 500,000 VND for goods from 10,000,000 VND. BT161B-VT is an earring set of 2,361,000 VND."""
 import json
@@ -23,25 +23,65 @@ def mock(name):
 
 # ---------------- categories, collections, ring sizes ----------------
 
-def test_categories_match_the_old_json_file(client):
+# (name, group, number of products) in the order the shop shows them
+CATEGORIES = [
+    ('Nhẫn cầu hôn', 'Nhẫn', 138),
+    ('Nhẫn cưới', 'Nhẫn', 34),
+    ('Nhẫn thời trang', 'Nhẫn', 28),
+    ('Bông tai', 'Bông tai', 69),
+    ('Dây chuyền', 'Dây chuyền', 45),
+    ('Mặt dây chuyền', 'Mặt dây chuyền', 61),
+    ('Lắc tay', 'Lắc tay', 6),
+    ('Charm', 'Charm', 47),
+    ('Bộ trang sức', 'Bộ trang sức', 7),
+    ('Vàng lưu niệm', 'Vàng lưu niệm', 8),
+]
+# (name, number of products, main categories, materials): the old file listed only the three biggest categories of a collection
+COLLECTIONS = [
+    ('Evermore', 87, ('Nhẫn cầu hôn', 'Nhẫn cưới'), ('14K', '18K', '10K')),
+    ('Starlight', 75, ('Nhẫn thời trang', 'Mặt dây chuyền', 'Bông tai'), ('14K', '10K', 'BAC925')),
+    ('Promis', 43, ('Nhẫn cầu hôn', 'Nhẫn cưới'), ('14K', '10K')),
+    ('Gloria', 27, ('Bông tai', 'Dây chuyền', 'Mặt dây chuyền'), ('14K', '10K', 'BAC925')),
+    ('Beyond', 24, ('Nhẫn cầu hôn',), ('14K',)),
+    ('Thần Tài Đại Cát', 23, ('Charm',), ('14K',)),
+    ('Bunnie', 19, ('Bông tai', 'Dây chuyền'), ('BAC925',)),
+    ('Perlina', 19, ('Dây chuyền', 'Bông tai', 'Bộ trang sức'), ('14K', '10K')),
+    ('The Empress', 19, ('Mặt dây chuyền', 'Bông tai'), ('24K',)),
+    ('Eternal', 17, ('Nhẫn cầu hôn', 'Nhẫn cưới'), ('14K', '18K')),
+    ('Rabbit Tales', 16, ('Dây chuyền', 'Bông tai'), ('10K',)),
+    ('Lucky U', 15, ('Bông tai', 'Dây chuyền', 'Mặt dây chuyền'), ('10K', '14K')),
+    ('12 Con Giáp', 12, ('Charm',), ('24K',)),
+    ('Lasting Moment', 10, ('Charm',), ('14K',)),
+    ('Moonlight', 9, ('Mặt dây chuyền', 'Dây chuyền', 'Bông tai'), ('10K', '14K')),
+    ('Haven Crystal', 7, ('Mặt dây chuyền', 'Dây chuyền'), ('10K', '14K')),
+    ('Phonesticker', 5, ('Vàng lưu niệm',), ('24K', '10K')),
+    ('Lumiere', 3, ('Mặt dây chuyền', 'Dây chuyền'), ('14K',)),
+    ('Vàng Lưu Niệm Tài Lộc', 3, ('Vàng lưu niệm',), ('24K',)),
+    ('Cát Trường', 2, ('Mặt dây chuyền',), ('14K',)),
+    ('Kim Tiền', 2, ('Nhẫn thời trang',), ('10K',)),
+    ('Lucena', 2, ('Nhẫn thời trang', 'Mặt dây chuyền'), ('14K',)),
+    ('Vàng 22K', 2, ('Mặt dây chuyền',), ('22K',)),
+    ("Soobin's Queen", 1, ('Dây chuyền',), ('10K',)),
+    ('Together', 1, ('Nhẫn cưới',), ('BAC925',)),
+]
+
+
+def test_categories_match_what_the_shop_always_showed(client):
     api = client.get("/api/categories").get_json()
-    old = mock("categories.json")["danhMuc"]
-    assert [(c["CategoryName"], c["CategoryGroup"], c["ProductCount"]) for c in api] == \
-           [(c["ten"], c["nhom"], c["soLuong"]) for c in old]
+    assert [(c["CategoryName"], c["CategoryGroup"], c["ProductCount"]) for c in api] == CATEGORIES
     assert sum(c["ProductCount"] for c in api) == 443
     assert [c["RequiresRingSize"] for c in api][:4] == [True, True, True, False]
 
 
-def test_collections_match_the_old_json_file(client):
+def test_collections_match_what_the_shop_always_showed(client):
     api = {c["CollectionName"]: c for c in client.get("/api/collections").get_json()}
-    old = mock("collections.json")["boSuuTap"]
-    assert set(api) == {c["ten"] for c in old}
-    for c in old:
-        got = api[c["ten"]]
-        assert got["ProductCount"] == c["soLuong"], c["ten"]
-        # The old file lists only the main categories of a collection (the three biggest), the API lists all of them.
-        assert set(c["loaiSanPham"]) <= set(got["Categories"]), c["ten"]
-        assert set(c["chatLieu"]) <= set(got["Materials"]), c["ten"]
+    assert set(api) == {name for name, *_ in COLLECTIONS}
+    for name, count, categories, materials in COLLECTIONS:
+        got = api[name]
+        assert got["ProductCount"] == count, name
+        # the table lists only the main categories of a collection, the API lists all of them
+        assert set(categories) <= set(got["Categories"]), name
+        assert set(materials) <= set(got["Materials"]), name
     assert sum(c["ProductCount"] for c in api.values()) == 443
 
 

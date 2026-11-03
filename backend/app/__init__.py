@@ -35,7 +35,7 @@ PROC_ERROR_STATUS = {
 def create_app() -> Flask:
     load_dotenv()  # read .env if present
     # static_url_path="" puts the frontend files at the site root, the same paths Live Server used:
-    # /src/pages/client/index.html, /mock-data/products.json, /public/fonts/...
+    # /src/pages/client/index.html, /mock-data/config.json, /public/fonts/...
     # Flask only serves files inside FRONTEND_DIR. API routes win over files because they are more specific.
     app = Flask(__name__, static_folder=str(FRONTEND_DIR), static_url_path="")
     app.json.ensure_ascii = False  # keep Vietnamese text readable in JSON

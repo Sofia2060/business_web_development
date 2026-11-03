@@ -148,7 +148,6 @@
     if (!v) throw new LoiApi(size ? `Mẫu này hiện chưa có size ${size}${mau ? ' màu ' + mau : ''}. Vui lòng chọn size khác.` : 'Mẫu này hiện không có lựa chọn bạn chọn.', { trangThai: 404 });
     return v;
   };
-  VN.timBienThe = timBienThe;
 
   VN.gioHang = {
     dong: [],        // lines of the cart now: from the database for a customer, from this browser for a visitor

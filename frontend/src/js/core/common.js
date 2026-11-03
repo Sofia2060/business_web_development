@@ -46,7 +46,6 @@
   VN.thamSo = (ten) => new URLSearchParams(location.search).get(ten);
   VN.chongDoi = (ham, ms = 200) => { let hen; return (...ts) => { clearTimeout(hen); hen = setTimeout(() => ham(...ts), ms); }; };
   VN.ngauNhien = (n) => Array.from({ length: n }, () => Math.floor(Math.random() * 10)).join('');
-  VN.chuNgauNhien = (n) => Array.from({ length: n }, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 32)]).join('');
   const yymmdd = (d = new Date()) => String(d.getFullYear()).slice(2) + hai(d.getMonth() + 1) + hai(d.getDate());
   VN.emailHopLe = (e) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(e).trim());
   VN.sdtHopLe = (s) => /^(0|\+84)(3|5|7|8|9)\d{8}$/.test(String(s).replace(/[\s.]/g, ''));
@@ -76,7 +75,7 @@
   };
   VN.urlSanPham = (ma) => VN.url('chiTiet', { ma });
 
-  /* Nguồn ảnh mặc định (khớp ../../../mock-data/products.json) – dùng được ngay cả khi trang chưa tải danh sách sản phẩm */
+  /* Nguồn ảnh mặc định (cho tiền tố cdn| và cloud| của ImageUrl trong database) – dùng được ngay cả khi trang chưa tải danh sách sản phẩm */
   let nguonAnh = { cdn: 'https://cdn.huythanhjewelry.vn/storage/photos/', cloud: 'https://cloud.huythanhjewelry.vn/storage/photos/' };
   /** Ảnh sản phẩm lưu dạng rút gọn "cdn|shares/..." -> URL đầy đủ */
   VN.anh = (duong) => {
@@ -141,7 +140,7 @@
 
   /* ================= 5. PHIÊN QUẢN TRỊ ================= */
   /**
-   * Dấu hiệu "đã đăng nhập quản trị" cho các trang quản trị (còn dùng dữ liệu mô phỏng, chờ nối API – nhóm C8).
+   * Dấu hiệu "đã đăng nhập quản trị" cho các trang quản trị (chỉ là cờ lưu trong trình duyệt; quyền thật do máy chủ kiểm tra ở mọi API admin).
    * Việc kiểm tra mật khẩu do máy chủ làm (VN.taiKhoan.dangNhap); hết hạn sau 8 giờ.
    */
   VN.quanTri = {

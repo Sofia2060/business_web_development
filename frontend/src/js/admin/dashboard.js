@@ -25,7 +25,7 @@
   };
 
   const ve = async () => {
-    const don = VN.donHang.tatCa(); const pa = VN.hoTro.tatCa(); const lich = qt.lich; const dg = danhGia;
+    const don = qt.don; const pa = VN.hoTro.tatCa(); const lich = qt.lich; const dg = danhGia;
     VN.$('#qt-hom-nay').textContent = `${VN.thu(new Date())}, ${VN.ngay(new Date())}`;
     const bayNgay = Date.now() - 7 * 86400000;
     const doanhThu = don.filter(daThu).reduce((t, d) => t + d.tongTien, 0);
