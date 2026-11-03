@@ -17,7 +17,9 @@
   /** Mã của lần đặt hàng này: gửi kèm đơn để bấm đặt hai lần vẫn chỉ ra một đơn (crypto.randomUUID chỉ có ở trang bảo mật) */
   const taoMa = () => (window.crypto && crypto.randomUUID ? crypto.randomUUID()
     : '10000000-1000-4000-8000-100000000000'.replace(/[018]/g, (c) => (c ^ (crypto.getRandomValues(new Uint8Array(1))[0] & (15 >> (c / 4)))).toString(16)));
-  const tt = { ch: null, dong: [], tc: VN.tuyChonGio.doc(), diaChi: 'moi', dangGui: false, uuDai: null, loiMa: '', token: taoMa() };
+  const tt = { ch: null, dong: [], tc: VN.tuyChonGio.doc(), diaChi: 'moi', dangGui: false, uuDai: null, loiMa: '', token: taoMa(), chuaRo: false };
+  // chuaRo: lần gửi đơn trước không có câu trả lời (mất mạng, lỗi máy chủ), nên chưa biết đơn đã được tạo hay chưa.
+  // Giữ nguyên token: gửi lại cùng token thì máy chủ trả về đơn đã có thay vì tạo đơn thứ hai.
 
   Promise.all([VN.duLieu.coBan(), VN.sanSang]).then(async ([{ ch }]) => {
     u = VN.taiKhoan.hienTai();
@@ -224,6 +226,7 @@
     const nut = VN.$('#nut-dat-hang');
     const moLai = () => { tt.dangGui = false; nut.disabled = false; nut.classList.remove('dang-xu-ly'); veTomTat(); };
     tt.dangGui = true; nut.disabled = true; nut.classList.add('dang-xu-ly'); nut.textContent = 'Đang kiểm tra đơn hàng';
+    let daGui = false;        // đã gửi yêu cầu tạo đơn (lỗi từ đây trở đi có thể xảy ra sau khi đơn đã được tạo)
     let diaChiTam = null;     // địa chỉ vừa thêm trong lần đặt này: bị xóa nếu đặt hàng lỗi (thử lại không sinh địa chỉ trùng), hoặc khách không muốn lưu vào sổ
     try {
       // FR10: kiểm tra lại giá & số lượng ngay trước khi tạo đơn (máy chủ vẫn tính lại khi đặt)
@@ -232,8 +235,10 @@
       await VN.gioHang.nap();
       const daBo = await boDongKhongBan();
       const dongMoi = await VN.gioHang.chiTiet();
-      if (!dongMoi.length) { location.replace(VN.url('gioHang')); return; }
-      const doiGia = dongMoi.length !== tt.dong.length || dongMoi.some((d, i) => !tt.dong[i] || d.donGia !== tt.dong[i].donGia || d.soLuong !== tt.dong[i].soLuong);
+      // Giỏ rỗng sau một lần gửi không có câu trả lời: có thể đơn đã được tạo và đã làm rỗng giỏ, hãy gửi lại để nhận đơn đó
+      const coTheDaCoDon = tt.chuaRo && !dongMoi.length;
+      if (!dongMoi.length && !coTheDaCoDon) { location.replace(VN.url('gioHang')); return; }
+      const doiGia = !coTheDaCoDon && (dongMoi.length !== tt.dong.length || dongMoi.some((d, i) => !tt.dong[i] || d.donGia !== tt.dong[i].donGia || d.soLuong !== tt.dong[i].soLuong));
       if (doiGia) {
         tt.dong = dongMoi; await kiemTraMa(tt.tc.maUuDai);
         thongBaoChung(daBo ? 'Một số sản phẩm vừa ngừng bán nên đã được bỏ khỏi giỏ. Vui lòng kiểm tra lại tổng tiền trước khi đặt hàng.'
@@ -252,11 +257,13 @@
           diaChiTam = diaChiId;
         }
         nut.textContent = 'Đang tạo đơn hàng';
+        daGui = true;
         don = await VN.donHang.tao(Object.assign({ diaChiId }, chung));
         if (form.luuDiaChi.checked) diaChiTam = null;       // the order exists: an address the customer wants to keep stays
       } else {
         const nn = layDiaChiMoi();
         nut.textContent = 'Đang tạo đơn hàng';
+        daGui = true;
         // Mã khách hàng = số điện thoại: người đặt (khi mua tặng) hoặc chính người nhận
         don = await VN.donHang.tao(Object.assign({
           hoTen: nn.hoTen, sdt: form.tangNguoiKhac.checked ? VN.chuanSdt(form.sdtNguoiDat.value) : nn.sdt, sdtNguoiNhan: nn.sdt,
@@ -274,6 +281,12 @@
       location.href = VN.url('ketQuaDatHang', { ma: don.ma });
     } catch (loi) {
       if (diaChiTam) VN.taiKhoan.xoaDiaChi(diaChiTam).catch(() => {});
+      if (daGui) tt.chuaRo = loi.trangThai === 0 || loi.trangThai >= 500;     // một lỗi rõ ràng (4xx) nghĩa là đơn chưa được tạo
+      if (daGui && tt.chuaRo) {
+        thongBaoChung('Chưa nhận được phản hồi từ máy chủ nên chưa biết đơn hàng đã được tạo hay chưa. Vui lòng bấm Đặt hàng lần nữa để kiểm tra: nếu đơn đã có, bạn sẽ được chuyển đến đơn đó và không bị tạo đơn thứ hai. Xin đừng tải lại trang.');
+        moLai();
+        return;
+      }
       thongBaoChung(loi.lyDo === 'phone_has_account'
         ? `${VN.thoat(loi.message)} <a class="lien-ket" href="${VN.url('taiKhoan', { tiep: VN.url('thanhToan') })}">Đăng nhập</a>`
         : VN.thoat(loi.message));

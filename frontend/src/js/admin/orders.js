@@ -24,7 +24,7 @@
 
   /* ================= DANH SÁCH ================= */
   const ve = () => {
-    const tat = VN.donHang.tatCa().slice().sort((a, b) => new Date(b.ngayDat) - new Date(a.ngayDat));
+    const tat = qt.don.slice().sort((a, b) => new Date(b.ngayDat) - new Date(a.ngayDat));
     VN.$('#qt-dh-tab').innerHTML = TAB.map(([k, ten]) => `<button type="button" role="tab" data-tab="${k}" aria-selected="${k === tt.tab}">${ten}<span class="dem">${tat.filter((d) => hopTab(d, k)).length}</span></button>`).join('');
     const tu = VN.khongDau(tt.tim.trim());
     const ds = tat.filter((d) => hopTab(d, tt.tab) && (!tt.pt || d.thanhToan.phuongThuc === tt.pt)

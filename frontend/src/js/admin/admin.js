@@ -3,7 +3,7 @@
    - Bảo vệ trang: chưa đăng nhập quản trị -> về ô đăng nhập chung (taikhoan.html), đăng nhập xong quay lại
    - Tên người dùng, đăng xuất, số việc cần xử lý trên menu
    - Tiện ích hiển thị: nhãn trạng thái, tên khách, ngăn chi tiết
-   Dữ liệu dùng chung với cửa hàng qua VN.donHang, VN.hoTro, VN.lichHen… (chung.js)
+   Đơn hàng và lịch hẹn lấy từ API admin (qt.don, qt.lich). Chỉ phản ánh còn dùng VN.hoTro (dữ liệu mô phỏng trong trình duyệt).
    ===================================================================== */
 (function () {
   'use strict';
@@ -21,7 +21,7 @@
   qt.boi = (vaiTro) => `${vaiTro || 'Cửa hàng'} (${qt.nguoi ? qt.nguoi.hoTen : 'Quản trị'})`;
 
   /* ---------- Đơn hàng từ máy chủ (GET /api/admin/orders) ---------- */
-  /** Mọi đơn, đã đổi sang dạng các trang dùng. Nạp bằng qt.napDon(); trang đọc đồng bộ qua VN.donHang.tatCa(). */
+  /** Mọi đơn, đã đổi sang dạng các trang dùng. Nạp bằng qt.napDon(); các trang đọc đồng bộ từ qt.don. */
   qt.don = [];
   /** Một đơn của API (dòng danh sách, hoặc chi tiết có thêm "customer") -> đơn dạng trang + thông tin khách */
   qt.donTuApi = (r) => {
@@ -66,14 +66,8 @@
   /** Trang chờ dòng này để có đơn và lịch hẹn trước khi vẽ */
   qt.sanSang = Promise.all([qt.napDon(), qt.napLich()]).catch(qt.baoLoiTai);
 
-  /*
-   * Chỉ trang Phản ánh còn đọc dữ liệu giả lập trong trình duyệt (database chưa có bảng phản ánh). Mấy hàm đọc đơn cũ
-   * dưới đây giữ lại cho trang đó; danh sách tài khoản khách trả về rỗng.
-   */
-  VN.donHang.tatCa = () => qt.don;
-  VN.donHang.tuHuyQuaHan = () => false;
-  VN.donHang.heHan = () => qt.napDon().catch(() => {});      // đồng hồ đếm ngược chạy về 0 -> hỏi lại máy chủ
-  VN.taiKhoan.ds = () => [];
+  // Đồng hồ đếm ngược thanh toán chạy về 0 -> hỏi lại máy chủ (trang cửa hàng đọc lại đơn của khách, trang admin đọc lại mọi đơn)
+  VN.donHang.heHan = () => qt.napDon().catch(() => {});
   // Cookie đăng nhập hết hạn khi trang đang mở: về ô đăng nhập chung
   window.addEventListener('vinora:het-phien', () => { VN.quanTri.xoaPhien(); location.replace(VN.url('taiKhoan', { tiep: location.pathname + location.search })); });
 
@@ -89,7 +83,8 @@
   qt.chuaTra = (d) => d.trangThai === 'Pending' && d.thanhToan.phuongThuc !== 'COD' && d.thanhToan.trangThai !== 'Success';
   /** Tên khách: tài khoản (nếu có) hoặc người nhận + đánh dấu khách không tài khoản */
   qt.khach = (d) => d.khach || { ten: d.nguoiNhan.hoTen, sdt: d.sdtKhach || d.nguoiNhan.sdt, email: '', coTaiKhoan: false };
-  qt.tenKhachTheoId = (id, sdt) => { const u = id ? VN.taiKhoan.ds().find((x) => x.id === id) : null; return u ? u.hoTen : (sdt ? `Khách ${VN.anSdt(sdt)}` : 'Khách hàng'); };
+  /** Tên khách của một đơn (để hiện trong trang Phản ánh); không thấy đơn thì dùng số điện thoại đã che bớt */
+  qt.tenKhachTheoDon = (maDon, sdt) => { const d = qt.don.find((o) => o.ma === maDon); return d ? qt.khach(d).ten : (sdt ? `Khách ${VN.anSdt(sdt)}` : 'Khách hàng'); };
   qt.nhatKy = (ls) => `<ol class="nhat-ky-qt">${(ls || []).slice().reverse().map((l) => `<li><time>${VN.ngayGio(l.luc)}</time><div>${VN.thoat(l.noiDung)}<small>${VN.thoat(l.boi || '')}</small></div></li>`).join('')}</ol>`;
   qt.trong = (chu) => `<div class="qt-trong">${chu}</div>`;
   /** Phân trang đơn giản cho bảng dài */
@@ -162,7 +157,7 @@
     // Màn hình hẹp: menu cuộn ngang -> đưa mục đang mở vào giữa
     const dangMo = VN.$('.qt-ben__ds [aria-current="page"]');
     if (dangMo && matchMedia('(max-width: 900px)').matches) { const nav = dangMo.closest('nav'); nav.scrollLeft = dangMo.offsetLeft - (nav.clientWidth - dangMo.offsetWidth) / 2; }
-    ['vinora:don-hang', 'vinora:ho-tro', 'vinora:lich-hen', 'vinora:danh-gia'].forEach((ten) => window.addEventListener(ten, veKhung));
+    ['vinora:don-hang', 'vinora:ho-tro', 'vinora:lich-hen'].forEach((ten) => window.addEventListener(ten, veKhung));
     // Khách thao tác ở thẻ trình duyệt khác (đặt hàng, gửi phản ánh…) -> cập nhật số việc
     window.addEventListener('storage', (e) => { if (/^vinora\./.test(e.key || '')) veKhung(); });
   };

@@ -226,8 +226,6 @@ def test_the_pages_do_not_use_the_removed_demo_data():
     gone = re.compile(r"VN\.(demo|DEMO|otp|QUAN_TRI_DEMO|bamMatKhau)\b|VN\.donHang\.(tatCa|luuTatCa|tao\(\{\s*sanPham|doiSangCOD|ghiThanhToan)|VN\.gioHang\.(luu|ds\(\)\.find)|VN\.baoHanh\.(kichHoatChoDon|ghiDichVu|taoMa|luuTatCa)|VN\.lichHen\.(capNhat|luuTatCa)|VN\.danhGia\.(tatCa|theoDon|phanLoai|phanHoi)")
     offenders = []
     for path in sorted((FRONTEND_DIR / "src" / "js").glob("*/*.js")):
-        if path.parent.name == "admin":      # the admin pages are not connected yet: admin.js replaces tatCa() with an empty list
-            continue
         for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
             if gone.search(line):
                 offenders.append(f"{path.relative_to(FRONTEND_DIR)}:{number}")

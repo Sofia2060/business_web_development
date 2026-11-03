@@ -22,7 +22,7 @@
       <td class="ma">${VN.thoat(x.ma)}</td>
       <td>${VN.thoat(x.tenLoai)}<small>${VN.thoat(x.moTa.length > 70 ? x.moTa.slice(0, 70) + '…' : x.moTa)}</small></td>
       <td><a class="lien-ket" href="${VN.url('qtDonHang', { ma: x.donHang })}">${VN.thoat(x.donHang)}</a></td>
-      <td>${VN.thoat(qt.tenKhachTheoId(x.khachHang, x.lienHe.sdt))}<small>${VN.thoat(x.lienHe.cach)} · ${VN.thoat(x.lienHe.sdt)}</small></td>
+      <td>${VN.thoat(qt.tenKhachTheoDon(x.donHang, x.lienHe.sdt))}<small>${VN.thoat(x.lienHe.cach)} · ${VN.thoat(x.lienHe.sdt)}</small></td>
       <td>${VN.ngayGio(x.luc)}${quaGio(x) ? '<small class="chu-do">Quá 24 giờ chưa liên hệ</small>' : ''}</td>
       <td>${nhan(x)}</td>
       <td><button type="button" class="nut nut--vien nut--rat-nho" data-xem="${VN.thoat(x.ma)}">Xử lý</button></td></tr>`).join('')}</tbody>`
@@ -37,7 +37,7 @@
   const veChiTiet = (ma) => {
     const x = VN.hoTro.tatCa().find((p) => p.ma === ma); if (!x) return;
     tt.ma = ma;
-    const d = VN.donHang.tatCa().find((o) => o.ma === x.donHang);
+    const d = qt.don.find((o) => o.ma === x.donHang);
     const sp = (x.sanPham || []).map((m) => d && d.sanPham.find((s) => s.ma === m)).filter(Boolean);
     const tiep = x.trangThai === 'Received' ? 'Processing' : 'Resolved';
     qt.moChiTiet(`Phản ánh ${x.ma}`, `
@@ -47,7 +47,7 @@
           <div><dt>Mô tả của khách</dt><dd>“${VN.thoat(x.moTa)}”</dd></div>
           ${sp.length ? `<div><dt>Sản phẩm</dt><dd>${sp.map((s) => `${VN.thoat(s.ten)} <small class="chu-phu">(${VN.thoat(s.ma)})</small>`).join('<br>')}</dd></div>` : ''}
           <div><dt>Đơn hàng</dt><dd><a class="lien-ket" href="${VN.url('qtDonHang', { ma: x.donHang })}">${VN.thoat(x.donHang)}</a>${d ? ` · ${VN.TRANG_THAI_DON[d.trangThai].ten} · ${VN.tien(d.tongTien)}` : ''}</dd></div>
-          <div><dt>Khách</dt><dd>${VN.thoat(qt.tenKhachTheoId(x.khachHang, x.lienHe.sdt))}</dd></div>
+          <div><dt>Khách</dt><dd>${VN.thoat(qt.tenKhachTheoDon(x.donHang, x.lienHe.sdt))}</dd></div>
           <div><dt>Liên hệ qua</dt><dd>${VN.thoat(x.lienHe.cach)} · <span class="so-deu">${VN.thoat(x.lienHe.sdt)}</span></dd></div>
         </dl>
         ${x.anh && x.anh.length ? `<div class="qt-anh">${x.anh.map((a, i) => `<a href="${a}" target="_blank" rel="noopener"><img src="${a}" alt="Ảnh minh chứng ${i + 1}"></a>`).join('')}</div>` : '<p class="chu-nho chu-phu">Khách không đính kèm ảnh.</p>'}
@@ -76,6 +76,9 @@
     if (ok) { ve(); veChiTiet(tt.ma); }
   });
   window.addEventListener('storage', VN.chongDoi((e) => { if (/^vinora\.hoTro$/.test(e.key || '')) ve(); }, 120));
-  ve();
-  if (tt.ma) { tt.tab = 'tat-ca'; ve(); veChiTiet(tt.ma); }
+  // The customer's name comes from the order, so draw once the orders are loaded
+  qt.sanSang.then(() => {
+    ve();
+    if (tt.ma) { tt.tab = 'tat-ca'; ve(); veChiTiet(tt.ma); }
+  });
 })();

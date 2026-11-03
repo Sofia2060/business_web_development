@@ -1,5 +1,6 @@
 """Public lookup data for the shop pages: categories, collections, ring size chart, gold prices.
-These replace the JSON files in frontend/mock-data/. No login needed."""
+These replace the category and collection JSON files that were in frontend/mock-data/ (the pages still read
+size-chart.json, not /api/ring-sizes). No login needed."""
 from flask import Blueprint, jsonify
 
 from ..db import query

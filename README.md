@@ -25,7 +25,7 @@ business_web_development/
 │   └── api/                   # mô tả endpoint
 │
 ├── frontend/                  # giao diện
-│   ├── index.html             # chuyển hướng tới trang chủ (gốc cho Live Server)
+│   ├── index.html             # chuyển hướng tới trang chủ
 │   ├── README.md
 │   ├── public/                # tài nguyên phục vụ nguyên trạng
 │   │   ├── fonts/
@@ -46,7 +46,7 @@ business_web_development/
 │   │       ├── core/          # hàm chung, API client, storage
 │   │       ├── components/
 │   │       └── pages/         # JS riêng từng trang
-│   └── mock-data/             # JSON/XML mẫu khi chưa có back-end
+│   └── mock-data/             # config, size-chart, provinces (.json), stores.xml: vài dữ liệu tĩnh các trang còn đọc
 │
 ├── backend/                   # Python (Flask)
 │   ├── app/
@@ -242,7 +242,7 @@ Các API này cần đăng nhập bằng tài khoản khách (`Customer`). Tài 
 | `PATCH /api/admin/products/<sku>` | Đổi `price`, `originalPrice` (null bỏ giảm giá), `status` (`Active`, `Hidden`, `Discontinued`). Giá chỉ cho sản phẩm giá cố định, sản phẩm giá theo vàng trả 409 |
 
 Điểm cần nhớ:
-- `checkoutToken` là một UUID do trình duyệt tạo cho mỗi lần thanh toán. Gửi lại cùng token (bấm đúp, mạng chậm) thì nhận lại đúng đơn cũ với mã 200, không tạo đơn thứ hai.
+- `checkoutToken` là một UUID do trình duyệt tạo cho mỗi lần thanh toán. Gửi lại cùng token (bấm đúp, mạng chậm) thì nhận lại đúng đơn cũ với mã 200, không tạo đơn thứ hai, kể cả khi giỏ đã rỗng vì đơn đó. Trang thanh toán dựa vào đó: nếu yêu cầu đặt hàng không có câu trả lời (mất mạng hoặc lỗi 5xx), trang giữ nguyên token, báo rằng chưa biết đơn đã có hay chưa, và lần bấm Đặt hàng tiếp theo gửi lại cùng token để nhận đơn cũ thay vì chuyển về giỏ hàng trống. Chỉ áp dụng khi chưa tải lại trang: token chỉ nằm trong bộ nhớ của trang. Khách có tài khoản tải lại trang vẫn thấy đơn trong mục Đơn hàng của tôi.
 - Phí giao hàng do server tính, không nhận từ trình duyệt: 30.000 đ, miễn phí khi tiền hàng từ 2.000.000 đ (tính trước khi giảm giá). Hằng số nằm ở `backend/app/config.py`.
 - Quy tắc hủy đơn (số tiền khách phải trả, sau voucher, nằm trong `fn_OnlineCancelLimit()`): **dưới 2.000.000 đ và không khắc chữ** thì khách tự hủy trên web (qua popup nhắc mất voucher). **Từ 2.000.000 đ, hoặc có khắc chữ** thì phải gọi hotline; nhân viên hỏi tình hình chế tác rồi hủy bằng API admin. Đơn đã bắt đầu chế tác thì không ai hủy được. Ví dụ: giá gốc 2.198.000 đ, voucher `GIAM300K` còn 1.898.000 đ thì tự hủy được; không voucher thì phải gọi hotline.
 - Hủy đơn có hai bước. Bước 1 (`/cancel`) chỉ tạo yêu cầu và cho biết voucher sẽ mất. Bước 2 (`/cancel/respond`) mới giữ hoặc hủy. Cột `CancelChannel` trong danh sách đơn cho biết trang nên hiện nút hủy (`Web`), dòng "gọi hotline" (`Hotline`) hay không hiện gì (`null`). Admin hủy đơn qua `POST /api/admin/orders/<mã đơn>/status` với `Cancelled`.
@@ -276,9 +276,9 @@ Khách chưa đăng nhập vẫn đặt hàng được. **Số điện thoại l
 | Địa chỉ | Việc làm |
 |---|---|
 | `GET /api/profile`, `PATCH /api/profile` | Hồ sơ khách (cần đăng nhập khách). Sửa `fullName`, `phone` (không trùng khách khác, trùng trả 409 `phone_in_use`), `dateOfBirth` (`YYYY-MM-DD`, trước hôm nay), `defaultRingSize` (có trong bảng size nhẫn). Chỉ trường có trong body mới đổi. `null` hoặc `""` xóa số điện thoại, ngày sinh, size. Một trường sai thì không lưu gì. Email và vai trò không đổi được ở đây |
-| `GET /api/categories` | Danh mục còn bán, kèm số sản phẩm (`ProductCount`). Thay `mock-data/categories.json` |
-| `GET /api/collections` | Bộ sưu tập kèm số sản phẩm, các danh mục (`Categories`) và tuổi vàng (`Materials`) có trong bộ sưu tập. Thay `mock-data/collections.json` |
-| `GET /api/ring-sizes` | Bảng quy đổi size nhẫn. Thay `mock-data/size-chart.json` |
+| `GET /api/categories` | Danh mục còn bán, kèm số sản phẩm (`ProductCount`). Thay file `categories.json` cũ (đã xóa) |
+| `GET /api/collections` | Bộ sưu tập kèm số sản phẩm, các danh mục (`Categories`) và tuổi vàng (`Materials`) có trong bộ sưu tập. Thay file `collections.json` cũ (đã xóa) |
+| `GET /api/ring-sizes` | Bảng quy đổi size nhẫn. Các trang vẫn đọc `mock-data/size-chart.json`, chưa dùng API này |
 | `GET /api/gold-prices` | Giá vàng đang có hiệu lực cho từng tuổi vàng (đồng một chỉ), cao nhất trước |
 | `POST /api/vouchers/check` | Kiểm tra mã giảm giá với giỏ hàng hiện tại. Khách đăng nhập: tính trên giỏ trong database. Khách chưa đăng nhập gửi giỏ của trình duyệt trong `items` (cùng dạng với đơn không tài khoản), thiếu cả đăng nhập lẫn `items` trả 401. Body: `code`. Thành công trả `discount`. Mã không có, đã tắt hoặc chưa tới ngày trả 404. Hết hạn, hết lượt hoặc chưa đủ tiền tối thiểu trả 409 kèm `reason` (`expired`, `used_up`, `min_order`). Cách tính giống `sp_PlaceOrder`; việc đặt hàng mới là lúc giảm giá được chốt |
 | `POST /api/recently-viewed` | Ghi nhận khách vừa mở một sản phẩm. Body: `sku`. Trả 204 (`sp_TrackProductView`) |
