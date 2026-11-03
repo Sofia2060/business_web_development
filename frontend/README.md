@@ -4,15 +4,11 @@ Không cần Python/Flask. Chỉ gồm HTML + CSS + JavaScript + dữ liệu JSO
 Các trang không dùng `<!DOCTYPE html>` và thẻ `<meta>` (khung nhìn điện thoại được thêm bằng một đoạn script nhỏ trong `<head>`).
 
 ## Cách mở
-Cách chính (có API và database): chạy `uv run python backend/run.py` ở gốc repo rồi mở `http://127.0.0.1:5000/`. Flask phục vụ thư mục này, xem README ở gốc repo.
+Chạy `uv run python backend/run.py` ở gốc repo rồi mở `http://127.0.0.1:5000/`. Flask phục vụ thư mục này và API ở cùng một địa chỉ, xem README ở gốc repo.
 
-Cách chỉ xem giao diện giả lập (không cần database):
-1. Mở thư mục `frontend` bằng VS Code.
-2. Cài tiện ích **Live Server** (Ritwick Dey) nếu chưa có.
-3. Chuột phải `index.html` (ở gốc `frontend/`) → **Open with Live Server**. File này tự chuyển tới `src/pages/client/index.html`.
-
-> Phải mở thư mục `frontend` làm gốc server, vì các trang dùng đường dẫn tương đối `../../../mock-data/` và `../../../public/`.
-> Không bấm đúp mở file `.html` trực tiếp (đường dẫn `file://`): trình duyệt chặn AJAX đọc `mock-data/*.json` và `stores.xml`, trang sẽ không có sản phẩm.
+> Các trang khách lấy sản phẩm, tài khoản, giỏ hàng và đơn hàng từ API (`/api/...`), nên không còn chạy riêng bằng Live Server hay bấm đúp file `.html`.
+> Chỉ còn đọc từ thư mục `mock-data/`: `config.json` (nhãn và quy tắc hiển thị), `size-chart.json`, `provinces.json`, `stores.xml`.
+> `categories.json`, `collections.json` không còn trang nào đọc, `products.json` cũng không còn trang nào đọc (trang quản trị sản phẩm đã nối API). Giữ lại vì test đối chiếu dữ liệu API với dữ liệu gốc; sẽ xóa ở bước dọn dẹp (C9).
 
 ## Cấu trúc
 ```
@@ -61,17 +57,17 @@ Chỉ có **một ô đăng nhập** (trang Tài khoản – bấm icon tài kho
 
 - Mỗi trình duyệt chỉ giữ **một phiên**: đăng nhập quản trị sẽ thoát tài khoản khách và ngược lại. Giao diện khách không có bất kỳ đường dẫn nào tới trang quản trị.
 - Ai mở thẳng địa chỉ trang quản trị mà chưa đăng nhập quản trị (kể cả đang đăng nhập tài khoản khách) sẽ bị đưa về ô đăng nhập; đăng nhập đúng tài khoản quản trị mới vào được.
-Admin dùng chung dữ liệu với cửa hàng (localStorage của cùng trình duyệt; cửa sổ ẩn danh hay trình duyệt khác là dữ liệu riêng). Khi trình bày: thao tác bằng tài khoản khách (hoặc đặt hàng không cần tài khoản), rồi đăng nhập quản trị trong cùng trình duyệt để xử lý – mở song song một thẻ cửa hàng (khách vãng lai) và một thẻ quản trị thì bên này thao tác, bên kia tự cập nhật.
+Đơn hàng của admin lấy từ máy chủ (API `/api/admin/orders`), nên đặt hàng ở trình duyệt nào cũng thấy; trang admin chỉ cập nhật khi tải lại hoặc sau mỗi thao tác của admin. Chỉ trang Phản ánh còn dùng dữ liệu mô phỏng trong localStorage của trình duyệt đó. Các trang còn lại lấy từ API `/api/admin/...`.
 
 | Trang | Chức năng |
 |---|---|
-| Tổng quan | Doanh thu đã thu, đơn mới, đơn chờ xử lý, phản ánh mở, điểm đánh giá; biểu đồ doanh thu 14 ngày; việc cần xử lý; đơn mới; sản phẩm bán chạy; nút tạo dữ liệu mẫu |
-| Đơn hàng | Lọc theo trạng thái / thanh toán, tìm theo mã – tên – SĐT; xác nhận đã nhận tiền chuyển khoản, xác nhận & giao hàng, giao thành công (kích hoạt thẻ bảo hành), hủy đơn chưa thanh toán, xác nhận đã hoàn tiền (xem đủ số tài khoản khách cung cấp), ghi chú nội bộ, nhật ký |
-| Phản ánh | Xem mô tả, ảnh minh chứng; chuyển Đã tiếp nhận → Đang xử lý → Đã giải quyết kèm nội dung gửi khách (khách thấy trong đơn hàng) |
-| Bảo hành & lịch hẹn | Xác nhận / hoàn tất / hủy lịch hẹn (tự trừ lượt với dịch vụ có giới hạn, cập nhật size sau khi chỉnh size); danh sách thẻ bảo hành |
-| Sản phẩm | 443 mẫu, lọc – tìm – phân trang; sửa giá bán, giá trước giảm, ngừng bán (áp dụng ngay cho cửa hàng) |
-| Khách hàng | Gộp khách có tài khoản và khách mua bằng SĐT: số đơn, đã chi, thẻ bảo hành, lịch sử mua |
-| Đánh giá | Điểm trung bình, phân bố sao, phân loại tích cực / tiêu cực tự động (chỉ admin thấy), phản hồi khách |
+| Tổng quan (đơn hàng và doanh thu đã nối API) | Doanh thu đã thu, đơn mới, đơn chờ xử lý, phản ánh mở, điểm đánh giá (hai mục này còn là dữ liệu mô phỏng); biểu đồ doanh thu 14 ngày; việc cần xử lý; đơn mới; sản phẩm bán chạy |
+| Đơn hàng (đã nối API) | Lọc theo trạng thái / thanh toán, tìm theo mã – tên – SĐT; xác nhận đã nhận tiền chuyển khoản, xác nhận đơn, bắt đầu chế tác, bàn giao vận chuyển, giao thành công (kích hoạt thẻ bảo hành), hủy đơn, nhật ký. Chưa có hoàn tiền hai bước và ghi chú nội bộ (database không có) |
+| Phản ánh (dữ liệu mô phỏng, chưa có bảng trong database) | Xem mô tả, ảnh minh chứng; chuyển Đã tiếp nhận → Đang xử lý → Đã giải quyết kèm nội dung gửi khách (khách thấy trong đơn hàng) |
+| Bảo hành & lịch hẹn (đã nối API) | Xác nhận lịch khách chọn, đề xuất giờ khác, hoàn tất (database trừ lượt, quyết định miễn phí hay tính phí), hủy lịch; danh sách thẻ bảo hành kèm lượt đã dùng |
+| Sản phẩm (đã nối API) | 443 mẫu, lọc – tìm – phân trang; sửa giá bán, giá trước giảm, trạng thái đang bán / đã ẩn / ngừng bán (lưu vào database; sản phẩm giá theo vàng chỉ đổi được trạng thái) |
+| Khách hàng (đã nối API) | Khách có tài khoản và khách mua bằng SĐT: số đơn, đã chi, thẻ bảo hành, lịch sử mua |
+| Đánh giá (đã nối API) | Điểm trung bình, phân bố sao, nhãn tích cực / tiêu cực (mô phỏng, chỉ admin thấy), các yếu tố khách nhắc tới. Chưa có phản hồi của cửa hàng |
 
 Các nút “Mô phỏng: …” trước đây ở giao diện khách (cửa hàng giao hàng, ngân hàng báo có, showroom xác nhận, CSKH xử lý, kế toán hoàn tiền) đã bỏ – những việc này giờ làm ở trang quản trị.
 

@@ -476,6 +476,36 @@ def test_admin_order_list_filters_and_pages(client):
         assert admin.get(f"/api/admin/orders?{bad}").status_code == 400
 
 
+def test_admin_order_list_rows_have_items_and_payment_times(client):
+    c, addr = new_customer()
+    code = place(c, addr, MID, method="VNPay")["OrderCode"]
+    row = new_admin().get("/api/admin/orders?limit=5").get_json()["items"][0]
+    assert row["OrderCode"] == code and row["PaymentMethod"] == "VNPay" and row["PaymentStatus"] == "Pending"
+    assert row["PaymentDeadline"] and row["PaidAt"] is None            # an unpaid online order has a deadline
+    assert row["ShipRecipientName"] and row["ShipPhone"] and "OrderID" not in row
+    (item,) = row["items"]
+    assert item["SKUSnap"] == MID and item["Quantity"] == 1 and item["UnitPrice"] > 0 and item["ProductSKU"]
+
+
+def test_admin_reads_one_order_in_full(client):
+    c, addr = new_customer()
+    code = place(c, addr, MID)["OrderCode"]
+    admin = new_admin()
+    order = admin.get(f"/api/admin/orders/{code}").get_json()
+    assert order["OrderCode"] == code and order["items"][0]["SKUSnap"] == MID and order["payments"][0]["PaymentMethod"] == "COD"
+    assert order["ShipAddress"] and "OrderID" not in order
+    assert order["customer"]["IsGuest"] is False and order["customer"]["CustomerEmail"].endswith("@example.test")
+    assert order == {**c.get(f"/api/orders/{code}").get_json(), "customer": order["customer"]}      # same order as the customer sees
+    assert admin.get("/api/admin/orders/VN000000000").status_code == 404
+
+
+def test_customer_cannot_read_an_admin_order(client):
+    c, addr = new_customer()
+    code = place(c, addr, MID)["OrderCode"]
+    assert c.get(f"/api/admin/orders/{code}").status_code == 403
+    assert client.get(f"/api/admin/orders/{code}").status_code == 401
+
+
 # ---------------- cases found in code review ----------------
 
 def test_address_id_above_int_range_is_400(client):
@@ -606,3 +636,19 @@ def test_a_quote_only_product_cannot_be_put_in_the_cart(client):
     res = add_to_cart(c, "MDBZ036-VV")                 # 24K pendant priced by the gold price of the day
     assert res.status_code == 409 and res.get_json()["reason"] == "quote_only"
     assert c.get("/api/cart").get_json()["items"] == []
+
+
+def test_order_list_carries_the_items_of_each_order(client):
+    c, addr = new_customer()
+    first = place(c, addr, SMALL, quantity=2)["OrderCode"]
+    second = place(c, addr, MID)["OrderCode"]
+    listed = c.get("/api/orders").get_json()
+    assert [o["OrderCode"] for o in listed] == [second, first]               # newest first
+    assert all("OrderID" not in o for o in listed)                            # the internal id stays inside
+    by_code = {o["OrderCode"]: o["items"] for o in listed}
+    assert [(i["ProductSKU"], i["Quantity"], i["LineTotal"]) for i in by_code[first]] == [("PSMEOTHANTAI", 2, 278000)]
+    assert [(i["SKUSnap"], i["Quantity"]) for i in by_code[second]] == [(MID, 1)]
+    one = by_code[second][0]
+    assert {"ProductNameSnap", "MaterialSnap", "GoldColor", "RingSize", "EngravingText", "EngravingStyle",
+            "UnitPrice"} <= one.keys()
+    assert c.get(f"/api/orders/{second}").get_json()["items"][0]["ProductNameSnap"] == one["ProductNameSnap"]

@@ -16,17 +16,6 @@
         "thoiGian": "2 – 4 ngày làm việc",
         "apDung": "toan-quoc",
         "mienPhiTheoDon": true
-      },
-      {
-        "ma": "hoa-toc",
-        "ten": "Giao hỏa tốc trong ngày",
-        "phi": 60000,
-        "thoiGian": "Trong 4 giờ với đơn xác nhận trước 16:00",
-        "apDung": [
-          "Thành phố Hồ Chí Minh",
-          "Thành phố Hà Nội"
-        ],
-        "mienPhiTheoDon": false
       }
     ]
   },
@@ -58,26 +47,19 @@
   ],
   "maUuDai": [
     {
-      "ma": "VINORA5",
-      "moTa": "Giảm 5% (tối đa 1.000.000 ₫) cho đơn từ 5.000.000 ₫",
-      "loai": "phan-tram",
-      "giaTri": 5,
-      "toiDa": 1000000,
-      "donToiThieu": 5000000
-    },
-    {
-      "ma": "CHAOBAN200",
-      "moTa": "Giảm 200.000 ₫ cho đơn từ 2.000.000 ₫",
-      "loai": "so-tien",
-      "giaTri": 200000,
+      "ma": "WELCOME5",
+      "moTa": "Giảm 5% (tối đa 1.000.000 ₫) cho đơn từ 2.000.000 ₫",
       "donToiThieu": 2000000
     },
     {
-      "ma": "FREESHIP",
-      "moTa": "Miễn phí mọi phương thức giao hàng",
-      "loai": "mien-phi-giao",
-      "giaTri": 0,
-      "donToiThieu": 0
+      "ma": "GIAM300K",
+      "moTa": "Giảm 300.000 ₫ cho đơn từ 2.000.000 ₫",
+      "donToiThieu": 2000000
+    },
+    {
+      "ma": "VINORA500K",
+      "moTa": "Giảm 500.000 ₫ cho đơn từ 10.000.000 ₫",
+      "donToiThieu": 10000000
     }
   ],
   "hoanTien": {

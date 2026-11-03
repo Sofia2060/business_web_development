@@ -11,7 +11,7 @@
   if (trang === 'lien-he') {
     const banDo = VN.$('#ban-do');
     const datBanDo = (c) => { banDo.src = 'https://maps.google.com/maps?q=' + encodeURIComponent(c.banDo) + '&z=15&output=embed'; };
-    Promise.all([VN.duLieu.cuaHang(), VN.duLieu.cauHinh()]).then(([ds, ch]) => {
+    Promise.all([VN.duLieu.cuaHang(), VN.duLieu.cauHinh(), VN.sanSang]).then(([ds, ch]) => {      // VN.sanSang: để biết khách đã đăng nhập chưa (điền sẵn biểu mẫu)
       VN.$('#lh-mo-ta').textContent = `Hotline ${ch.thuongHieu.hotline} · ${ch.thuongHieu.email} · ${ch.thuongHieu.gioLamViec}.${ch.thuongHieu.ghiChu ? ' ' + ch.thuongHieu.ghiChu : ''}`;
       VN.$('#ds-showroom').innerHTML = ds.map((c, i) => `<button type="button" class="the-showroom${i === 0 ? ' dang-chon' : ''}" data-cua-hang="${VN.thoat(c.ma)}" aria-pressed="${i === 0}">
         <strong>${VN.thoat(c.ten)}</strong><span>${VN.bt('ghim', 'bt--nho')} ${VN.thoat(c.diaChi)}</span><span>${VN.bt('dong-ho', 'bt--nho')} ${VN.thoat(c.gioMoCua)} · ${VN.bt('dien-thoai', 'bt--nho')} ${VN.thoat(c.dienThoai)}</span></button>`).join('');

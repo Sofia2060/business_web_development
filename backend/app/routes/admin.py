@@ -6,6 +6,7 @@ from flask import Blueprint, g, jsonify, request
 from ..auth import admin_required
 from ..db import call, query
 from ..validation import body, page_number, text, utf16_len
+from .orders import order_detail
 
 bp = Blueprint("admin", __name__, url_prefix="/api/admin")
 
@@ -22,27 +23,54 @@ def list_users():
         "SELECT UserID, FullName, Email, Role, IsActive, LastLoginAt, CreatedAt FROM dbo.Users ORDER BY UserID"))
 
 
+_CUSTOMER_COLUMNS = ("c.CustomerID, COALESCE(u.FullName, o.ShipRecipientName) AS CustomerName, u.Email AS CustomerEmail, c.Phone AS CustomerPhone, "
+                     "CAST(CASE WHEN c.UserID IS NULL THEN 1 ELSE 0 END AS BIT) AS IsGuest")
+
+
 @bp.get("/orders")
 @admin_required
 def list_orders():
-    """All orders, newest first. Query: status, page, limit (max 100)."""
+    """All orders, newest first, each with its items. Query: status, page, limit (max 100)."""
     status = request.args.get("status")
     page, limit = page_number(request.args.get("page"), 1), page_number(request.args.get("limit"), 20)
     if (status and status not in ORDER_STATUSES) or not page or not limit or limit > 100:
         return jsonify(error="Invalid query parameter"), 400
     where, params = ("WHERE o.OrderStatus = ?", (status,)) if status else ("", ())
     total = query(f"SELECT COUNT(*) AS n FROM dbo.Orders o {where}", params)[0]["n"]
-    items = query(
-        "SELECT o.OrderCode, o.CreatedAt, o.OrderStatus, o.TotalAmount, "
-        "COALESCE(u.FullName, o.ShipRecipientName) AS CustomerName, u.Email AS CustomerEmail, c.Phone AS CustomerPhone, "
-        "CAST(CASE WHEN c.UserID IS NULL THEN 1 ELSE 0 END AS BIT) AS IsGuest, p.PaymentMethod, p.Status AS PaymentStatus, "
+    orders = query(
+        "SELECT o.OrderID, o.OrderCode, o.CreatedAt, o.OrderStatus, o.TotalAmount, o.ShipRecipientName, o.ShipPhone, "
+        f"{_CUSTOMER_COLUMNS}, p.PaymentMethod, p.Status AS PaymentStatus, p.PaidAt, h.PaymentDeadline, "
         "o.ProductionStartedAt FROM dbo.Orders o JOIN dbo.Customers c ON c.CustomerID = o.CustomerID "
         "LEFT JOIN dbo.Users u ON u.UserID = c.UserID "
-        "OUTER APPLY (SELECT TOP (1) PaymentMethod, Status FROM dbo.Payments WHERE OrderID = o.OrderID "
+        "JOIN dbo.vw_CustomerOrderHistory h ON h.OrderID = o.OrderID "
+        "OUTER APPLY (SELECT TOP (1) PaymentMethod, Status, PaidAt FROM dbo.Payments WHERE OrderID = o.OrderID "
         f"ORDER BY PaymentID DESC) p {where} "
         "ORDER BY o.OrderID DESC OFFSET ? ROWS FETCH NEXT ? ROWS ONLY",
         params + ((page - 1) * limit, limit))
-    return jsonify(total=total, page=page, limit=limit, items=items)
+    items: dict[int, list] = {}
+    if orders:
+        marks = ", ".join("?" * len(orders))      # the ids come from the query above, never from the request
+        for item in query(
+                "SELECT oi.OrderID, oi.ProductNameSnap, oi.SKUSnap, oi.GoldColor, oi.RingSize, oi.Quantity, oi.UnitPrice, "
+                "p.SKU AS ProductSKU FROM dbo.OrderItems oi JOIN dbo.Products p ON p.ProductID = oi.ProductID "
+                f"WHERE oi.OrderID IN ({marks}) ORDER BY oi.OrderID, oi.OrderItemID", tuple(o["OrderID"] for o in orders)):
+            items.setdefault(item.pop("OrderID"), []).append(item)
+    for order in orders:
+        order["items"] = items.get(order.pop("OrderID"), [])
+    return jsonify(total=total, page=page, limit=limit, items=orders)
+
+
+@bp.get("/orders/<code>")
+@admin_required
+def get_order(code: str):
+    """One order in full: items, payments, addresses and times, plus who the customer is."""
+    order = order_detail(code)
+    if not order:
+        return jsonify(error="Order not found"), 404
+    order["customer"] = query(
+        f"SELECT {_CUSTOMER_COLUMNS} FROM dbo.Orders o JOIN dbo.Customers c ON c.CustomerID = o.CustomerID "
+        "LEFT JOIN dbo.Users u ON u.UserID = c.UserID WHERE o.OrderCode = ?", (code,))[0]
+    return jsonify(order)
 
 
 @bp.post("/orders/<code>/status")

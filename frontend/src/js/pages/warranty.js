@@ -12,7 +12,7 @@
   const VN = window.Vinora;
   const khu = VN.$('#khu-bh');
   if (!khu) return;
-  const u = VN.taiKhoan.hienTai();
+  let u = null;      // khách có tài khoản (gán khi đã tải phiên đăng nhập)
   const tt = { ch: null, cuaHang: [], the: null, tab: 'the' };
   const TAB = { the: 'bang-the', 'lich-hen': 'bang-lich', 'tra-cuu': 'bang-tra' };
 
@@ -41,7 +41,7 @@
   const conLaiChu = (the, q) => { const n = VN.baoHanh.conLai(the, tt.ch, q.ma); return n === Infinity ? q.hienThi : `${n}/${q.luot} lượt`; };
   /** Thẻ hiển thị: của tài khoản, hoặc (khách chưa đăng nhập) thẻ của các đơn đã mở trên trình duyệt này */
   const dsThe = () => (u ? VN.baoHanh.cuaToi() : VN.baoHanh.tatCa().filter((t) => !t.khachHang && VN.donHang.coQuyen(t.donHang)).sort((a, b) => new Date(b.ngayKichHoat) - new Date(a.ngayKichHoat)));
-  const chuTheCua = (the) => { if (u) return u.hoTen; const d = VN.donHang.lay(the.donHang); return d ? d.nguoiNhan.hoTen : ''; };
+  const chuTheCua = (the) => { if (u) return u.hoTen; const d = VN.donHang.lay(the.donHang); return d && d.nguoiNhan ? d.nguoiNhan.hoTen : ''; };
   const veDsThe = () => {
     const ds = dsThe();
     VN.$$('[data-dem-the]').forEach((x) => { x.textContent = ds.length || ''; });
@@ -306,5 +306,5 @@
     }
     if (traMa) { VN.$('#o-tra-cuu').value = traMa; moTab('tra-cuu', false); VN.$('#form-tra-cuu').requestSubmit(); }
   };
-  if (u && u.email === VN.DEMO.email) VN.demo.damBaoDuLieu(u.id).then(batDau); else batDau();
+  VN.sanSang.then(() => { u = VN.taiKhoan.hienTai(); batDau(); });
 })();

@@ -448,16 +448,17 @@
 
   <h2>Hạn thanh toán trực tuyến</h2>
   <ul class="ds-cham">
-    <li>Đơn chọn chuyển khoản VietQR, VNPay hoặc MoMo cần hoàn tất thanh toán trong <strong>24 giờ</strong> kể từ lúc đặt. Thời gian còn lại hiển thị ngay trên đơn hàng.</li>
-    <li>Quá 24 giờ chưa nhận được thanh toán, hệ thống <strong>tự động hủy đơn</strong> để trả lại hàng giữ chỗ. Bạn có thể chuyển sang thanh toán khi nhận hàng bất cứ lúc nào trước hạn.</li>
+    <li>Đơn chọn chuyển khoản VietQR, VNPay hoặc MoMo cần hoàn tất thanh toán trong <strong>15 phút</strong> kể từ lúc đặt. Thời gian còn lại hiển thị ngay trên đơn hàng.</li>
+    <li>Quá 15 phút chưa nhận được thanh toán, đặt hàng được xem là không thành công: hệ thống <strong>tự động hủy đơn</strong> và trả lại hàng giữ chỗ. Bạn vẫn có thể đặt lại sản phẩm bất cứ lúc nào. Đơn thanh toán khi nhận hàng (COD) không bị giới hạn thời gian này.</li>
   </ul>
 
   <h2>Hủy đơn &amp; hoàn tiền</h2>
   <ul class="ds-cham">
-    <li>Bạn có thể tự hủy đơn trong mục <a class="lien-ket" href="orders.html">Đơn hàng</a> khi đơn còn ở trạng thái <strong>Chờ xử lý</strong>. Nếu chỉ cần đổi size, chữ khắc, địa chỉ hay ngày giao, hãy gửi yêu cầu điều chỉnh đơn thay vì hủy.</li>
+    <li>Đơn <strong>dưới 2.000.000 ₫ và không có sản phẩm khắc chữ</strong>: bạn tự hủy trong mục <a class="lien-ket" href="orders.html">Đơn hàng</a> khi đơn chưa chế tác. Hệ thống sẽ nhắc nếu đơn đang dùng voucher: hủy là mất voucher, đặt lại chỉ còn giá gốc. Bạn chọn giữ đơn hoặc vẫn hủy.</li>
+    <li>Đơn <strong>từ 2.000.000 ₫ hoặc có sản phẩm khắc chữ</strong>: không tự hủy được trên website vì đơn có giá trị cao hoặc được chế tác riêng. Vui lòng gọi hotline <strong>1900 0000</strong> để được hỗ trợ.</li>
+    <li>Đơn đã bắt đầu chế tác hoặc đã bàn giao vận chuyển: không thể hủy. Nếu chỉ cần đổi size, chữ khắc, địa chỉ hay ngày giao, hãy gửi yêu cầu điều chỉnh đơn.</li>
     <li>Đơn chưa thanh toán: hủy ngay, không phát sinh chi phí.</li>
-    <li>Đơn đã thanh toán trực tuyến: ngân hàng không hỗ trợ trả ngược tiền về nguồn thanh toán, vì vậy khi hủy bạn cung cấp <strong>tài khoản ngân hàng nhận hoàn tiền</strong>. Vinora chuyển khoản hoàn tiền trong <span id="hoan-tien-tg">3 – 5 ngày làm việc</span> và cập nhật trạng thái trên đơn hàng.</li>
-    <li>Đơn đã bàn giao vận chuyển (Đang giao) không thể hủy trên website; vui lòng gửi phản ánh hoặc gọi hotline để được hỗ trợ.</li>
+    <li>Đơn đã thanh toán trực tuyến: khi hủy, số tiền đã thanh toán được hoàn lại và trạng thái thanh toán trên đơn chuyển sang Đã hoàn tiền. Thời gian tiền về tài khoản tùy ngân hàng, thường <span id="hoan-tien-tg">3 – 5 ngày làm việc</span>.</li>
   </ul>
 
   <h2>Nhận hàng</h2>
@@ -594,6 +595,8 @@
   </dialog>
 
   <script src="../../js/core/common.js" defer></script>
+  <script src="../../js/core/api.js" defer></script>
+  <script src="../../js/core/session.js" defer></script>
   <script src="../../js/pages/info.js" defer></script>
 </body>
 </html>

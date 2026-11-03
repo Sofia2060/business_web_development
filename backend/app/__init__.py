@@ -1,5 +1,6 @@
 import os
 import posixpath
+from datetime import timedelta
 
 import pyodbc
 from dotenv import load_dotenv
@@ -27,6 +28,7 @@ PROC_ERROR_STATUS = {
     50049: 409,                          # order is being crafted: nobody can cancel it
     50050: 409,                          # payment for an order that is cancelled or past the payment time limit
     50051: 409,                          # production can only start on a confirmed order
+    50031: 409, 50035: 409, 50036: 409, 50037: 409,   # after-sales: card not valid, appointment in the wrong status
 }
 
 
@@ -43,6 +45,7 @@ def create_app() -> Flask:
     if not app.secret_key or len(app.secret_key) < 32:
         raise RuntimeError("SECRET_KEY is missing or shorter than 32 characters. Copy .env.example to .env and set a random value.")
     app.config["SESSION_COOKIE_SAMESITE"] = "Lax"  # blocks the cookie on cross-site POSTs
+    app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=14)  # for "remember me" logins
     app.config["MAX_CONTENT_LENGTH"] = 16 * 1024  # reject huge request bodies
 
     @app.before_request
@@ -93,7 +96,7 @@ def create_app() -> Flask:
         app.logger.exception("Database error")
         return jsonify(error="Database error. Please try again."), 500
 
-    from .routes import addresses, admin, auth, cart, catalog, orders, products, profile, recently_viewed, vouchers
-    for module in (products, catalog, auth, profile, admin, addresses, cart, vouchers, orders, recently_viewed):
+    from .routes import addresses, admin, admin_shop, auth, cart, catalog, orders, products, profile, recently_viewed, vouchers
+    for module in (products, catalog, auth, profile, admin, admin_shop, addresses, cart, vouchers, orders, recently_viewed):
         app.register_blueprint(module.bp)
     return app

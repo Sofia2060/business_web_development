@@ -93,3 +93,11 @@ def test_unknown_api_paths_and_wrong_methods_answer_in_json(client):
 def test_missing_page_keeps_the_normal_error_page(client):
     res = client.get("/src/pages/client/not-a-page.html")
     assert res.status_code == 404 and not res.is_json
+
+
+@pytest.mark.parametrize("page", PAGES)
+def test_every_page_loads_the_shop_scripts_in_order(page):
+    """common.js first, then api.js (fetch client and adapters), then session.js (account, cart, orders), then the page's own script.
+    A page without them would fail at run time (VN.api and VN.sanSang would not exist)."""
+    scripts = re.findall(r'<script src="[^"]*?js/((?:core|pages|components|admin)/[\w.-]+\.js)"', (FRONTEND_DIR / page).read_text(encoding="utf-8"))
+    assert scripts[:3] == ["core/common.js", "core/api.js", "core/session.js"], scripts

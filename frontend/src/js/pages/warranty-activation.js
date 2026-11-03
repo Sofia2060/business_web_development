@@ -9,14 +9,16 @@
   const VN = window.Vinora;
   const khungThe = VN.$('#kh-ds-the');
   if (!khungThe) return;
-  const u = VN.taiKhoan.hienTai();
+  let u = null;      // khách có tài khoản (gán khi đã tải phiên đăng nhập)
   const maDon = VN.thamSo('don') || '';
   const CHU_SAO = ['', 'Rất không hài lòng', 'Chưa hài lòng', 'Bình thường', 'Hài lòng', 'Tuyệt vời'];
   const CHU_DE = { tot: ['Độ sáng bóng', 'Đóng gói sang trọng', 'Chữ khắc đẹp', 'Đúng size', 'Giao hàng đúng hẹn', 'Tư vấn tận tình'], chua: ['Nhầm size nhẫn', 'Giao trễ giờ kỷ niệm', 'Sản phẩm trầy xước', 'Chữ khắc chưa đẹp'] };
 
   const batDau = async () => {
+    await VN.sanSang;
+    u = VN.taiKhoan.hienTai();
     const ch = await VN.duLieu.cauHinh();
-    const don = VN.donHang.lay(maDon);
+    const don = await VN.donHang.napMot(maDon).catch(() => null);   // đơn lấy từ máy chủ; thẻ bảo hành vẫn lưu trên trình duyệt (chờ nối API)
     if (!don || don.trangThai !== 'Delivered') {
       VN.$('#kh-td').textContent = don ? 'Đơn hàng chưa ở trạng thái Đã nhận' : 'Không tìm thấy đơn hàng';
       VN.$('#kh-mo-ta').textContent = don ? 'Thẻ bảo hành được kích hoạt khi bạn bấm “Đã nhận được hàng” trên đơn đang giao.' : 'Vui lòng mở trang này từ mục Đơn hàng, hoặc tra cứu đơn bằng mã đơn và số điện thoại.';
@@ -74,5 +76,5 @@
     });
   };
 
-  if (u && u.email === VN.DEMO.email) VN.demo.damBaoDuLieu(u.id).then(batDau); else batDau();
+  batDau();
 })();

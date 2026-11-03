@@ -1,93 +1,89 @@
 /* =====================================================================
-   QUẢN TRỊ – SẢN PHẨM
-   Danh mục gốc đọc từ ../../../mock-data/products.json (AJAX). Chỉnh giá bán, giá gốc (để hiện giảm giá)
-   và ngừng bán được lưu thành bản ghi đè 'qtSanPham' – cửa hàng áp dụng ngay khi tải dữ liệu
-   (VN.duLieu.sanPham trong chung.js). Back-end thật sẽ cập nhật thẳng vào cơ sở dữ liệu.
+   QUẢN TRỊ – SẢN PHẨM (nối API /api/admin/products)
+   Danh sách có cả sản phẩm đã ẩn và ngừng bán. Sửa giá bán, giá trước giảm (để hiện giảm giá) và trạng thái,
+   lưu thẳng vào database. Cửa hàng giữ danh mục 5 phút trong trình duyệt nên thấy giá mới sau thời gian đó (hoặc khi mở tab mới).
+   Sản phẩm giá theo giá vàng chỉ báo giá, không có giá bán để sửa: chỉ đổi được trạng thái.
    ===================================================================== */
 (function () {
   'use strict';
   const VN = window.Vinora; const qt = VN.qt;
   if (!qt || qt.chan || !VN.$('#qt-sp-bang')) return;
-  const tt = { tatCa: [], dm: {}, bst: {}, locDm: '', locTt: '', tim: '', trang: 1, banRa: {} };
-  const sua = () => VN.kho.doc('qtSanPham', {});
+  const tt = { tatCa: [], dm: {}, locDm: '', locTt: '', tim: '', trang: 1 };
+  const TEN_TT = { Active: ['Đang bán', 'nhan--ngoc'], Hidden: ['Đã ẩn', 'nhan--cam'], Discontinued: ['Ngừng bán', 'nhan--do'] };
   const ten = (s) => (tt.dm[s.danhMuc] || {}).ten || '';
 
+  /** Một sản phẩm của API -> sản phẩm dạng trang dùng */
+  const sanPhamTuApi = (p) => {
+    const giaCu = p.OriginalPrice && p.Price && p.OriginalPrice > p.Price ? p.OriginalPrice : null;
+    return {
+      ma: p.SKU, ten: p.ProductName, danhMuc: p.CategoryID, chatLieu: p.Material, coDinh: p.PricingMethod === 'Fixed', baoGia: !!p.IsQuoteOnly,
+      gia: p.Price, giaCu, giam: giaCu ? Math.round((giaCu - p.Price) * 100 / giaCu) : null, trangThai: p.Status, anh: p.ImageUrl, daBan: p.SoldQuantity,
+    };
+  };
+  const dangBan = (s) => s.trangThai === 'Active';
+
   const ve = () => {
-    const ghiDe = sua();
     const ds = tt.tatCa;
     VN.$('#qt-sp-so').innerHTML = [
       ['', 'Tổng mẫu', ds.length, `${Object.keys(tt.dm).length} danh mục`],
-      ['ngoc', 'Đang bán', ds.filter((s) => !s.ngungBan).length, `${ds.filter((s) => !s.ngungBan && s.loaiGia === 'gia_cong').length} mẫu báo giá theo giá vàng`],
-      ['do', 'Ngừng bán', ds.filter((s) => s.ngungBan).length, 'Ẩn khỏi cửa hàng'],
-      ['cam', 'Đang giảm giá', ds.filter((s) => !s.ngungBan && s.giaCu).length, `${Object.keys(ghiDe).length} mẫu đã chỉnh sửa`],
+      ['ngoc', 'Đang bán', ds.filter(dangBan).length, `${ds.filter((s) => dangBan(s) && s.baoGia).length} mẫu chỉ báo giá`],
+      ['do', 'Ẩn hoặc ngừng bán', ds.filter((s) => !dangBan(s)).length, 'Không hiện ở cửa hàng'],
+      ['cam', 'Đang giảm giá', ds.filter((s) => dangBan(s) && s.giaCu).length, 'Có giá trước giảm'],
     ].map(([lop, t, so, phu]) => `<div class="qt-o-so${lop ? ' qt-o-so--' + lop : ''}"><span>${t}</span><strong>${so}</strong><small>${phu}</small></div>`).join('');
     const tu = VN.khongDau(tt.tim);
     const loc = ds.filter((s) => (!tt.locDm || String(s.danhMuc) === tt.locDm)
-      && (!tt.locTt || (tt.locTt === 'ban' && !s.ngungBan) || (tt.locTt === 'ngung' && s.ngungBan) || (tt.locTt === 'giam' && s.giaCu) || (tt.locTt === 'cong' && s.loaiGia === 'gia_cong') || (tt.locTt === 'sua' && ghiDe[s.ma]))
+      && (!tt.locTt || (tt.locTt === 'ban' && dangBan(s)) || (tt.locTt === 'ngung' && !dangBan(s)) || (tt.locTt === 'giam' && s.giaCu) || (tt.locTt === 'cong' && s.baoGia))
       && (!tu || VN.khongDau(s.ma + ' ' + s.ten).includes(tu)));
     const p = qt.phanTrang(loc, tt.trang, 20); tt.trang = p.trang;
     VN.$('#qt-sp-bang').innerHTML = loc.length ? `<thead><tr><th>Sản phẩm</th><th>Danh mục</th><th>Chất liệu</th><th class="so">Giá bán</th><th class="so">Giá gốc</th><th class="so">Đã bán</th><th>Trạng thái</th><th></th></tr></thead><tbody>${p.muc.map((s) => `<tr>
-      <td><span class="qt-sp-nho"><img src="${VN.anh(s.anh[0])}" alt="" loading="lazy"><span>${VN.thoat(s.ten)}<small>${VN.thoat(s.ma)}${ghiDe[s.ma] ? ' · <span class="chu-vang">đã chỉnh</span>' : ''}</small></span></span></td>
+      <td><span class="qt-sp-nho"><img src="${VN.anh(s.anh)}" alt="" loading="lazy"><span>${VN.thoat(s.ten)}<small>${VN.thoat(s.ma)}</small></span></span></td>
       <td>${VN.thoat(ten(s))}</td><td>${VN.thoat(s.chatLieu)}</td>
-      <td class="so">${s.loaiGia === 'gia_cong' ? `<small>Tiền công</small>${VN.tien(s.gia)}` : VN.tien(s.gia)}</td>
+      <td class="so">${s.baoGia ? '<small>Chỉ báo giá</small>—' : VN.tien(s.gia)}</td>
       <td class="so">${s.giaCu ? `<del>${VN.tien(s.giaCu)}</del><small>−${s.giam}%</small>` : '—'}</td>
-      <td class="so">${tt.banRa[s.ma] || 0}</td>
-      <td>${s.ngungBan ? '<span class="nhan nhan--do">Ngừng bán</span>' : '<span class="nhan nhan--ngoc">Đang bán</span>'}</td>
-      <td><div class="qt-hanh-dong"><button type="button" class="nut nut--vien nut--rat-nho" data-sua="${VN.thoat(s.ma)}">Sửa</button>${s.ngungBan ? '' : `<a class="nut nut--chu" href="${VN.urlSanPham(s.ma)}" target="_blank" rel="noopener">Xem</a>`}</div></td></tr>`).join('')}</tbody>`
+      <td class="so">${s.daBan}</td>
+      <td><span class="nhan ${TEN_TT[s.trangThai][1]}">${TEN_TT[s.trangThai][0]}</span></td>
+      <td><div class="qt-hanh-dong"><button type="button" class="nut nut--vien nut--rat-nho" data-sua="${VN.thoat(s.ma)}">Sửa</button>${dangBan(s) ? `<a class="nut nut--chu" href="${VN.urlSanPham(s.ma)}" target="_blank" rel="noopener">Xem</a>` : ''}</div></td></tr>`).join('')}</tbody>`
       : `<tbody><tr><td>${qt.trong('Không có sản phẩm phù hợp.')}</td></tr></tbody>`;
     VN.$('#qt-sp-trang').innerHTML = loc.length ? qt.htmlPhanTrang(p) : '';
   };
 
   const moSua = (ma) => {
     const s = tt.tatCa.find((x) => x.ma === ma); if (!s) return;
-    const goc = tt.goc[ma];
-    qt.moChiTiet(s.ten, `<div class="qt-ct__muc"><div class="qt-sp-nho"><img src="${VN.anh(s.anh[0])}" alt=""><span>${VN.thoat(s.ten)}<small>${VN.thoat(s.ma)} · ${VN.thoat(ten(s))} · ${VN.thoat(s.chatLieu)}</small></span></div></div>
-      <form class="qt-form qt-ct__muc" data-form-sp="${VN.thoat(ma)}" novalidate>
-        <div class="luoi-truong">
-          <div class="truong"><label class="nhan-truong" for="qt-sp-gia">${s.loaiGia === 'gia_cong' ? 'Tiền công (₫)' : 'Giá bán (₫)'}</label>
-            <input class="o-nhap so-deu" id="qt-sp-gia" name="gia" inputmode="numeric" value="${s.gia}"><p class="goi-y-truong">Giá gốc trong dữ liệu: ${VN.tien(goc.gia)}</p></div>
+    const truongGia = s.coDinh ? `<div class="luoi-truong">
+          <div class="truong"><label class="nhan-truong" for="qt-sp-gia">Giá bán (₫)</label>
+            <input class="o-nhap so-deu" id="qt-sp-gia" name="gia" inputmode="numeric" value="${s.gia}"></div>
           <div class="truong"><label class="nhan-truong" for="qt-sp-gia-cu">Giá trước giảm (₫)</label>
             <input class="o-nhap so-deu" id="qt-sp-gia-cu" name="giaCu" inputmode="numeric" value="${s.giaCu || ''}" placeholder="Để trống nếu không giảm giá"><p class="goi-y-truong">Lớn hơn giá bán thì cửa hàng hiện nhãn giảm giá.</p></div>
-        </div>
-        <label class="lua-chon"><input type="checkbox" name="ngungBan"${s.ngungBan ? ' checked' : ''}> <span>Ngừng bán – ẩn khỏi cửa hàng, tìm kiếm và giỏ hàng</span></label>
-        <div class="hang hang--quan"><button class="nut nut--chinh nut--nho" type="submit">Lưu thay đổi</button>${sua()[ma] ? '<button class="nut nut--chu" type="button" data-khoi-phuc-sp>Khôi phục dữ liệu gốc</button>' : ''}</div>
+        </div>` : '<p class="chu-nho chu-phu">Sản phẩm giá theo giá vàng chỉ báo giá, không có giá bán để sửa.</p>';
+    qt.moChiTiet(s.ten, `<div class="qt-ct__muc"><div class="qt-sp-nho"><img src="${VN.anh(s.anh)}" alt=""><span>${VN.thoat(s.ten)}<small>${VN.thoat(s.ma)} · ${VN.thoat(ten(s))} · ${VN.thoat(s.chatLieu)}</small></span></div></div>
+      <form class="qt-form qt-ct__muc" data-form-sp="${VN.thoat(ma)}" novalidate>
+        ${truongGia}
+        <div class="truong"><label class="nhan-truong" for="qt-sp-tt-sua">Trạng thái</label>
+          <select class="o-chon" id="qt-sp-tt-sua" name="trangThai">${Object.entries(TEN_TT).map(([k, [t]]) => `<option value="${k}"${k === s.trangThai ? ' selected' : ''}>${t}</option>`).join('')}</select>
+          <p class="goi-y-truong">Đã ẩn hoặc ngừng bán: sản phẩm biến mất khỏi cửa hàng, tìm kiếm và giỏ hàng.</p></div>
+        <div class="hang hang--quan"><button class="nut nut--chinh nut--nho" type="submit">Lưu thay đổi</button></div>
       </form>`, 'Chỉnh sửa sản phẩm');
   };
-  const apDung = (ma, ghi) => {
-    const ds = sua();
-    if (ghi) ds[ma] = ghi; else delete ds[ma];
-    VN.kho.ghi('qtSanPham', ds);
-    // Cập nhật bản đang hiển thị (dữ liệu đã nạp vào bộ nhớ)
-    const s = tt.tatCa.find((x) => x.ma === ma); const g = tt.goc[ma];
-    Object.assign(s, { gia: g.gia, giaCu: g.giaCu, giam: g.giam, ngungBan: false });
-    if (ghi) {
-      if (ghi.gia) s.gia = ghi.gia;
-      if ('giaCu' in ghi) s.giaCu = ghi.giaCu || null;
-      s.giam = s.giaCu && s.giaCu > s.gia ? Math.round((s.giaCu - s.gia) * 100 / s.giaCu) : null;
-      if (!s.giam) s.giaCu = null;
-      s.ngungBan = !!ghi.ngungBan;
-    }
-  };
 
-  document.addEventListener('submit', (e) => {
+  document.addEventListener('submit', async (e) => {
     const f = e.target.closest('[data-form-sp]'); if (!f) return;
     e.preventDefault();
-    const ma = f.dataset.formSp;
-    const gia = Number(String(f.gia.value).replace(/\D/g, ''));
-    const giaCu = Number(String(f.giaCu.value).replace(/\D/g, '')) || 0;
-    const okGia = gia >= 1000; const okCu = !giaCu || giaCu > gia;
-    VN.baoLoiTruong(f.gia, okGia ? '' : 'Nhập giá hợp lệ (từ 1.000 ₫).');
-    VN.baoLoiTruong(f.giaCu, okCu ? '' : 'Giá trước giảm phải lớn hơn giá bán.');
-    if (!okGia || !okCu) return;
-    apDung(ma, { gia, giaCu: giaCu || null, ngungBan: f.ngungBan.checked, luc: new Date().toISOString(), boi: qt.nguoi.hoTen });
-    VN.thongBao({ tieuDe: 'Đã lưu sản phẩm ' + ma, noiDung: 'Cửa hàng hiển thị giá mới ở lần tải trang tiếp theo.', loai: 'thanh-cong' });
-    qt.dongChiTiet(); ve();
-  });
-  document.addEventListener('click', (e) => {
-    if (e.target.closest('[data-khoi-phuc-sp]')) {
-      const f = e.target.closest('form'); apDung(f.dataset.formSp, null);
-      VN.thongBao({ tieuDe: 'Đã khôi phục dữ liệu gốc', loai: 'thanh-cong' }); qt.dongChiTiet(); ve();
+    const ma = f.dataset.formSp; const s = tt.tatCa.find((x) => x.ma === ma);
+    const thayDoi = { status: f.trangThai.value };
+    if (s.coDinh) {
+      const gia = Number(String(f.gia.value).replace(/\D/g, ''));
+      const giaCu = Number(String(f.giaCu.value).replace(/\D/g, '')) || null;
+      const okGia = gia >= 1000; const okCu = !giaCu || giaCu >= gia;
+      VN.baoLoiTruong(f.gia, okGia ? '' : 'Nhập giá hợp lệ (từ 1.000 ₫).');
+      VN.baoLoiTruong(f.giaCu, okCu ? '' : 'Giá trước giảm không được thấp hơn giá bán.');
+      if (!okGia || !okCu) return;
+      Object.assign(thayDoi, { price: gia, originalPrice: giaCu });
     }
+    const ok = await qt.lam(() => VN.api.patch('/api/admin/products/' + encodeURIComponent(ma), thayDoi), 'Đã lưu sản phẩm ' + ma);
+    if (!ok) return;
+    const moi = (await VN.api.get('/api/admin/products')).find((p) => p.SKU === ma);       // lấy lại bản vừa lưu
+    if (moi) tt.tatCa[tt.tatCa.findIndex((x) => x.ma === ma)] = sanPhamTuApi(moi);
+    qt.dongChiTiet(); ve();
   });
   VN.$('#qt-sp-bang').addEventListener('click', (e) => { const b = e.target.closest('[data-sua]'); if (b) moSua(b.dataset.sua); });
   VN.$('#qt-sp-dm').addEventListener('change', (e) => { tt.locDm = e.target.value; tt.trang = 1; ve(); });
@@ -95,11 +91,10 @@
   VN.$('#qt-sp-tim').addEventListener('input', VN.chongDoi((e) => { tt.tim = e.target.value; tt.trang = 1; ve(); }, 150));
   VN.$('#qt-sp-trang').addEventListener('click', (e) => { const b = e.target.closest('[data-trang]'); if (b) { tt.trang = Number(b.dataset.trang); ve(); window.scrollTo({ top: 0 }); } });
 
-  Promise.all([VN.duLieu.sanPham(), VN.duLieu.danhMuc(), VN.taiJSON((VN.duongDan.duLieu || '../../../mock-data/') + 'products.json?goc=1')]).then(([sp, dm, goc]) => {
-    tt.tatCa = sp.tatCa; tt.dm = dm.theoId;
-    tt.goc = {}; goc.sanPham.forEach((s) => { tt.goc[s.ma] = { gia: s.gia, giaCu: s.giaCu, giam: s.giam }; });
-    VN.donHang.tatCa().filter((d) => d.trangThai !== 'Cancelled').forEach((d) => d.sanPham.forEach((x) => { tt.banRa[x.ma] = (tt.banRa[x.ma] || 0) + x.soLuong; }));
+  VN.$('#qt-sp-bang').innerHTML = `<tbody><tr><td>${qt.trong('Đang tải sản phẩm…')}</td></tr></tbody>`;
+  Promise.all([VN.api.get('/api/admin/products'), VN.duLieu.danhMuc()]).then(([ds, dm]) => {
+    tt.tatCa = ds.map(sanPhamTuApi); tt.dm = dm.theoId;
     VN.$('#qt-sp-dm').insertAdjacentHTML('beforeend', dm.ds.map((x) => `<option value="${x.id}">${VN.thoat(x.ten)}</option>`).join(''));
     ve();
-  });
+  }).catch(qt.baoLoiTai);
 })();

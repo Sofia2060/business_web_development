@@ -10,7 +10,7 @@ from flask import Blueprint, g, jsonify
 
 from ..auth import customer_or_guest, customer_required
 from ..db import ProcError, call, named_lock, query, transaction
-from ..validation import INT_MAX, body, is_int, text, utf16_len
+from ..validation import INT_MAX, body, is_int, normalize_phone, text, utf16_len
 from .addresses import LIMITS, full_address_error, read_fields
 from .cart import add_line, cart_subtotal, read_line, shipping_fee
 
@@ -119,6 +119,7 @@ def _forget_unused_guest(customer_id: int, new_address_id: int | None, created_n
 def place_guest_order():
     """Order without an account. Body: fullName, phone, addressLine, ward, province, items
     ([{"variantSku", "quantity", "engravingText", "engravingStyle"}], at most 20 lines), paymentMethod, checkoutToken, voucherCode, note.
+    recipientPhone is optional: the number to call at the delivery address when the order is a gift for someone else.
 
     The phone number is the customer id: the first order creates the guest customer, later orders and lookups
     use the same number. If the number belongs to an account the answer is 409 and the owner has to log in.
@@ -130,6 +131,12 @@ def place_guest_order():
     items = data.get("items")
     fields, field_error = read_fields({**data, "recipientName": data.get("fullName")}, (*LIMITS, "phone"))
     error = error or (field_error and field_error.replace("recipientName", "fullName"))
+    receiver = data.get("recipientPhone")
+    if not error and receiver not in (None, ""):
+        fields["recipientPhone"] = normalize_phone(receiver) if isinstance(receiver, str) else None
+        error = None if fields["recipientPhone"] else "Invalid recipientPhone"
+    if not error:
+        fields.setdefault("recipientPhone", fields["phone"])
     if not error and (not isinstance(items, list) or not 1 <= len(items) <= MAX_GUEST_LINES
                       or not all(isinstance(item, dict) for item in items)):
         error = f"items must be a list of 1 to {MAX_GUEST_LINES} lines"
@@ -180,8 +187,8 @@ def _guest_order(fields: dict, lines: list, checkout: dict):
                         "AND RecipientName COLLATE Vietnamese_100_CS_AS = ? AND Phone = ? "
                         "AND AddressLine COLLATE Vietnamese_100_CS_AS = ? AND Ward COLLATE Vietnamese_100_CS_AS = ? "
                         "AND Province COLLATE Vietnamese_100_CS_AS = ?",
-                        (customer_id, fields["recipientName"], phone, fields["addressLine"], fields["ward"],
-                         fields["province"]))
+                        (customer_id, fields["recipientName"], fields["recipientPhone"], fields["addressLine"],
+                         fields["ward"], fields["province"]))
         if address:
             address_id = address[0]["AddressID"]
         else:
@@ -190,8 +197,8 @@ def _guest_order(fields: dict, lines: list, checkout: dict):
                 cur.execute(
                     "INSERT INTO dbo.CustomerAddresses (CustomerID, RecipientName, Phone, AddressLine, Ward, Province, IsDefault) "
                     "OUTPUT INSERTED.AddressID VALUES (?, ?, ?, ?, ?, ?, ?)",
-                    (customer_id, fields["recipientName"], phone, fields["addressLine"], fields["ward"], fields["province"],
-                     0 if has_any else 1))
+                    (customer_id, fields["recipientName"], fields["recipientPhone"], fields["addressLine"], fields["ward"],
+                     fields["province"], 0 if has_any else 1))
                 address_id = new_address_id = cur.fetchval()
 
         with transaction() as cur:
@@ -212,28 +219,39 @@ def _guest_order(fields: dict, lines: list, checkout: dict):
 @bp.get("")
 @customer_required
 def list_orders():
-    """My orders. CancelChannel says what the page should show: "Web" = cancel button, "Hotline" = call to cancel,
-    null = the order can no longer be cancelled. PaymentDeadline is when an unpaid online order fails."""
-    return jsonify(query(
-        "SELECT OrderCode, CreatedAt, OrderStatus, Subtotal, DiscountAmount, ShippingFee, TotalAmount, "
+    """My orders, each with its items. CancelChannel says what the page should show: "Web" = cancel button,
+    "Hotline" = call to cancel, null = the order can no longer be cancelled. PaymentDeadline is when an unpaid
+    online order fails."""
+    orders = query(
+        "SELECT OrderID, OrderCode, CreatedAt, OrderStatus, Subtotal, DiscountAmount, ShippingFee, TotalAmount, "
         "PaymentMethod, PaymentStatus, PaymentDeadline, HasEngraving, CancelChannel "
-        "FROM dbo.vw_CustomerOrderHistory WHERE CustomerID = ? ORDER BY OrderID DESC", (g.customer_id,)))
+        "FROM dbo.vw_CustomerOrderHistory WHERE CustomerID = ? ORDER BY OrderID DESC", (g.customer_id,))
+    items: dict[int, list] = {}
+    for item in query(
+            "SELECT oi.OrderID, oi.ProductNameSnap, oi.SKUSnap, oi.MaterialSnap, oi.GoldColor, oi.RingSize, "
+            "oi.EngravingText, oi.EngravingStyle, oi.Quantity, oi.UnitPrice, oi.LineTotal, p.SKU AS ProductSKU "
+            "FROM dbo.OrderItems oi JOIN dbo.Products p ON p.ProductID = oi.ProductID "
+            "JOIN dbo.Orders o ON o.OrderID = oi.OrderID WHERE o.CustomerID = ? ORDER BY oi.OrderID, oi.OrderItemID",
+            (g.customer_id,)):
+        items.setdefault(item.pop("OrderID"), []).append(item)
+    for order in orders:
+        order["items"] = items.get(order.pop("OrderID"), [])
+    return jsonify(orders)
 
 
-@bp.get("/<code>")
-@customer_or_guest
-def get_order(code: str):
-    """One of my orders. A guest sends ?phone=<the phone used for the order>."""
+def order_detail(code: str, customer_id: int | None = None):
+    """The full order with its items and payments, or None. customer_id limits it to that customer's orders;
+    the admin routes pass None to read any order."""
+    owner, params = ("AND o.CustomerID = ?", (code, customer_id)) if customer_id is not None else ("", (code,))
     rows = query(
         "SELECT o.OrderID, o.OrderCode, o.OrderStatus, o.ShipRecipientName, o.ShipPhone, o.ShipAddress, o.Subtotal, "
         "o.DiscountAmount, v.VoucherCode, o.IsRetentionApplied, o.ShippingFee, o.TotalAmount, o.Note, o.CancelReason, "
         "o.CreatedAt, o.ConfirmedAt, o.ShippedAt, o.DeliveredAt, o.CancelledAt, o.ProductionStartedAt, "
         "h.PaymentDeadline, h.HasEngraving, h.CancelChannel "
         "FROM dbo.Orders o LEFT JOIN dbo.Vouchers v ON v.VoucherID = o.VoucherID "
-        "JOIN dbo.vw_CustomerOrderHistory h ON h.OrderID = o.OrderID WHERE o.OrderCode = ? AND o.CustomerID = ?",
-        (code, g.customer_id))
+        f"JOIN dbo.vw_CustomerOrderHistory h ON h.OrderID = o.OrderID WHERE o.OrderCode = ? {owner}", params)
     if not rows:
-        return jsonify(error="Order not found"), 404
+        return None
     order = rows[0]
     order["items"] = query(
         "SELECT oi.ProductNameSnap, oi.SKUSnap, oi.MaterialSnap, oi.GoldColor, oi.RingSize, oi.EngravingText, oi.EngravingStyle, "
@@ -241,7 +259,7 @@ def get_order(code: str):
         "JOIN dbo.Products p ON p.ProductID = oi.ProductID WHERE oi.OrderID = ? ORDER BY oi.OrderItemID",
         (order["OrderID"],))
     order["payments"] = query(
-        "SELECT PaymentMethod, Amount, Status, CreatedAt, PaidAt FROM dbo.Payments WHERE OrderID = ? ORDER BY PaymentID",
+        "SELECT PaymentMethod, Amount, Status, CreatedAt, PaidAt, TransactionID FROM dbo.Payments WHERE OrderID = ? ORDER BY PaymentID",
         (order["OrderID"],))
     # A cancel request that waits for the customer's answer, so the page can show the reminder popup again.
     pending = query("SELECT RequestID FROM dbo.OrderCancellationRequests WHERE OrderID = ? AND Decision = 'Pending'",
@@ -250,6 +268,16 @@ def get_order(code: str):
                                       "VoucherDiscount": order["DiscountAmount"], "Subtotal": order["Subtotal"],
                                       "TotalAmount": order["TotalAmount"]} if pending else None)
     del order["OrderID"]
+    return order
+
+
+@bp.get("/<code>")
+@customer_or_guest
+def get_order(code: str):
+    """One of my orders. A guest sends ?phone=<the phone used for the order>."""
+    order = order_detail(code, g.customer_id)
+    if not order:
+        return jsonify(error="Order not found"), 404
     return jsonify(order)
 
 

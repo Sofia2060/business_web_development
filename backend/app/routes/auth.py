@@ -19,8 +19,10 @@ def _public(user: dict) -> dict:
     return {"id": user["UserID"], "fullName": user["FullName"], "email": user["Email"], "role": user["Role"]}
 
 
-def _start_session(user_id: int) -> None:
+def _start_session(user_id: int, remember: bool = False) -> None:
+    """Log in by putting the user id in the signed cookie. Without remember the cookie ends when the browser closes."""
     session.clear()
+    session.permanent = remember
     session["user_id"] = user_id
 
 
@@ -108,7 +110,7 @@ def login():
 
     with transaction() as cur:
         cur.execute("UPDATE dbo.Users SET LastLoginAt = SYSDATETIME() WHERE UserID = ?", (user["UserID"],))
-    _start_session(user["UserID"])
+    _start_session(user["UserID"], remember=data.get("remember") is True)
     return jsonify(_public(user))
 
 

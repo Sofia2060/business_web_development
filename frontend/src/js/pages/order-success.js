@@ -2,8 +2,8 @@
    KẾT QUẢ ĐẶT HÀNG (?ma=mã đơn) – FR10, FR11
    - COD: đặt hàng thành công, thanh toán khi nhận
    - VietQR: hiển thị thông tin chuyển khoản; kế toán xác nhận tiền ở trang quản trị, trang tự cập nhật
-   - VNPay / MoMo: thành công, hoặc thất bại -> thanh toán lại / đổi sang COD
-   - Thanh toán trực tuyến chưa xong: đồng hồ đếm ngược 24 giờ, quá hạn đơn tự hủy
+   - VNPay / MoMo: thành công, hoặc thất bại -> thanh toán lại (trong 15 phút)
+   - Thanh toán trực tuyến chưa xong: đồng hồ đếm ngược 15 phút, quá hạn máy chủ tự hủy đơn
    - Khách đặt không cần tài khoản: nhắc lưu mã đơn + số điện thoại để tra cứu, gợi ý tạo tài khoản
    ===================================================================== */
 (function () {
@@ -11,8 +11,8 @@
   const VN = window.Vinora;
   const khung = VN.$('#ket-qua');
   if (!khung) return;
-  const u = VN.taiKhoan.hienTai();
-  const maDon = (VN.thamSo('ma') || '').trim();
+  let u = null;      // khách có tài khoản (gán khi đã tải phiên đăng nhập)
+  const maDon = (VN.thamSo('ma') || '').trim().toUpperCase();
 
   const TEN_KIEU = { 'co-dien': 'Cổ điển', 'hien-dai': 'Hiện đại', 'viet-tay': 'Viết tay' };
   const NGAN_HANG = { ten: 'Ngân hàng TMCP Ngoại thương Việt Nam (Vietcombank)', soTk: '0000 2026 1027', chuTk: 'CONG TY VINORA JEWELRY' };
@@ -30,14 +30,14 @@
     const daHuy = don.trangThai === 'Cancelled';
     let trangThai; // [kiểu, biểu tượng, tiêu đề, mô tả]
     const choTra = !daHuy && pt !== 'COD' && tts !== 'Success';
-    if (daHuy && tts === 'Expired') trangThai = ['do', 'dong-ho', 'Đơn hàng đã tự hủy', `Đơn hàng quá ${VN.HAN_THANH_TOAN_GIO} giờ chưa được thanh toán nên hệ thống đã tự động hủy. Sản phẩm vẫn có thể đặt lại bất cứ lúc nào.`];
+    if (daHuy && tts === 'Expired') trangThai = ['do', 'dong-ho', 'Đơn hàng đã tự hủy', `Đơn hàng quá ${VN.HAN_THANH_TOAN_PHUT} phút chưa được thanh toán nên hệ thống đã tự động hủy. Sản phẩm vẫn có thể đặt lại bất cứ lúc nào.`];
     else if (daHuy) trangThai = ['do', 'huy', 'Đơn hàng đã được hủy', 'Đơn hàng này đã hủy. Bạn có thể xem lại chi tiết trong mục Đơn hàng.'];
     else if (pt === 'COD') trangThai = ['ngoc', 'dau-tich', 'Đặt hàng thành công!', `Cảm ơn ${u ? VN.thoat(VN.taiKhoan.tenGoi(u)) : 'bạn'}. Vinora sẽ xác nhận và đóng gói đơn hàng trong 24 giờ; bạn thanh toán khi nhận hàng.`];
     else if (tts === 'Success') trangThai = ['ngoc', 'dau-tich', 'Thanh toán thành công!', `Giao dịch <strong>${VN.thoat(don.thanhToan.maGiaoDich)}</strong> qua ${VN.thoat(VN.TEN_THANH_TOAN[pt])} đã được ghi nhận. Vinora đang chuẩn bị đơn hàng của bạn.`];
-    else if (pt === 'BANK') trangThai = ['vang', 'qr', 'Hoàn tất chuyển khoản để xác nhận đơn', 'Đơn hàng đã được tạo và giữ hàng cho bạn. Vui lòng chuyển khoản theo thông tin bên dưới.'];
-    else trangThai = ['do', 'canh-bao', 'Thanh toán chưa thành công', `Giao dịch qua ${VN.thoat(VN.TEN_THANH_TOAN[pt])} bị hủy hoặc không thành công. Đơn hàng vẫn được giữ – bạn có thể thanh toán lại hoặc chuyển sang thanh toán khi nhận hàng.`];
+    else if (pt === 'BANK') trangThai = ['vang', 'qr', 'Hoàn tất chuyển khoản để xác nhận đơn', 'Đơn hàng đã được tạo và giữ hàng cho bạn trong 15 phút. Vui lòng chuyển khoản theo thông tin bên dưới.'];
+    else trangThai = ['do', 'canh-bao', 'Thanh toán chưa thành công', `Giao dịch qua ${VN.thoat(VN.TEN_THANH_TOAN[pt])} bị hủy hoặc không thành công. Đơn hàng vẫn được giữ – bạn có thể thanh toán lại trước khi hết thời gian bên dưới.`];
     const [kieu, bt, tieuDe, moTa] = trangThai;
-    const nn = don.nguoiNhan;
+    const nn = don.nguoiNhan || { hoTen: '', sdt: '', diaChi: '' };     // a list row (when the detail could not load) has no recipient
     const ttTT = VN.TRANG_THAI_TT[tts] || { ten: tts, lop: '' };
 
     khung.innerHTML = `
@@ -52,7 +52,7 @@
         <p class="chu-nho chu-phu">Đặt lúc ${VN.ngayGio(don.ngayDat)} · ${don.sanPham.reduce((a, d) => a + d.soLuong, 0)} sản phẩm · ${VN.tien(don.tongTien)}</p>
         ${choTra && don.hanThanhToan ? `<div class="han-tt" data-khung-dem-nguoc>
           ${VN.bt('dong-ho')}<span>Thời gian còn lại để thanh toán</span><strong class="so-deu" data-dem-nguoc="${don.hanThanhToan}">${VN.dinhDangDemNguoc(VN.donHang.conLaiThanhToan(don))}</strong>
-          <small>Hạn chót ${VN.ngayGio(don.hanThanhToan)}. Quá hạn, hệ thống tự động hủy đơn và trả lại hàng giữ chỗ.</small></div>` : ''}
+          <small>Hạn chót ${VN.ngayGio(don.hanThanhToan)}. Quá hạn, đặt hàng được xem là không thành công: hệ thống tự động hủy đơn và trả lại hàng giữ chỗ.</small></div>` : ''}
       </section>
 
       ${!u ? `<section class="kq-khach" aria-labelledby="td-kq-khach">
@@ -82,14 +82,13 @@
       ${!daHuy && ['VNPAY', 'MOMO'].includes(pt) && tts !== 'Success' ? `
       <section class="kq-thu-lai">
         <button type="button" class="nut nut--chinh" data-thanh-toan-lai>${VN.bt('the')} Thanh toán lại qua ${VN.thoat(VN.TEN_THANH_TOAN[pt])}</button>
-        <button type="button" class="nut nut--vien" data-doi-cod>Chuyển sang thanh toán khi nhận hàng</button>
       </section>` : ''}
 
       <div class="kq-luoi">
         <section class="kq-khoi" aria-labelledby="td-tiep-theo">
           <h2 class="t-4" id="td-tiep-theo">Tiếp theo sẽ diễn ra</h2>
           <ol class="kq-buoc">
-            <li class="${daHuy ? '' : 'dang-o'}"><strong>Cửa hàng xác nhận &amp; đóng gói</strong><span>Trong vòng 24 giờ, đơn ở trạng thái Chờ xử lý – bạn vẫn có thể tự hủy đơn.</span></li>
+            <li class="${daHuy ? '' : 'dang-o'}"><strong>Cửa hàng xác nhận &amp; đóng gói</strong><span>Trong vòng 24 giờ. ${don.kenhHuy === 'Web' ? 'Bạn vẫn có thể tự hủy đơn trên website khi đơn còn chờ xử lý.' : don.kenhHuy === 'Hotline' ? 'Đơn có giá trị cao hoặc có khắc chữ: nếu cần hủy, vui lòng gọi hotline 1900 0000.' : ''}</span></li>
             <li><strong>${VN.thoat(don.giaoHang.ten)}</strong><span>Đóng gói niêm phong, bảo hiểm toàn bộ giá trị đơn hàng.</span></li>
             <li><strong>Bấm “Đã nhận được hàng”</strong><span>Trong mục Đơn hàng của tôi sau khi kiểm tra sản phẩm.</span></li>
             <li><strong>Thẻ bảo hành điện tử tự kích hoạt</strong><span>Mỗi sản phẩm một thẻ trọn đời, đặt lịch hậu mãi ngay trên website.</span></li>
@@ -136,24 +135,37 @@
     if (e.target.closest('[data-thanh-toan-lai]')) {
       const don = VN.donHang.lay(maDon);
       if (!don || don.trangThai === 'Cancelled') { ve(); return; }
-      VN.donHang.capNhat(maDon, (d) => { d.thanhToan.trangThai = 'Pending'; });
       const kq = await VN.congThanhToan.mo(don);
+      await VN.donHang.napMot(maDon).catch(() => {});
       ve();
+      theoDoi();
       VN.thongBao(kq.ok ? { tieuDe: 'Thanh toán thành công', loai: 'thanh-cong' } : { tieuDe: 'Thanh toán chưa thành công', noiDung: VN.thoat(kq.lyDo), loai: 'loi' });
-      return;
-    }
-    if (e.target.closest('[data-doi-cod]')) {
-      const dongY = await VN.xacNhan({ nhan: 'Đổi phương thức thanh toán', tieuDe: 'Chuyển sang thanh toán khi nhận hàng?', noiDung: 'Bạn sẽ thanh toán bằng tiền mặt hoặc chuyển khoản khi nhận hàng. Đơn hàng giữ nguyên sản phẩm và tổng tiền.', chuDongY: 'Chuyển sang COD' });
-      if (!dongY) return;
-      VN.donHang.doiSangCOD(maDon);
-      ve();
-      VN.thongBao({ tieuDe: 'Đã chuyển sang thanh toán khi nhận hàng', loai: 'thanh-cong' });
     }
   });
 
-  ve();
-  // Hết 24 giờ khi đang mở trang -> đơn tự hủy -> vẽ lại
-  // Kế toán xác nhận tiền chuyển khoản ở trang quản trị (thẻ khác) -> cập nhật trang kết quả
-  window.addEventListener('storage', (e) => { if (e.key === 'vinora.donHang') ve(); });
+  /** Tải đơn từ máy chủ rồi vẽ. Khách chưa đăng nhập xem được đơn đã đặt trên trình duyệt này (nhớ cùng số điện thoại). */
+  const taiVaVe = async () => {
+    try { await VN.donHang.napMot(maDon); } catch (loi) { if (loi.trangThai === 0) VN.thongBao({ tieuDe: 'Chưa tải được đơn hàng', noiDung: VN.thoat(loi.message), loai: 'loi' }); }
+    ve();
+  };
+  /* Đơn chờ thanh toán: máy chủ có thể đã nhận tiền (kế toán xác nhận chuyển khoản) hoặc đã tự hủy do quá hạn -> cập nhật trang */
+  let henCapNhat = null;
+  const theoDoi = () => {
+    clearInterval(henCapNhat);
+    const don = VN.donHang.lay(maDon);
+    if (!don || don.trangThai !== 'Pending' || !don.hanThanhToan) return;
+    henCapNhat = setInterval(async () => {
+      const truoc = VN.donHang.lay(maDon);
+      const sau = await VN.donHang.napMot(maDon).catch(() => null);
+      if (!sau) return;
+      if (!truoc || sau.trangThai !== truoc.trangThai || sau.thanhToan.trangThai !== truoc.thanhToan.trangThai) { ve(); theoDoi(); }
+    }, 10000);
+  };
+
+  VN.sanSang.then(async () => {
+    u = VN.taiKhoan.hienTai();
+    await taiVaVe();
+    theoDoi();
+  });
   window.addEventListener('vinora:don-hang', () => { const d = VN.donHang.lay(maDon); if (d && d.trangThai === 'Cancelled' && !khung.dataset.daHuy) { khung.dataset.daHuy = '1'; ve(); } });
 })();

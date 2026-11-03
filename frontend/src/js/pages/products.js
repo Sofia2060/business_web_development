@@ -78,7 +78,7 @@
       case 'gia-tang': return a.sort((x, y) => (giaSx(x) ?? Infinity) - (giaSx(y) ?? Infinity));
       case 'gia-giam': return a.sort((x, y) => (giaSx(y) ?? -1) - (giaSx(x) ?? -1));
       case 'giam-nhieu': return a.sort((x, y) => (y.giam || 0) - (x.giam || 0) || (giaSx(y) ?? -1) - (giaSx(x) ?? -1));
-      default: return tt.q ? a : a.sort((x, y) => Number(!!y.moTa) - Number(!!x.moTa) || cmpNgay(x, y));
+      default: return tt.q ? a : a.sort((x, y) => Number(y.coMoTa) - Number(x.coMoTa) || cmpNgay(x, y));
     }
   };
 

@@ -1,11 +1,11 @@
 /* =====================================================================
    5.2.7 QUẢN LÝ ĐƠN HÀNG (FR12, FR13, FR14)
-   - Đã đăng nhập: đơn của tài khoản. Chưa đăng nhập: tra cứu bằng mã đơn + số điện thoại,
-     danh sách các đơn đặt / tra cứu trên trình duyệt này
-   - Danh sách theo trạng thái, tìm theo mã hoặc tên; đơn trả trực tuyến chưa thanh toán có đếm ngược 24 giờ
+   - Đã đăng nhập: đơn của tài khoản (máy chủ). Chưa đăng nhập: tra cứu bằng mã đơn + số điện thoại,
+     danh sách các đơn đặt / tra cứu trên trình duyệt này (máy chủ trả đơn khi đúng cả mã đơn và số điện thoại)
+   - Danh sách theo trạng thái, tìm theo mã hoặc tên; đơn trả trực tuyến chưa thanh toán có đếm ngược 15 phút
    - Chi tiết đơn (?ma=): tiến trình, hạn thanh toán, sản phẩm, tiền, giao hàng, thanh toán / hoàn tiền,
      đánh giá của bạn, phản ánh & hỗ trợ, nhật ký (NFR8)
-   - Hủy đơn -> popup 5.2.6 (huydon.js); phản ánh -> phananh.js
+   - Hủy đơn -> popup 5.2.6 (cancel-order.js): đơn nhỏ tự hủy, đơn từ 2 triệu hoặc có khắc chữ gọi hotline; phản ánh -> complaint.js
    - "Đã nhận được hàng" (chỉ đơn Đang giao) -> trang Kích hoạt thẻ bảo hành & Đánh giá
    ===================================================================== */
 (function () {
@@ -13,17 +13,17 @@
   const VN = window.Vinora;
   const khuDs = VN.$('#dh-danh-sach'); const khuCt = VN.$('#dh-chi-tiet');
   if (!khuDs) return;
-  const u = VN.taiKhoan.hienTai();     // có thể null: khách đặt hàng không cần tài khoản
+  let u = null;     // khách có tài khoản (gán khi đã tải phiên đăng nhập); null: khách đặt hàng không cần tài khoản
 
   const TEN_KIEU = { 'co-dien': 'Cổ điển', 'hien-dai': 'Hiện đại', 'viet-tay': 'Viết tay' };
-  const TAB = [['tat-ca', 'Tất cả'], ['Pending', 'Chờ xử lý'], ['Shipping', 'Đang giao'], ['Delivered', 'Đã nhận'], ['Cancelled', 'Đã hủy']];
-  const tt = { tab: VN.thamSo('tab') || 'tat-ca', tim: '', ch: null };
+  const TAB = [['tat-ca', 'Tất cả'], ['Pending', 'Chờ xử lý'], ['Confirmed', 'Đã xác nhận'], ['Shipping', 'Đang giao'], ['Delivered', 'Đã nhận'], ['Cancelled', 'Đã hủy']];
+  const tt = { tab: VN.thamSo('tab') || 'tat-ca', tim: '', ch: null, daNhacHuy: {} };
   if (!TAB.some(([k]) => k === tt.tab)) tt.tab = 'tat-ca';
 
   const nhanTT = (don) => { const t = VN.TRANG_THAI_DON[don.trangThai]; return `<span class="nhan ${t.lop}">${t.ten}</span>`; };
   const nhanThanhToan = (don) => {
     const tts = don.thanhToan.trangThai;
-    if (tts === 'Pending' && don.trangThai === 'Cancelled') return '<span class="nhan">Chưa thanh toán</span>';
+    if (don.trangThai === 'Cancelled' && ['Pending', 'Failed'].includes(tts)) return '<span class="nhan">Chưa thanh toán</span>';   // hủy đơn: máy chủ đánh dấu lần thanh toán đang chờ là Failed
     if (don.thanhToan.phuongThuc === 'COD' && tts === 'Pending') return '<span class="nhan">Thanh toán khi nhận</span>';
     const t = VN.TRANG_THAI_TT[tts] || { ten: tts, lop: '' };
     return `<span class="nhan ${t.lop}">${t.ten}</span>`;
@@ -47,6 +47,7 @@
     if (chiTiet || ['Shipping', 'Delivered'].includes(don.trangThai)) n.push(`<button type="button" class="nut nut--vien nut--nho" data-tac="phan-anh" data-ma="${don.ma}">${VN.bt('chat')} Phản ánh vấn đề</button>`);
     if (['Delivered', 'Cancelled'].includes(don.trangThai)) n.push(`<button type="button" class="nut nut--vien nut--nho" data-tac="mua-lai" data-ma="${don.ma}">${VN.bt('doi-tra')} Mua lại</button>`);
     if (VN.donHang.coTheHuy(don)) n.push(`<button type="button" class="nut nut--chu nut-huy-don" data-tac="huy" data-ma="${don.ma}">Hủy đơn</button>`);
+    else if (don.daBatDauCheTac && ['Pending', 'Confirmed'].includes(don.trangThai)) n.push('<span class="chu-rat-nho chu-phu">Đơn đang được chế tác, không thể hủy.</span>');
     return n.join('');
   };
 
@@ -56,19 +57,21 @@
 
   /* ================= TRA CỨU (khách chưa đăng nhập) ================= */
   const formTc = VN.$('#form-tra-cuu-dh');
-  formTc.addEventListener('submit', (e) => {
+  formTc.addEventListener('submit', async (e) => {
     e.preventDefault();
     const loi = VN.$('#tc-loi');
     const kiemTra = (o, dung, thongDiep) => { VN.baoLoiTruong(o, dung ? '' : thongDiep); return dung; };
     const ok = [
-      kiemTra(formTc.ma, /^VNR\w{8,}$/i.test(formTc.ma.value.trim()), 'Mã đơn bắt đầu bằng VNR, ví dụ VNR251030ABCD.'),
+      kiemTra(formTc.ma, /^VN\d{10,}$/i.test(formTc.ma.value.trim()), 'Mã đơn bắt đầu bằng VN, ví dụ VN261103000009.'),
       kiemTra(formTc.sdt, VN.sdtHopLe(formTc.sdt.value), 'Số điện thoại gồm 10 số, bắt đầu bằng 03, 05, 07, 08 hoặc 09.'),
     ].every(Boolean);
     if (!ok) { loi.hidden = true; return; }
-    const kq = VN.donHang.traCuu(formTc.ma.value, formTc.sdt.value);
+    let kq;
+    try { kq = await VN.donHang.traCuu(formTc.ma.value, formTc.sdt.value); }
+    catch (er) { loi.hidden = false; loi.innerHTML = `${VN.bt('canh-bao')}<span>${VN.thoat(er.message)}</span>`; return; }
     if (kq.loi) {
       loi.hidden = false;
-      loi.innerHTML = `${VN.bt('canh-bao')}<span>${VN.thoat(kq.loi)}${kq.canDangNhap ? ` <a class="lien-ket" href="${VN.url('taiKhoan', { tiep: location.pathname + location.search })}">Đăng nhập</a>` : ''}</span>`;
+      loi.innerHTML = `${VN.bt('canh-bao')}<span>${VN.thoat(kq.loi)} Đơn của số điện thoại đã đăng ký tài khoản chỉ xem được sau khi <a class="lien-ket" href="${VN.url('taiKhoan', { tiep: location.pathname + location.search })}">đăng nhập</a>.</span>`;
       return;
     }
     loi.hidden = true; formTc.reset();
@@ -124,17 +127,15 @@
   VN.$('#dh-o-tim').addEventListener('input', VN.chongDoi((e) => { tt.tim = e.target.value; veDanhSach(); }, 150));
 
   /* ================= CHI TIẾT ================= */
-  const BUOC = [['Pending', 'Đặt hàng', 'hop-hang'], ['Shipping', 'Đang giao', 'xe-giao'], ['Delivered', 'Đã nhận hàng', 'xac-nhan'], ['BaoHanh', 'Kích hoạt bảo hành', 'khien']];
+  const BUOC = [['Pending', 'Đặt hàng', 'hop-hang'], ['Confirmed', 'Cửa hàng xác nhận', 'xac-nhan'], ['Shipping', 'Đang giao', 'xe-giao'], ['Delivered', 'Đã nhận hàng', 'xac-nhan'], ['BaoHanh', 'Kích hoạt bảo hành', 'khien']];
 
   const htmlHuy = (don) => {
     const yc = don.yeuCauHuy || {};
-    const ht = don.hoanTien;
-    let hoan = '';
-    if (don.thanhToan.trangThai === 'RefundPending' && ht) hoan = `<div class="hoan-tien">${VN.bt('doi-tra', 'bt--nho')} <span>Vinora đang hoàn <strong>${VN.tien(ht.soTien)}</strong> vào tài khoản <strong>${VN.thoat(ht.nganHang)}</strong> <span class="so-deu">${VN.thoat(VN.anSoTaiKhoan(ht.soTaiKhoan))}</span> – ${VN.thoat(ht.chuTaiKhoan)}. Thời gian nhận tiền: ${VN.thoat(tt.ch ? tt.ch.hoanTien.thoiGian : '3 – 5 ngày làm việc')}.</span></div>`;
-    if (don.thanhToan.trangThai === 'Refunded' && ht) hoan = `<div class="hoan-tien">${VN.bt('xac-nhan', 'bt--nho')} <span>Đã hoàn <strong>${VN.tien(ht.soTien)}</strong> vào tài khoản ${VN.thoat(ht.nganHang)} <span class="so-deu">${VN.thoat(VN.anSoTaiKhoan(ht.soTaiKhoan))}</span>${ht.luc ? ` lúc ${VN.ngayGio(ht.luc)}` : ''}.</span></div>`;
+    const hoan = don.thanhToan.trangThai === 'Refunded'
+      ? `<div class="hoan-tien">${VN.bt('xac-nhan', 'bt--nho')} <span>Đã hoàn lại <strong>${VN.tien(don.tongTien)}</strong> đã thanh toán qua ${VN.thoat(VN.TEN_THANH_TOAN[don.thanhToan.phuongThuc])}.</span></div>` : '';
     return `<div class="tien-trinh tien-trinh--huy"><span class="tien-trinh__bt">${VN.bt(yc.tuDong ? 'dong-ho' : 'huy')}</span><div>
       <strong>${yc.tuDong ? 'Đơn hàng đã tự động hủy' : 'Đơn hàng đã hủy'}</strong>
-      <p>${VN.ngayGio(yc.luc || don.ngayDat)} · ${yc.tuDong ? `Hệ thống tự hủy vì quá ${VN.HAN_THANH_TOAN_GIO} giờ chưa nhận được thanh toán.` : `Lý do: ${VN.thoat(yc.lyDo || '—')}${yc.ghiChu ? ` – ${VN.thoat(yc.ghiChu)}` : ''}`}</p>${hoan}</div></div>`;
+      <p>${VN.ngayGio(yc.luc || don.ngayDat)} · ${yc.tuDong ? `Đặt hàng không thành công: quá ${VN.HAN_THANH_TOAN_PHUT} phút chưa nhận được thanh toán.` : `Lý do: ${VN.thoat(yc.lyDo || '—')}`}</p>${hoan}</div></div>`;
   };
 
   const htmlDanhGia = (don) => {
@@ -173,8 +174,10 @@
       ${ds.length ? `<div class="ds-phan-anh">${ds.map(the).join('')}</div>` : ''}</section>`;
   };
 
-  const veChiTiet = (ma) => {
-    const don = VN.donHang.lay(ma);
+  const veChiTiet = async (ma) => {
+    let don = null;
+    try { don = await VN.donHang.napMot(ma); } catch (loi) { if (loi.trangThai === 0) VN.thongBao({ tieuDe: 'Chưa tải được đơn hàng', noiDung: VN.thoat(loi.message), loai: 'loi' }); }
+    if ((VN.thamSo('ma') || '') !== ma) return;      // trong lúc tải, khách đã chuyển sang trang khác
     khuDs.hidden = true; khuCt.hidden = false; VN.$('#dh-tra-cuu').hidden = true; VN.$('#dh-lien-ket').hidden = true;
     VN.$('#dh-tieu-de').textContent = don ? `Đơn hàng ${don.ma}` : 'Không tìm thấy đơn hàng';
     VN.$('#dh-duong-dan').innerHTML = `<li><a href="${VN.url('trangChu')}">Trang chủ</a></li><li><a href="${VN.url('donHang')}" data-ve-ds>${u ? 'Đơn hàng của tôi' : 'Tra cứu đơn hàng'}</a></li><li aria-current="page">${VN.thoat(ma)}</li>`;
@@ -186,16 +189,16 @@
     VN.$('#dh-mo-ta').innerHTML = `Đặt lúc ${VN.ngayGio(don.ngayDat)} · ${nhanTT(don)} ${nhanThanhToan(don)}`;
     const huy = don.trangThai === 'Cancelled';
     const coThe = VN.baoHanh.theoDon(don.ma).length > 0;
-    const moc = { Pending: don.ngayDat, Shipping: don.ngayGiao || (don.lichSu.find((l) => l.trangThai === 'Shipping') || {}).luc, Delivered: don.ngayNhan, BaoHanh: coThe ? don.ngayNhan : null };
-    const thuTu = ['Pending', 'Shipping', 'Delivered'].indexOf(don.trangThai) + (coThe ? 1 : 0);
+    const moc = { Pending: don.ngayDat, Confirmed: don.ngayXacNhan, Shipping: don.ngayGiao, Delivered: don.ngayNhan, BaoHanh: coThe ? don.ngayNhan : null };
+    const thuTu = ['Pending', 'Confirmed', 'Shipping', 'Delivered'].indexOf(don.trangThai) + (coThe ? 1 : 0);
     const tienTrinh = huy ? htmlHuy(don)
       : `<ol class="tien-trinh">${BUOC.map(([k, ten, bt], i) => `<li class="${i < thuTu ? 'da-xong' : i === thuTu ? 'dang-o' : ''}">
-          <span class="tien-trinh__bt">${VN.bt(bt)}</span><strong>${ten}</strong><small>${moc[k] && i <= thuTu ? VN.ngayGio(moc[k]) : i === thuTu + 1 && k === 'Shipping' ? 'Chờ cửa hàng xác nhận' : ''}</small></li>`).join('')}</ol>`;
+          <span class="tien-trinh__bt">${VN.bt(bt)}</span><strong>${ten}</strong><small>${moc[k] && i <= thuTu ? VN.ngayGio(moc[k]) : i === thuTu + 1 && k === 'Confirmed' ? 'Chờ cửa hàng xác nhận' : i === thuTu + 1 && k === 'Shipping' ? 'Chờ bàn giao vận chuyển' : ''}</small></li>`).join('')}</ol>`;
     const han = chuaThanhToanOnline(don) && don.hanThanhToan
       ? `<div class="han-tt han-tt--ct${VN.donHang.conLaiThanhToan(don) < 3600000 ? ' sap-het' : ''}" data-khung-dem-nguoc>${VN.bt('dong-ho')}<span>Thời gian còn lại để thanh toán</span>
           <strong class="so-deu" data-dem-nguoc="${don.hanThanhToan}">${VN.dinhDangDemNguoc(VN.donHang.conLaiThanhToan(don))}</strong>
-          <small>Hạn chót ${VN.ngayGio(don.hanThanhToan)}. Sau thời điểm này, nếu chưa nhận được thanh toán, hệ thống tự động hủy đơn. Bạn có thể chuyển sang thanh toán khi nhận hàng để không bị hủy.</small>
-          <div class="hang hang--quan"><a class="nut nut--chinh nut--nho" href="${VN.url('ketQuaDatHang', { ma: don.ma })}">${VN.bt('the')} Thanh toán ngay</a><button type="button" class="nut nut--vien nut--nho" data-tac="doi-cod" data-ma="${don.ma}">Chuyển sang thanh toán khi nhận</button></div></div>` : '';
+          <small>Hạn chót ${VN.ngayGio(don.hanThanhToan)}. Sau thời điểm này, nếu chưa nhận được thanh toán, đặt hàng không thành công và hệ thống tự động hủy đơn.</small>
+          <div class="hang hang--quan"><a class="nut nut--chinh nut--nho" href="${VN.url('ketQuaDatHang', { ma: don.ma })}">${VN.bt('the')} Thanh toán ngay</a></div></div>` : '';
     const nn = don.nguoiNhan;
     const ht = don.hoanTien;
     khuCt.innerHTML = `
@@ -244,22 +247,21 @@
         <div class="khoi-tk__dau"><div><p class="nhan-tren">Nhật ký đơn hàng</p><h2 id="td-nhat-ky">Lịch sử xử lý</h2><p>Mọi thay đổi trạng thái, thanh toán, hoàn tiền và phản ánh đều được ghi lại kèm thời điểm và người thực hiện.</p></div></div>
         <ol class="nhat-ky">${don.lichSu.slice().reverse().map((l) => `<li><time datetime="${l.luc}">${VN.ngayGio(l.luc)}</time><div><p>${VN.thoat(l.noiDung)}</p><small>${VN.thoat(l.boi)} · ${VN.TRANG_THAI_DON[l.trangThai] ? VN.TRANG_THAI_DON[l.trangThai].ten : ''}</small></div></li>`).join('')}</ol>
       </section>`;
+    // Khách đã bấm hủy nhưng chưa trả lời popup nhắc nhở: hiện lại popup một lần
+    if (don.huyDangCho && !tt.daNhacHuy[ma]) {
+      tt.daNhacHuy[ma] = true;
+      setTimeout(() => VN.moHuyDon(ma, { tiepTuc: true }).then(lamMoi), 300);
+    }
   };
 
   /* ================= ĐIỀU HƯỚNG & THAO TÁC ================= */
-  const veLienKet = () => {
-    const khung = VN.$('#dh-lien-ket');
-    const ds = u && u.sdt ? VN.donHang.chuaLienKet(u.sdt) : [];
-    khung.hidden = !ds.length;
-    if (ds.length) khung.innerHTML = `${VN.bt('dien-thoai')}<span>Có <strong>${ds.length} đơn hàng</strong> đặt bằng số <span class="so-deu">${VN.thoat(VN.anSdt(u.sdt))}</span> khi chưa đăng nhập. <a class="lien-ket" href="${VN.url('taiKhoan', { lienket: 1 })}">Xác minh số điện thoại để liên kết vào tài khoản</a>.</span>`;
-  };
   const veTheoUrl = () => {
     const ma = VN.thamSo('ma');
     if (ma) {
       veChiTiet(ma);
-      if (VN.thamSo('phananh') && VN.donHang.lay(ma)) {
+      if (VN.thamSo('phananh')) {
         history.replaceState(null, '', VN.url('donHang', { ma }));
-        setTimeout(() => moPhanAnh(ma), 200);
+        setTimeout(() => moPhanAnh(ma), 600);
       }
       return;
     }
@@ -272,7 +274,6 @@
     VN.$('#dh-duong-dan').innerHTML = u
       ? `<li><a href="${VN.url('trangChu')}">Trang chủ</a></li><li><a href="${VN.url('taiKhoan')}">Tài khoản</a></li><li aria-current="page">Đơn hàng của tôi</li>`
       : `<li><a href="${VN.url('trangChu')}">Trang chủ</a></li><li aria-current="page">Tra cứu đơn hàng</li>`;
-    veLienKet();
     veDanhSach();
   };
   const lamMoi = () => { if (VN.thamSo('ma')) veChiTiet(VN.thamSo('ma')); else veDanhSach(); };
@@ -280,8 +281,7 @@
   // Đơn thay đổi (tự hủy khi hết hạn thanh toán, phản ánh được xử lý…) -> vẽ lại
   window.addEventListener('vinora:don-hang', VN.chongDoi(lamMoi, 60));
   window.addEventListener('vinora:ho-tro', VN.chongDoi(lamMoi, 60));
-  // Cửa hàng xử lý đơn ở trang quản trị (thẻ trình duyệt khác) -> cập nhật ngay
-  window.addEventListener('storage', (e) => { if (/^vinora\.(donHang|hoTro|danhGia)$/.test(e.key || '')) lamMoi(); });
+  window.addEventListener('storage', (e) => { if (/^vinora\.(hoTro|danhGia)$/.test(e.key || '')) lamMoi(); });
 
   const moPhanAnh = async (ma) => { if (VN.moPhanAnh) await VN.moPhanAnh(ma); };
 
@@ -291,48 +291,50 @@
     const ve = e.target.closest('[data-ve-ds]');
     if (ve) { e.preventDefault(); history.pushState(null, '', VN.url('donHang', tt.tab === 'tat-ca' ? {} : { tab: tt.tab })); veTheoUrl(); return; }
     const b = e.target.closest('[data-tac]'); if (!b) return;
-    const ma = b.dataset.ma; const don = ma ? VN.donHang.lay(ma) : null;
+    const ma = b.dataset.ma;
     if (b.dataset.tac === 'huy') {
       await VN.moHuyDon(ma);
       lamMoi();
     } else if (b.dataset.tac === 'phan-anh') {
+      await VN.donHang.napMot(ma).catch(() => {});          // hộp thoại phản ánh cần đủ thông tin đơn (người nhận, sản phẩm)
       await moPhanAnh(ma);
-    } else if (b.dataset.tac === 'doi-cod') {
-      const dongY = await VN.xacNhan({ nhan: 'Đổi phương thức thanh toán', tieuDe: 'Chuyển sang thanh toán khi nhận hàng?', noiDung: 'Bạn sẽ thanh toán bằng tiền mặt hoặc chuyển khoản khi nhận hàng; đơn không còn bị giới hạn 24 giờ.', chuDongY: 'Chuyển sang COD' });
-      if (!dongY) return;
-      try { VN.donHang.doiSangCOD(ma); VN.thongBao({ tieuDe: 'Đã chuyển sang thanh toán khi nhận hàng', loai: 'thanh-cong' }); } catch (loi) { VN.thongBao({ tieuDe: 'Không đổi được', noiDung: VN.thoat(loi.message), loai: 'loi' }); }
     } else if (b.dataset.tac === 'da-nhan') {
+      const don = VN.donHang.lay(ma);
       const dongY = await VN.xacNhan({
         nhan: `Đơn ${ma}`, tieuDe: 'Bạn đã nhận đủ sản phẩm?', chuDongY: 'Đã nhận được hàng', chuHuy: 'Chưa nhận',
         noiDung: `Xác nhận khi bạn đã kiểm tra ${don.sanPham.reduce((a, d) => a + d.soLuong, 0)} sản phẩm còn nguyên niêm phong, đúng size và chữ khắc. Hệ thống sẽ kích hoạt thẻ bảo hành điện tử trọn đời cho từng sản phẩm. Nếu có vấn đề, hãy chọn “Phản ánh vấn đề”.`,
       });
       if (!dongY) return;
       try {
-        VN.donHang.xacNhanDaNhan(ma);
+        await VN.donHang.xacNhanDaNhan(ma);
         location.href = VN.url('kichHoatBaoHanh', { don: ma });
       } catch (loi) { VN.thongBao({ tieuDe: 'Không xác nhận được', noiDung: VN.thoat(loi.message), loai: 'loi' }); }
     } else if (b.dataset.tac === 'mua-lai') {
+      const don = VN.donHang.lay(ma);
       const { sp } = await VN.duLieu.coBan();
       let them = 0;
-      don.sanPham.forEach((d) => {
-        const s = sp.theoMa[d.ma]; if (!s || !s.coTheMua) return;
-        const dong = { ma: d.ma, soLuong: d.soLuong };
+      for (const d of don.sanPham) {
+        const s = sp.theoMa[d.ma]; if (!s || !s.coTheMua) continue;
+        const dong = { ma: d.ma, soLuong: d.soLuong, bienThe: d.maBienThe };
         if (d.mau) dong.mau = d.mau; if (d.size) dong.size = d.size;
         if (d.khacChu) { dong.khacChu = d.khacChu; dong.kieuChu = d.kieuChu; }
-        VN.gioHang.them(dong); them += d.soLuong;
-      });
+        try { await VN.gioHang.them(dong); them += d.soLuong; } catch (loi) { VN.thongBao({ tieuDe: `Chưa thêm được ${VN.thoat(d.ten)}`, noiDung: VN.thoat(loi.message), loai: 'loi' }); }
+      }
       if (them) VN.moGioMini();
       else VN.thongBao({ tieuDe: 'Sản phẩm hiện không còn bán trực tuyến', loai: 'loi' });
     }
   });
 
   const batDau = async () => {
+    await VN.sanSang;
+    u = VN.taiKhoan.hienTai();
     tt.ch = await VN.duLieu.cauHinh().catch(() => null);
     if (!u) {
       VN.$('.menu-tk').hidden = true; VN.$('.khu-tk').classList.add('khu-tk--khach');
       VN.$('#tc-dang-nhap').href = VN.url('taiKhoan', { tiep: location.pathname + location.search });
     }
+    try { await VN.donHang.nap(); } catch (loi) { VN.thongBao({ tieuDe: 'Chưa tải được danh sách đơn hàng', noiDung: VN.thoat(loi.message), loai: 'loi' }); }
     veTheoUrl();
   };
-  if (u && u.email === VN.DEMO.email) VN.demo.damBaoDuLieu(u.id).then(batDau); else batDau();
+  batDau();
 })();

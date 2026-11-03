@@ -3,17 +3,17 @@
    ---------------------------------------------------------------------
    1. Tiện ích DOM & định dạng (tiền VNĐ, ngày giờ, bỏ dấu tiếng Việt)
    2. Đường dẫn trang & ảnh sản phẩm
-   3. AJAX bằng XMLHttpRequest + kho dữ liệu (JSON, XML)
-   4. Lưu trữ cục bộ – mô phỏng CSDL khi chưa nối back-end
-   5. Tài khoản (User / Customer)
-   6. Giỏ hàng & tính tiền đơn hàng
-   7. Đơn hàng – Thanh toán – Giữ chân hủy đơn – Bảo hành – Lịch hẹn – Đánh giá
+   3. AJAX bằng XMLHttpRequest (tệp tĩnh JSON, XML)
+   4. Lưu trữ cục bộ (localStorage): giỏ của khách chưa đăng nhập, yêu thích, đã xem, bảo hành, đánh giá…
+   5. Phiên quản trị
+   6. Tùy chọn giỏ hàng & tính tiền
+   7. Trạng thái đơn hàng – Bảo hành – Lịch hẹn – Đánh giá (còn lưu cục bộ, chờ nối API)
    8. Sản phẩm đã xem
    9. Thành phần giao diện: thông báo, hộp thoại xác nhận, thẻ sản phẩm
    10. Đầu trang: menu, tìm kiếm gợi ý, giỏ hàng mini
-   11. Dữ liệu trải nghiệm (tài khoản demo) & khởi động
-   Ghi chú tích hợp back-end: các hàm trong mục 5 – 7 đang lưu bằng localStorage.
-   Khi có API Python, chỉ cần thay phần thân hàm bằng lời gọi AJAX tương ứng.
+   11. Khởi động
+   Dữ liệu cửa hàng (sản phẩm, tài khoản, giỏ hàng, đơn hàng) lấy từ API Flask:
+   xem api.js (gọi API, đổi dữ liệu) và session.js (VN.taiKhoan, VN.gioHang, VN.donHang).
    ===================================================================== */
 (function () {
   'use strict';
@@ -122,73 +122,7 @@
   VN.taiJSON = (url) => VN.taiTep(url, 'json');
   VN.taiXML = (url) => VN.taiTep(url, 'xml');
 
-  const tepDuLieu = (ten) => (duongDan.duLieu || '../../../mock-data/') + ten;
-  const cache = {};
-  VN.duLieu = {
-    /** Danh sách sản phẩm + chỉ mục theo mã (SKU) */
-    sanPham() {
-      return cache.sp || (cache.sp = VN.taiJSON(tepDuLieu('products.json')).then((d) => {
-        nguonAnh = Object.assign({}, nguonAnh, d.nguonAnh || {});
-        const theoMa = {};
-        const sua = VN.kho.doc('qtSanPham', {});              // chỉnh sửa từ trang quản trị sản phẩm
-        d.sanPham.forEach((sp) => {
-          const s = sua[sp.ma];
-          if (s) {
-            if (s.gia) sp.gia = s.gia;
-            if ('giaCu' in s) sp.giaCu = s.giaCu || null;
-            sp.giam = sp.giaCu && sp.giaCu > sp.gia ? Math.round((sp.giaCu - sp.gia) * 100 / sp.giaCu) : null;
-            if (!sp.giam) sp.giaCu = null;
-            sp.ngungBan = !!s.ngungBan;
-          }
-          sp.coTheMua = sp.loaiGia !== 'gia_cong';          // giá công: cần báo giá theo giá vàng ngày
-          sp.giaBan = sp.coTheMua ? sp.gia : null;
-          if (!sp.ngungBan) theoMa[sp.ma] = sp;
-        });
-        // tatCa: cả mẫu ngừng bán (trang quản trị); ds / theoMa: chỉ mẫu đang bán (cửa hàng)
-        return { ds: d.sanPham.filter((sp) => !sp.ngungBan), theoMa, tatCa: d.sanPham };
-      }));
-    },
-    danhMuc() {
-      return cache.dm || (cache.dm = VN.taiJSON(tepDuLieu('categories.json')).then((d) => {
-        const theoId = {}; d.danhMuc.forEach((x) => { theoId[x.id] = x; });
-        return { ds: d.danhMuc, theoId };
-      }));
-    },
-    boSuuTap() {
-      return cache.bst || (cache.bst = VN.taiJSON(tepDuLieu('collections.json')).then((d) => {
-        const theoId = {}; d.boSuuTap.forEach((x) => { theoId[x.id] = x; });
-        return { ds: d.boSuuTap, theoId };
-      }));
-    },
-    cauHinh() { return cache.ch || (cache.ch = VN.taiJSON(tepDuLieu('config.json'))); },
-    bangSize() { return cache.size || (cache.size = VN.taiJSON(tepDuLieu('size-chart.json'))); },
-    tinhThanh() { return cache.tinh || (cache.tinh = VN.taiJSON(tepDuLieu('provinces.json'))); },
-    /** Danh sách showroom đọc từ tệp XML bằng DOM (getElementsByTagName) */
-    cuaHang() {
-      return cache.ch_xml || (cache.ch_xml = VN.taiXML(tepDuLieu('stores.xml')).then((xml) => {
-        const lay = (nut, the) => (nut.getElementsByTagName(the)[0] || {}).textContent || '';
-        return Array.from(xml.getElementsByTagName('cuahang')).map((n) => ({
-          ma: n.getAttribute('ma'), ten: lay(n, 'ten'), diaChi: lay(n, 'diachi'), khuVuc: lay(n, 'khuvuc'),
-          dienThoai: lay(n, 'dienthoai'), gioMoCua: lay(n, 'giomocua'), banDo: lay(n, 'bando'),
-        }));
-      }));
-    },
-    /** Tải đồng thời dữ liệu cốt lõi và gắn tên danh mục, bộ sưu tập vào từng sản phẩm */
-    coBan() {
-      return cache.coBan || (cache.coBan = Promise.all([this.sanPham(), this.danhMuc(), this.boSuuTap(), this.cauHinh()])
-        .then(([sp, dm, bst, ch]) => {
-          sp.tatCa.forEach((s) => {
-            s.dm = dm.theoId[s.danhMuc] || { ten: '', nhom: '' };
-            s.bst = bst.theoId[s.boSuuTap] || { ten: '' };
-            s.tenChatLieu = (ch.tenChatLieu || {})[s.chatLieu] || s.chatLieu;
-            s.tuKhoa = VN.khongDau([s.ten, s.ma, s.dm.ten, s.dm.nhom, s.bst.ten, s.tenChatLieu, s.mau.join(' ')].join(' '));
-          });
-          return { sp, dm, bst, ch };
-        }));
-    },
-  };
-
-  /* ================= 4. LƯU TRỮ CỤC BỘ (mô phỏng CSDL) ================= */
+  /* ================= 4. LƯU TRỮ CỤC BỘ ================= */
   const TIEN_TO = 'vinora.';
   const boNhoTam = {};
   VN.kho = {
@@ -203,141 +137,20 @@
     xoa(khoa) { try { localStorage.removeItem(TIEN_TO + khoa); } catch (e) { delete boNhoTam[khoa]; } },
   };
   const phatSuKien = (ten, chiTiet) => window.dispatchEvent(new CustomEvent('vinora:' + ten, { detail: chiTiet }));
+  VN.phatSuKien = phatSuKien;
 
-  /* ================= 5. TÀI KHOẢN ================= */
-  /** Băm mật khẩu SHA-256 phía trình duyệt (chỉ để mô phỏng – back-end thật phải băm có salt, NFR1) */
-  VN.bamMatKhau = async (matKhau, email) => {
-    const chuoi = 'vinora|' + String(email).trim().toLowerCase() + '|' + matKhau;
-    if (window.crypto && crypto.subtle && window.TextEncoder) {
-      const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(chuoi));
-      return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, '0')).join('');
-    }
-    let h = 5381; for (let i = 0; i < chuoi.length; i++) h = ((h << 5) + h + chuoi.charCodeAt(i)) >>> 0;
-    return 'djb2-' + h.toString(16);
-  };
-
-  const DEMO = { email: 'demo@vinora.vn', matKhau: 'Vinora@2026', hoTen: 'Nguyễn Minh Anh', sdt: '0901234567' };
-  VN.DEMO = DEMO;
-
-  VN.taiKhoan = {
-    ds() { return VN.kho.doc('nguoiDung', []); },
-    luu(ds) { VN.kho.ghi('nguoiDung', ds); },
-    docPhien() {
-      try { const s = sessionStorage.getItem(TIEN_TO + 'phien'); if (s) return JSON.parse(s); } catch (e) { /* bỏ qua */ }
-      return VN.kho.doc('phien', null);
-    },
-    hienTai() {
-      const phien = this.docPhien();
-      if (!phien) return null;
-      return this.ds().find((u) => u.id === phien.id) || null;
-    },
-    datPhien(id, ghiNho = true) {
-      const phien = { id, luc: Date.now() };
-      if (ghiNho) VN.kho.ghi('phien', phien);
-      else { try { sessionStorage.setItem(TIEN_TO + 'phien', JSON.stringify(phien)); } catch (e) { VN.kho.ghi('phien', phien); } }
-    },
-    async dangKy({ hoTen, email, matKhau, sdt = '' }) {
-      email = String(email).trim().toLowerCase();
-      const ds = this.ds();
-      if (ds.some((u) => u.email === email)) throw new Error('Email này đã được dùng để đăng ký. Vui lòng đăng nhập hoặc dùng email khác.');
-      const nguoi = {
-        id: 'KH' + Date.now().toString(36).toUpperCase(), vaiTro: 'customer', hoTen: hoTen.trim(), email, sdt,
-        matKhauBam: await VN.bamMatKhau(matKhau, email), diaChi: [], sizeNhan: null, ngaySinh: '', ngayTao: new Date().toISOString(),
-      };
-      ds.push(nguoi); this.luu(ds); VN.quanTri.dangXuat(); this.datPhien(nguoi.id, true);
-      phatSuKien('tai-khoan', nguoi);
-      return nguoi;
-    },
-    async dangNhap(email, matKhau, ghiNho = true) {
-      email = String(email).trim().toLowerCase();
-      if (email === DEMO.email) await VN.demo.damBaoTaiKhoan();
-      const nguoi = this.ds().find((u) => u.email === email);
-      if (!nguoi || nguoi.matKhauBam !== await VN.bamMatKhau(matKhau, email)) throw new Error('Email hoặc mật khẩu chưa đúng. Vui lòng kiểm tra lại.');
-      VN.quanTri.dangXuat();                         // một trình duyệt chỉ giữ một phiên đăng nhập
-      this.datPhien(nguoi.id, ghiNho);
-      if (email === DEMO.email) await VN.demo.damBaoDuLieu(nguoi.id);
-      phatSuKien('tai-khoan', nguoi);
-      return nguoi;
-    },
-    dangXuat() {
-      VN.kho.xoa('phien');
-      try { sessionStorage.removeItem(TIEN_TO + 'phien'); } catch (e) { /* bỏ qua */ }
-      phatSuKien('tai-khoan', null);
-    },
-    capNhat(thayDoi) {
-      const hienTai = this.hienTai(); if (!hienTai) return null;
-      const ds = this.ds(); const i = ds.findIndex((u) => u.id === hienTai.id);
-      ds[i] = Object.assign({}, ds[i], thayDoi); this.luu(ds); phatSuKien('tai-khoan', ds[i]);
-      return ds[i];
-    },
-    async doiMatKhau(cu, moi) {
-      const nguoi = this.hienTai();
-      if (nguoi.matKhauBam !== await VN.bamMatKhau(cu, nguoi.email)) throw new Error('Mật khẩu hiện tại chưa đúng.');
-      this.capNhat({ matKhauBam: await VN.bamMatKhau(moi, nguoi.email) });
-    },
-    /** Chuyển đến trang đăng nhập nếu chưa đăng nhập; trả về người dùng hiện tại nếu đã đăng nhập */
-    yeuCau(quayLai = location.pathname + location.search) {
-      const nguoi = this.hienTai();
-      if (!nguoi) { location.href = VN.url('taiKhoan', { tiep: quayLai }); return null; }
-      return nguoi;
-    },
-    tenGoi(nguoi) { const p = String(nguoi?.hoTen || '').trim().split(/\s+/); return p[p.length - 1] || ''; },
-    /**
-     * Sau khi xác minh OTP: gắn đơn hàng, thẻ bảo hành, đánh giá, phản ánh đã đặt bằng số điện thoại này
-     * (khi chưa có tài khoản) vào tài khoản đang đăng nhập
-     */
-    lienKetSdt(sdt) {
-      const u = this.hienTai(); if (!u) return null;
-      sdt = VN.chuanSdt(sdt);
-      const luc = new Date().toISOString(); const maDon = new Set();
-      const dsDon = VN.donHang.tatCa();
-      dsDon.forEach((d) => {
-        if (d.khachHang || d.sdtKhach !== sdt) return;
-        d.khachHang = u.id; maDon.add(d.ma);
-        (d.lichSu = d.lichSu || []).push({ luc, noiDung: 'Đơn hàng được liên kết vào tài khoản sau khi xác minh số điện thoại.', boi: 'Hệ thống', trangThai: d.trangThai });
-      });
-      if (maDon.size) VN.donHang.luuTatCa(dsDon);
-      const dsThe = VN.baoHanh.tatCa(); let soThe = 0;
-      dsThe.forEach((t) => { if (!t.khachHang && (t.sdtKhach === sdt || maDon.has(t.donHang))) { t.khachHang = u.id; soThe++; } });
-      if (soThe) VN.baoHanh.luuTatCa(dsThe);
-      ['danhGia', 'hoTro'].forEach((khoa) => {
-        const ds = VN.kho.doc(khoa, []); let doi = false;
-        ds.forEach((x) => { if (!x.khachHang && maDon.has(x.donHang)) { x.khachHang = u.id; doi = true; } });
-        if (doi) VN.kho.ghi(khoa, ds);
-      });
-      if (!u.sdt) this.capNhat({ sdt });
-      return { soDon: maDon.size, soThe };
-    },
-  };
-
+  /* ================= 5. PHIÊN QUẢN TRỊ ================= */
   /**
-   * Tài khoản quản trị (MÔ PHỎNG phía trình duyệt – back-end thật kiểm tra mật khẩu và phân quyền trên máy chủ).
-   * Phiên quản trị hết hạn sau 8 giờ.
+   * Dấu hiệu "đã đăng nhập quản trị" cho các trang quản trị (còn dùng dữ liệu mô phỏng, chờ nối API – nhóm C8).
+   * Việc kiểm tra mật khẩu do máy chủ làm (VN.taiKhoan.dangNhap); hết hạn sau 8 giờ.
    */
-  const QUAN_TRI = { email: 'admin@vinora.vn', matKhau: 'Admin@2026', hoTen: 'Quản trị viên Vinora', vaiTro: 'Quản lý cửa hàng' };
-  VN.QUAN_TRI_DEMO = { email: QUAN_TRI.email, matKhau: QUAN_TRI.matKhau };
   VN.quanTri = {
-    async dangNhap(email, matKhau) {
-      email = String(email).trim().toLowerCase();
-      if (email !== QUAN_TRI.email || await VN.bamMatKhau(matKhau, email) !== await VN.bamMatKhau(QUAN_TRI.matKhau, QUAN_TRI.email)) throw new Error('Email hoặc mật khẩu quản trị chưa đúng.');
-      VN.taiKhoan.dangXuat();                        // thoát phiên khách trước khi vào quản trị
-      VN.kho.ghi('phienQuanTri', { email, hoTen: QUAN_TRI.hoTen, vaiTro: QUAN_TRI.vaiTro, het: Date.now() + 8 * 3600000 });
-    },
+    datPhien({ email, hoTen }) { VN.kho.ghi('phienQuanTri', { email, hoTen, vaiTro: 'Quản lý cửa hàng', het: Date.now() + 8 * 3600000 }); },
     hienTai() { const p = VN.kho.doc('phienQuanTri', null); return p && p.het > Date.now() ? p : null; },
-    dangXuat() { VN.kho.xoa('phienQuanTri'); },
+    xoaPhien() { VN.kho.xoa('phienQuanTri'); },
+    dangXuat() { this.xoaPhien(); return VN.api.post('/api/auth/logout').catch(() => {}); },
   };
 
-  /** Mã OTP xác minh số điện thoại – MÔ PHỎNG (chưa nối tổng đài SMS): mã luôn là 123456, hiệu lực 5 phút */
-  VN.otp = {
-    MA_MO_PHONG: '123456',
-    gui(sdt) { VN.kho.ghi('otp', { sdt: VN.chuanSdt(sdt), het: Date.now() + 5 * 60000 }); return this.MA_MO_PHONG; },
-    kiemTra(sdt, ma) {
-      const o = VN.kho.doc('otp', null);
-      if (!o || o.sdt !== VN.chuanSdt(sdt) || o.het < Date.now()) return 'Mã xác minh đã hết hạn, vui lòng gửi lại mã.';
-      if (String(ma).trim() !== this.MA_MO_PHONG) return 'Mã xác minh chưa đúng.';
-      VN.kho.xoa('otp'); return '';
-    },
-  };
   VN.kiemTraMatKhau = (mk) => {
     const loi = [];
     if (mk.length < 8) loi.push('ít nhất 8 ký tự');
@@ -347,49 +160,7 @@
     return loi;
   };
 
-  /* ================= 6. GIỎ HÀNG ================= */
-  VN.gioHang = {
-    ds() { return VN.kho.doc('gioHang', []); },
-    luu(ds) { VN.kho.ghi('gioHang', ds); phatSuKien('gio', ds); },
-    /** Mỗi dòng giỏ được phân biệt theo mã + màu + size + nội dung khắc (FR9) */
-    khoa(d) { return [d.ma, d.mau || '', d.size || '', d.khacChu || '', d.kieuChu || ''].join('|'); },
-    them(dong, toiDa = 5) {
-      const ds = this.ds(); const k = this.khoa(dong);
-      const co = ds.find((x) => this.khoa(x) === k);
-      let vuotMuc = false;
-      if (co) { const sl = co.soLuong + dong.soLuong; vuotMuc = sl > toiDa; co.soLuong = Math.min(toiDa, sl); }
-      else ds.unshift(Object.assign({ soLuong: 1 }, dong, { themLuc: Date.now() }));
-      this.luu(ds);
-      return { ds, vuotMuc };
-    },
-    datSoLuong(khoa, sl) { const ds = this.ds(); const d = ds.find((x) => this.khoa(x) === khoa); if (d) { d.soLuong = sl; this.luu(ds); } },
-    xoa(khoa) { const ds = this.ds(); const i = ds.findIndex((x) => this.khoa(x) === khoa); let da = null; if (i > -1) { da = ds.splice(i, 1)[0]; this.luu(ds); } return da; },
-    khoiPhuc(dong, viTri = 0) { const ds = this.ds(); ds.splice(viTri, 0, dong); this.luu(ds); },
-    /** Sửa size / chữ khắc / màu của một dòng; nếu trùng với dòng khác thì gộp số lượng (FR9) */
-    capNhatDong(khoaCu, thayDoi, toiDa = 5) {
-      const ds = this.ds(); const i = ds.findIndex((x) => this.khoa(x) === khoaCu);
-      if (i < 0) return null;
-      const moi = Object.assign({}, ds[i], thayDoi);
-      ['mau', 'size', 'khacChu', 'kieuChu'].forEach((k) => { if (moi[k] === '' || moi[k] === null || moi[k] === undefined) delete moi[k]; });
-      if (!moi.khacChu) delete moi.kieuChu;
-      const k = this.khoa(moi);
-      const j = ds.findIndex((x, n) => n !== i && this.khoa(x) === k);
-      if (j > -1) { ds[j].soLuong = Math.min(toiDa, ds[j].soLuong + moi.soLuong); ds.splice(i, 1); } else ds[i] = moi;
-      this.luu(ds);
-      return k;
-    },
-    xoaHet() { this.luu([]); },
-    tongSoLuong() { return this.ds().reduce((t, d) => t + (d.soLuong || 0), 0); },
-    /** Ghép dữ liệu sản phẩm mới nhất để kiểm tra lại giá (FR10) */
-    async chiTiet() {
-      const { sp } = await VN.duLieu.coBan();
-      return this.ds().map((d) => {
-        const s = sp.theoMa[d.ma];
-        return s && s.coTheMua ? Object.assign({}, d, { sp: s, donGia: s.giaBan, thanhTien: s.giaBan * d.soLuong, khoa: this.khoa(d) }) : null;
-      }).filter(Boolean);
-    },
-  };
-
+  /* ================= 6. TÙY CHỌN GIỎ HÀNG & TÍNH TIỀN ================= */
   /** Tùy chọn của giỏ hàng (gói quà, lời nhắn thiệp, mã ưu đãi) – dùng chung cho trang giỏ hàng và thanh toán */
   VN.tuyChonGio = {
     doc() { return Object.assign({ goiQua: true, loiNhan: '', maUuDai: '' }, VN.kho.doc('tuyChonGio', {})); },
@@ -397,34 +168,24 @@
     xoa() { VN.kho.xoa('tuyChonGio'); },
   };
 
-  /** Tính tiền đơn hàng – một nơi duy nhất cho giỏ hàng, giỏ mini và thanh toán (NFR5) */
-  VN.tinhTien = (dong, ch, { maUuDai = '', maGiao = 'tieu-chuan' } = {}) => {
+  /**
+   * Tính tiền đơn hàng – một nơi duy nhất cho giỏ hàng, giỏ mini và thanh toán (NFR5).
+   * giam = số tiền giảm của mã ưu đãi do máy chủ tính (VN.uuDai.kiemTra). Phí giao theo quy tắc của máy chủ:
+   * miễn phí từ mức mienPhiTu, còn lại phí giao tiêu chuẩn. Máy chủ tính lại khi đặt hàng.
+   */
+  VN.tinhTien = (dong, ch, { giam = 0 } = {}) => {
     const tamTinh = dong.reduce((t, d) => t + d.donGia * d.soLuong, 0);
-    let giam = 0; let uuDai = null; let loi = '';
-    const ma = String(maUuDai || '').trim().toUpperCase();
-    if (ma) {
-      const u = (ch.maUuDai || []).find((x) => x.ma === ma);
-      if (!u) loi = 'Mã ưu đãi không tồn tại hoặc đã hết hạn.';
-      else if (tamTinh < (u.donToiThieu || 0)) loi = `Mã ${u.ma} áp dụng cho đơn từ ${VN.tien(u.donToiThieu)}.`;
-      else {
-        uuDai = u;
-        if (u.loai === 'phan-tram') giam = Math.min(Math.round(tamTinh * u.giaTri / 100), u.toiDa || Infinity);
-        else if (u.loai === 'so-tien') giam = Math.min(u.giaTri, tamTinh);
-      }
-    }
-    const dsGiao = ch.giaoHang.phuongThuc;
-    const pt = dsGiao.find((p) => p.ma === maGiao) || dsGiao[0];
-    let phiGiao = pt.phi;
+    const giamThuc = Math.min(Math.max(0, giam), tamTinh);
+    const pt = ch.giaoHang.phuongThuc[0];
     const duMienPhi = tamTinh >= ch.giaoHang.mienPhiTu;
-    if (pt.mienPhiTheoDon && duMienPhi) phiGiao = 0;
-    if (uuDai && uuDai.loai === 'mien-phi-giao') phiGiao = 0;
-    if (!dong.length) phiGiao = 0;
-    return { tamTinh, giam, phiGiao, tong: Math.max(0, tamTinh - giam) + phiGiao, uuDai, loi, pt, duMienPhi, conThieu: Math.max(0, ch.giaoHang.mienPhiTu - tamTinh) };
+    const phiGiao = !dong.length || duMienPhi ? 0 : pt.phi;
+    return { tamTinh, giam: giamThuc, phiGiao, tong: tamTinh - giamThuc + phiGiao, pt, duMienPhi, conThieu: Math.max(0, ch.giaoHang.mienPhiTu - tamTinh) };
   };
 
   /* ================= 7. ĐƠN HÀNG – THANH TOÁN – BẢO HÀNH – LỊCH HẸN – ĐÁNH GIÁ ================= */
   VN.TRANG_THAI_DON = {
     Pending: { ten: 'Chờ xử lý', lop: 'nhan--cam', bt: 'dong-ho' },
+    Confirmed: { ten: 'Đã xác nhận', lop: 'nhan--xanh', bt: 'xac-nhan' },
     Shipping: { ten: 'Đang giao', lop: 'nhan--xanh', bt: 'xe-giao' },
     Delivered: { ten: 'Đã nhận', lop: 'nhan--ngoc', bt: 'xac-nhan' },
     Cancelled: { ten: 'Đã hủy', lop: 'nhan--do', bt: 'huy' },
@@ -437,13 +198,14 @@
     Refunded: { ten: 'Đã hoàn tiền', lop: 'nhan--xanh' },
     Expired: { ten: 'Quá hạn thanh toán', lop: 'nhan--do' },
   };
-  /** Đơn thanh toán trực tuyến phải trả tiền trong 24 giờ, quá hạn hệ thống tự hủy */
-  VN.HAN_THANH_TOAN_GIO = 24;
+  /** Đơn thanh toán trực tuyến phải trả tiền trong 15 phút, quá hạn máy chủ tự hủy đơn (fn_PaymentTimeoutMinutes) */
+  VN.HAN_THANH_TOAN_PHUT = 15;
   VN.TEN_THANH_TOAN = { COD: 'Thanh toán khi nhận hàng', BANK: 'Chuyển khoản VietQR', VNPAY: 'Cổng VNPay', MOMO: 'Ví MoMo' };
-  VN.TEN_DICH_VU = { Cleaning: 'Làm sạch', Polishing: 'Đánh bóng & xi mới', Resizing: 'Chỉnh size nhẫn' };
+  VN.TEN_DICH_VU = { Cleaning: 'Làm sạch', Polishing: 'Đánh bóng & xi mới', Replating: 'Đánh bóng & xi mới', Resizing: 'Chỉnh size nhẫn' };
   VN.TRANG_THAI_LICH = {
     Pending: { ten: 'Chờ xác nhận', lop: 'nhan--cam' },
     Confirmed: { ten: 'Đã xác nhận', lop: 'nhan--xanh' },
+    Rescheduled: { ten: 'Đã đổi giờ', lop: 'nhan--vang' },
     Completed: { ten: 'Hoàn tất', lop: 'nhan--ngoc' },
     Cancelled: { ten: 'Đã hủy', lop: 'nhan--do' },
   };
@@ -451,173 +213,6 @@
   const ghiLichSu = (doiTuong, noiDung, boi = 'Khách hàng', trangThai) => {
     doiTuong.lichSu = doiTuong.lichSu || [];
     doiTuong.lichSu.push({ luc: new Date().toISOString(), noiDung, boi, trangThai: trangThai || doiTuong.trangThai });
-  };
-
-  VN.donHang = {
-    tatCa() { return VN.kho.doc('donHang', []); },
-    luuTatCa(ds) { VN.kho.ghi('donHang', ds); phatSuKien('don-hang', ds); },
-    /* Mã đơn được xem trên trình duyệt này khi chưa đăng nhập (đơn vừa đặt hoặc đã tra cứu đúng SĐT) */
-    dsQuyen() { return VN.kho.doc('donTruyCap', []); },
-    coQuyen(ma) { return this.dsQuyen().includes(ma); },
-    ghiQuyen(ma) { VN.kho.ghi('donTruyCap', [ma].concat(this.dsQuyen().filter((x) => x !== ma)).slice(0, 50)); },
-    /** Đã đăng nhập: đơn của tài khoản. Chưa đăng nhập: đơn đặt không cần tài khoản đã mở trên trình duyệt này */
-    cuaToi() {
-      this.tuHuyQuaHan();
-      const u = VN.taiKhoan.hienTai(); const quyen = new Set(this.dsQuyen());
-      return this.tatCa().filter((d) => (u ? d.khachHang === u.id : !d.khachHang && quyen.has(d.ma))).sort((a, b) => new Date(b.ngayDat) - new Date(a.ngayDat));
-    },
-    lay(ma) {
-      this.tuHuyQuaHan();
-      const u = VN.taiKhoan.hienTai(); const d = this.tatCa().find((x) => x.ma === ma);
-      if (!d) return null;
-      if (u && d.khachHang === u.id) return d;
-      return !d.khachHang && this.coQuyen(ma) ? d : null;
-    },
-    /** Tra cứu đơn bằng mã đơn + số điện thoại đặt hàng (không cần tài khoản) */
-    traCuu(ma, sdt) {
-      ma = String(ma || '').trim().toUpperCase(); sdt = VN.chuanSdt(sdt);
-      const d = this.tatCa().find((x) => x.ma === ma);
-      if (!d || (d.sdtKhach !== sdt && VN.chuanSdt(d.nguoiNhan && d.nguoiNhan.sdt) !== sdt)) return { loi: 'Không tìm thấy đơn hàng khớp với mã đơn và số điện thoại này. Vui lòng kiểm tra lại.' };
-      const u = VN.taiKhoan.hienTai();
-      if (d.khachHang && (!u || u.id !== d.khachHang)) return { loi: 'Đơn hàng này đã được liên kết với một tài khoản. Vui lòng đăng nhập tài khoản đó để xem.', canDangNhap: true };
-      this.ghiQuyen(d.ma);
-      return { don: d };
-    },
-    /** Đơn đặt bằng số điện thoại này nhưng chưa thuộc tài khoản nào (để liên kết khi khách tạo tài khoản) */
-    chuaLienKet(sdt) { sdt = VN.chuanSdt(sdt); return sdt ? this.tatCa().filter((d) => !d.khachHang && d.sdtKhach === sdt) : []; },
-    conLaiThanhToan(don) { return don && don.hanThanhToan ? new Date(don.hanThanhToan).getTime() - Date.now() : Infinity; },
-    /** Tự hủy các đơn thanh toán trực tuyến quá 24 giờ chưa nhận được tiền */
-    tuHuyQuaHan() {
-      const ds = this.tatCa(); let doi = false;
-      ds.forEach((d) => {
-        if (d.trangThai !== 'Pending' || !d.hanThanhToan || d.thanhToan.phuongThuc === 'COD' || d.thanhToan.trangThai === 'Success') return;
-        if (new Date(d.hanThanhToan).getTime() > Date.now()) return;
-        d.trangThai = 'Cancelled'; d.thanhToan.trangThai = 'Expired';
-        d.yeuCauHuy = { luc: d.hanThanhToan, lyDo: `Quá ${VN.HAN_THANH_TOAN_GIO} giờ chưa thanh toán`, tuDong: true, daHuy: true };
-        d.lichSu = d.lichSu || [];
-        d.lichSu.push({ luc: d.hanThanhToan, noiDung: `Hệ thống tự động hủy đơn do quá ${VN.HAN_THANH_TOAN_GIO} giờ chưa nhận được thanh toán.`, boi: 'Hệ thống', trangThai: 'Cancelled' });
-        doi = true;
-      });
-      if (doi) this.luuTatCa(ds);
-      return doi;
-    },
-    capNhat(ma, hamSua) {
-      const ds = this.tatCa(); const don = ds.find((d) => d.ma === ma);
-      if (!don) throw new Error('Không tìm thấy đơn hàng ' + ma);
-      hamSua(don); this.luuTatCa(ds); return don;
-    },
-    /** Tạo đơn hàng mới ở trạng thái Chờ xử lý (FR10) – mã đơn duy nhất */
-    tao(duLieu) {
-      const u = VN.taiKhoan.hienTai();
-      const ds = this.tatCa();
-      let ma; do { ma = 'VNR' + yymmdd() + VN.chuNgauNhien(4); } while (ds.some((d) => d.ma === ma));
-      const bayGio = new Date();
-      const don = Object.assign({
-        ma, khachHang: u ? u.id : null, ngayDat: bayGio.toISOString(), trangThai: 'Pending',
-        yeuCauHuy: null, daDanhGia: false, lichSu: [],
-      }, duLieu);
-      don.sdtKhach = VN.chuanSdt(don.sdtKhach || (u && u.sdt) || don.nguoiNhan.sdt);
-      if (don.thanhToan.phuongThuc !== 'COD') don.hanThanhToan = new Date(bayGio.getTime() + VN.HAN_THANH_TOAN_GIO * 3600000).toISOString();
-      ghiLichSu(don, u ? 'Đặt hàng thành công, đơn chờ cửa hàng xác nhận.' : `Đặt hàng không cần tài khoản (mã khách hàng: số điện thoại ${VN.anSdt(don.sdtKhach)}), đơn chờ cửa hàng xác nhận.`, 'Khách hàng', 'Pending');
-      ds.push(don); this.luuTatCa(ds);
-      this.ghiQuyen(ma);
-      return don;
-    },
-    /** Ghi nhận kết quả thanh toán từ cổng Sandbox (FR11) */
-    ghiThanhToan(ma, ketQua) {
-      this.tuHuyQuaHan();
-      return this.capNhat(ma, (don) => {
-        if (don.trangThai === 'Cancelled') throw new Error('Đơn hàng đã bị hủy nên không thể thanh toán.');
-        don.thanhToan.trangThai = ketQua ? 'Success' : 'Failed';
-        don.thanhToan.maGiaoDich = ketQua ? 'SBX' + Date.now() : null;
-        don.thanhToan.luc = new Date().toISOString();
-        ghiLichSu(don, ketQua ? `Thanh toán thành công qua ${VN.TEN_THANH_TOAN[don.thanhToan.phuongThuc]} (giao dịch ${don.thanhToan.maGiaoDich}).` : `Thanh toán qua ${VN.TEN_THANH_TOAN[don.thanhToan.phuongThuc]} không thành công.`, 'Cổng thanh toán');
-      });
-    },
-    doiSangCOD(ma) {
-      return this.capNhat(ma, (don) => {
-        if (don.trangThai !== 'Pending') throw new Error('Đơn hàng không còn ở trạng thái chờ xử lý.');
-        don.thanhToan = { phuongThuc: 'COD', trangThai: 'Pending', maGiaoDich: null };
-        delete don.hanThanhToan;
-        ghiLichSu(don, 'Khách hàng đổi phương thức thanh toán sang thanh toán khi nhận hàng.');
-      });
-    },
-    coTheHuy(don) { return don && don.trangThai === 'Pending'; },
-    /**
-     * Hủy đơn khi còn Chờ xử lý. Đơn đã thanh toán trực tuyến: ngân hàng không trả ngược về nguồn tiền được,
-     * nên khách cung cấp tài khoản nhận hoàn tiền -> trạng thái Chờ hoàn tiền (kế toán chuyển khoản trong 3 – 5 ngày làm việc)
-     */
-    huy(ma, lyDo, ghiChu = '', hoanTien = null) {
-      return this.capNhat(ma, (don) => {
-        if (!this.coTheHuy(don)) throw new Error('Đơn hàng đã được bàn giao vận chuyển nên không thể hủy trên website.');
-        const daTra = don.thanhToan.trangThai === 'Success';
-        if (daTra && (!hoanTien || !hoanTien.soTaiKhoan)) throw new Error('Vui lòng cung cấp tài khoản ngân hàng để nhận hoàn tiền.');
-        don.yeuCauHuy = { luc: new Date().toISOString(), lyDo, ghiChu, daHuy: true };
-        don.trangThai = 'Cancelled';
-        delete don.hanThanhToan;
-        ghiLichSu(don, `Khách hàng hủy đơn. Lý do: ${lyDo}${ghiChu ? ' – ' + ghiChu : ''}.`, 'Khách hàng', 'Cancelled');
-        if (daTra) {
-          don.thanhToan.trangThai = 'RefundPending';
-          don.hoanTien = { soTien: don.tongTien, nganHang: hoanTien.nganHang, soTaiKhoan: hoanTien.soTaiKhoan, chuTaiKhoan: hoanTien.chuTaiKhoan, yeuCauLuc: new Date().toISOString() };
-          ghiLichSu(don, `Ghi nhận yêu cầu hoàn ${VN.tien(don.tongTien)} vào tài khoản ${hoanTien.nganHang} ${VN.anSoTaiKhoan(hoanTien.soTaiKhoan)}.`, 'Hệ thống', 'Cancelled');
-        }
-      });
-    },
-    /* ---------- Thao tác của cửa hàng (trang quản trị) ---------- */
-    /** Kế toán đã chuyển khoản hoàn tiền cho khách */
-    hoanTienXong(ma, boi = 'Kế toán') {
-      return this.capNhat(ma, (d) => {
-        if (d.thanhToan.trangThai !== 'RefundPending') throw new Error('Đơn không có yêu cầu hoàn tiền đang chờ.');
-        d.thanhToan.trangThai = 'Refunded'; d.hoanTien.luc = new Date().toISOString();
-        ghiLichSu(d, `Đã chuyển khoản hoàn ${VN.tien(d.hoanTien.soTien)} vào tài khoản ${d.hoanTien.nganHang} ${VN.anSoTaiKhoan(d.hoanTien.soTaiKhoan)}.`, boi, 'Cancelled');
-      });
-    },
-    /** Kế toán xác nhận đã nhận tiền chuyển khoản VietQR */
-    xacNhanChuyenKhoan(ma, boi = 'Kế toán') {
-      this.tuHuyQuaHan();
-      return this.capNhat(ma, (d) => {
-        if (d.trangThai !== 'Pending') throw new Error('Đơn không còn ở trạng thái chờ xử lý.');
-        if (d.thanhToan.trangThai === 'Success') throw new Error('Đơn đã được thanh toán.');
-        d.thanhToan.trangThai = 'Success'; d.thanhToan.maGiaoDich = 'CK' + Date.now(); d.thanhToan.luc = new Date().toISOString();
-        ghiLichSu(d, `Xác nhận đã nhận ${VN.tien(d.tongTien)} chuyển khoản (giao dịch ${d.thanhToan.maGiaoDich}).`, boi);
-      });
-    },
-    /** Cửa hàng hủy đơn (chỉ khi khách chưa thanh toán; đơn đã trả cần khách cung cấp tài khoản hoàn tiền) */
-    huyBoiCuaHang(ma, lyDo, boi = 'Cửa hàng') {
-      return this.capNhat(ma, (d) => {
-        if (d.trangThai !== 'Pending') throw new Error('Chỉ hủy được đơn đang chờ xử lý.');
-        if (d.thanhToan.trangThai === 'Success') throw new Error('Đơn đã thanh toán: liên hệ khách để khách hủy và cung cấp tài khoản nhận hoàn tiền.');
-        d.trangThai = 'Cancelled'; delete d.hanThanhToan;
-        d.yeuCauHuy = { luc: new Date().toISOString(), lyDo, boiCuaHang: true, daHuy: true };
-        ghiLichSu(d, `Cửa hàng hủy đơn. Lý do: ${lyDo}.`, boi, 'Cancelled');
-      });
-    },
-    /** Ghi chú nội bộ – chỉ hiện trong trang quản trị, khách không thấy */
-    ghiChuNoiBo(ma, noiDung, boi = 'Quản trị') {
-      return this.capNhat(ma, (d) => { (d.ghiChuNoiBo = d.ghiChuNoiBo || []).push({ luc: new Date().toISOString(), noiDung, boi }); });
-    },
-    /** Khách xác nhận đã nhận hàng -> Đã nhận -> tự kích hoạt thẻ bảo hành (FR14, FR15) */
-    xacNhanDaNhan(ma, boi = 'Khách hàng') {
-      const don = this.capNhat(ma, (d) => {
-        if (d.trangThai !== 'Shipping') throw new Error('Chỉ xác nhận được với đơn đang giao.');
-        d.trangThai = 'Delivered'; d.ngayNhan = new Date().toISOString();
-        if (d.thanhToan.phuongThuc === 'COD') { d.thanhToan.trangThai = 'Success'; d.thanhToan.luc = d.ngayNhan; }
-        ghiLichSu(d, boi === 'Khách hàng' ? 'Khách hàng xác nhận đã nhận đủ sản phẩm.' : 'Đơn vị vận chuyển giao hàng thành công, khách đã ký nhận.', boi, 'Delivered');
-      });
-      const the = VN.baoHanh.kichHoatChoDon(don);
-      this.capNhat(ma, (d) => ghiLichSu(d, `Hệ thống kích hoạt ${the.length} thẻ bảo hành điện tử.`, 'Hệ thống'));
-      return { don, the };
-    },
-    /** Cửa hàng xác nhận đơn và bàn giao vận chuyển (đơn COD hoặc đã thanh toán) */
-    giaoHang(ma, boi = 'Cửa hàng') {
-      this.tuHuyQuaHan();
-      return this.capNhat(ma, (d) => {
-        if (d.trangThai !== 'Pending') throw new Error('Chỉ chuyển được đơn đang chờ xử lý.');
-        if (d.thanhToan.phuongThuc !== 'COD' && d.thanhToan.trangThai !== 'Success') throw new Error('Đơn thanh toán trực tuyến chưa nhận được tiền.');
-        d.trangThai = 'Shipping'; d.ngayGiao = new Date().toISOString();
-        ghiLichSu(d, 'Cửa hàng xác nhận đơn và bàn giao cho đơn vị vận chuyển.', boi, 'Shipping');
-      });
-    },
   };
 
   VN.baoHanh = {
@@ -709,7 +304,6 @@
       if (ds.some((d) => d.donHang === donHang)) throw new Error('Đơn hàng này đã được đánh giá.');
       const dg = { ma: 'DG' + Date.now().toString(36).toUpperCase(), donHang, khachHang: u ? u.id : null, soSao, noiDung, chuDe, camXuc: this.phanLoai(soSao, noiDung, chuDe), luc: new Date().toISOString() };
       ds.push(dg); VN.kho.ghi('danhGia', ds);
-      VN.donHang.capNhat(donHang, (d) => { d.daDanhGia = true; ghiLichSu(d, `Khách hàng đánh giá ${soSao}/5 sao.`); });
       return dg;
     },
   };
@@ -730,7 +324,6 @@
       const pa = { ma, donHang, khachHang: u ? u.id : null, loai, tenLoai, sanPham, moTa, anh, lienHe, trangThai: 'Received', luc: new Date().toISOString(), lichSu: [] };
       ghiLichSu(pa, 'Khách hàng gửi phản ánh.', 'Khách hàng', 'Received');
       ds.push(pa); this.luuTatCa(ds);
-      VN.donHang.capNhat(donHang, (d) => ghiLichSu(d, `Khách hàng gửi phản ánh ${ma}: ${tenLoai}.`));
       return pa;
     },
     /** Chăm sóc khách hàng cập nhật trạng thái + phản hồi gửi khách (hiện trong đơn hàng của khách) */
@@ -878,7 +471,7 @@
   /** HTML giá: giá bán, giá gốc gạch ngang, hoặc giá công với sản phẩm tính theo giá vàng ngày */
   VN.giaHtml = (sp, lon = false) => {
     if (!sp.coTheMua) {
-      return `<span class="the-sp__gia-cong">Giá vàng theo ngày · công <strong>${VN.tien(sp.gia)}</strong></span>`;
+      return '<span class="the-sp__gia-cong">Giá theo giá vàng ngày · <strong>liên hệ báo giá</strong></span>';
     }
     const lop = 'gia' + (lon ? ' gia--lon' : '') + (sp.giaCu ? ' gia--giam' : '');
     return `<span class="${lop}"><span class="gia__hien-tai">${VN.tien(sp.giaBan)}</span>${sp.giaCu ? `<del aria-label="Giá gốc">${VN.tien(sp.giaCu)}</del>` : ''}</span>`;
@@ -1135,7 +728,7 @@
     const gioMini = VN.$('#gio-mini');
     if (gioMini) gioMini.addEventListener('click', (e) => {
       const nut = e.target.closest('[data-xoa-mini]');
-      if (nut) { const da = VN.gioHang.xoa(nut.dataset.xoaMini); VN.veGioMini(); if (da) VN.thongBao({ tieuDe: 'Đã xóa khỏi giỏ hàng', hanhDong: { chu: 'Hoàn tác', khiBam: () => { VN.gioHang.khoiPhuc(da); VN.veGioMini(); } } }); }
+      if (nut) VN.gioHang.xoa(nut.dataset.xoaMini).then((da) => { VN.veGioMini(); if (da) VN.thongBao({ tieuDe: 'Đã xóa khỏi giỏ hàng', hanhDong: { chu: 'Hoàn tác', khiBam: () => VN.gioHang.khoiPhuc(da).then(() => VN.veGioMini()) } }); }).catch((loi) => VN.thongBao({ tieuDe: 'Chưa xóa được', noiDung: VN.thoat(loi.message), loai: 'loi' }));
     });
 
     // Thanh thông báo xoay vòng
@@ -1153,7 +746,7 @@
       <span class="xn__chu"><strong>${VN.thoat(sp.ten)}</strong><small>${phu}</small></span>
       ${them}
     </a>`;
-  const giaNgan = (sp) => (sp.coTheMua ? VN.tien(sp.giaBan) : 'Giá theo giá vàng ngày');
+  const giaNgan = (sp) => (sp.coTheMua ? VN.tien(sp.giaBan) : 'Liên hệ báo giá');
   const hopRong = (bt, chu, nut) => `<div class="xn__rong">${VN.bt(bt)}<p>${chu}</p>${nut || ''}</div>`;
 
   const XEM_NHANH = {
@@ -1185,7 +778,7 @@
           </ul>`;
       }
       const dem = (n) => (n ? `<span class="menu-tk__dem">${n}</span>` : '');
-      const donMo = VN.donHang.cuaToi().filter((d) => ['Pending', 'Shipping'].includes(d.trangThai)).length;
+      const donMo = VN.donHang.cuaToi().filter((d) => ['Pending', 'Confirmed', 'Shipping'].includes(d.trangThai)).length;
       const lichMo = VN.lichHen.cuaToi().filter((l) => ['Pending', 'Confirmed'].includes(l.trangThai)).length;
       return `<div class="xn__nguoi"><span class="menu-tk__chu-cai" aria-hidden="true">${VN.thoat(VN.taiKhoan.tenGoi(u).charAt(0).toUpperCase())}</span>
           <span><strong>${VN.thoat(u.hoTen)}</strong><small>${VN.thoat(u.email)}</small></span></div>
@@ -1358,7 +951,7 @@
       VN.$$('[data-tk-email]', menu).forEach((el) => { el.textContent = u ? u.email : ''; });
       VN.$$('[data-tk-chu-cai]', menu).forEach((el) => { el.textContent = u ? VN.taiKhoan.tenGoi(u).charAt(0).toUpperCase() : 'V'; });
       const dem = (sel, n) => VN.$$(sel, menu).forEach((el) => { el.textContent = n; el.hidden = !n; });
-      dem('[data-tk-dem-don]', u ? VN.donHang.cuaToi().filter((d) => ['Pending', 'Shipping'].includes(d.trangThai)).length : 0);
+      dem('[data-tk-dem-don]', u ? VN.donHang.cuaToi().filter((d) => ['Pending', 'Confirmed', 'Shipping'].includes(d.trangThai)).length : 0);
       dem('[data-tk-dem-the]', u ? VN.baoHanh.cuaToi().length : 0);
       dem('[data-tk-dem-lich]', u ? VN.lichHen.cuaToi().filter((l) => ['Pending', 'Confirmed'].includes(l.trangThai)).length : 0);
       dem('[data-tk-dem-yeu-thich]', VN.yeuThich.ds().length);
@@ -1370,15 +963,16 @@
     document.addEventListener('click', async (e) => {
       if (!e.target.closest('[data-dang-xuat]')) return;
       dongXemNhanh();
-      const dongY = await VN.xacNhan({ nhan: 'Tài khoản', tieuDe: 'Đăng xuất khỏi Vinora?', noiDung: 'Giỏ hàng, sản phẩm yêu thích và lịch sử xem vẫn được giữ trên trình duyệt này.', chuDongY: 'Đăng xuất' });
+      const dongY = await VN.xacNhan({ nhan: 'Tài khoản', tieuDe: 'Đăng xuất khỏi Vinora?', noiDung: 'Giỏ hàng của tài khoản được giữ lại cho lần đăng nhập sau. Sản phẩm yêu thích và lịch sử xem vẫn nằm trên trình duyệt này.', chuDongY: 'Đăng xuất' });
       if (!dongY) return;
-      VN.taiKhoan.dangXuat();
+      await VN.taiKhoan.dangXuat();
       location.href = VN.url('taiKhoan');
     });
   };
 
   /** Đồng hồ đếm ngược hạn thanh toán: mọi phần tử [data-dem-nguoc="thời điểm hết hạn"] cập nhật mỗi giây */
   const khoiTaoDemNguoc = () => {
+    let lanLamMoi = 0;     // hết giờ thì tải lại đơn, nhưng không quá một lần mỗi 10 giây (đồng hồ máy khách có thể chạy trước máy chủ)
     const chay = () => {
       let het = false;
       VN.$$('[data-dem-nguoc]').forEach((el) => {
@@ -1387,7 +981,7 @@
         const khung = el.closest('[data-khung-dem-nguoc]'); if (khung) khung.classList.toggle('sap-het', con < 3600000);
         if (con <= 0) het = true;
       });
-      if (het) VN.donHang.tuHuyQuaHan();     // hết giờ -> tự hủy, trang nghe sự kiện 'vinora:don-hang' để vẽ lại
+      if (het && Date.now() - lanLamMoi > 10000) { lanLamMoi = Date.now(); VN.donHang.heHan(); }   // máy chủ tự hủy đơn, trang nghe 'vinora:don-hang' để vẽ lại
     };
     chay(); setInterval(chay, 1000);
   };
@@ -1404,117 +998,7 @@
     }, true);
   };
 
-  /* ================= 11. DỮ LIỆU TRẢI NGHIỆM (TÀI KHOẢN DEMO) & KHỞI ĐỘNG ================= */
-  /**
-   * Tài khoản trải nghiệm demo@vinora.vn được tạo sẵn vài đơn hàng thật từ dữ liệu sản phẩm
-   * để trình bày đủ luồng: đếm ngược hạn thanh toán, hủy đơn & hoàn tiền, xác nhận nhận hàng, thẻ bảo hành, lịch hẹn.
-   */
-  VN.demo = {
-    async damBaoTaiKhoan() {
-      const ds = VN.taiKhoan.ds();
-      if (ds.some((u) => u.email === DEMO.email)) return;
-      ds.push({
-        id: 'KHDEMO', vaiTro: 'customer', hoTen: DEMO.hoTen, email: DEMO.email, sdt: DEMO.sdt,
-        matKhauBam: await VN.bamMatKhau(DEMO.matKhau, DEMO.email), sizeNhan: 12, ngaySinh: '2003-08-16', ngayTao: '2026-03-02T09:00:00.000Z',
-        diaChi: [{ id: 'DC1', hoTen: DEMO.hoTen, sdt: DEMO.sdt, tinh: 'Thành phố Hồ Chí Minh', phuongXa: 'Phường Linh Xuân', diaChi: '669 Quốc lộ 1', macDinh: true }],
-      });
-      VN.taiKhoan.luu(ds);
-    },
-    async damBaoDuLieu(idKhach, batBuoc = false) {
-      if (!batBuoc && VN.kho.doc('demoDaTao2') === idKhach) return;
-      const { sp } = await VN.duLieu.coBan();
-      const lay = (ma) => sp.theoMa[ma];
-      const dong = (ma, soLuong, them = {}) => {
-        const s = lay(ma); if (!s) return null;
-        return Object.assign({ ma: s.ma, ten: s.ten, anh: s.anh[0], chatLieu: s.chatLieu, mau: s.mau[0] || '', soLuong, donGia: s.giaBan, laNhan: !!s.canChonSize }, them);
-      };
-      const lui = (ngay, gio = 10) => { const d = new Date(); d.setDate(d.getDate() - ngay); d.setHours(gio, 12, 0, 0); return d.toISOString(); };
-      const nhan = { hoTen: DEMO.hoTen, sdt: DEMO.sdt, email: DEMO.email, tinh: 'Thành phố Hồ Chí Minh', phuongXa: 'Phường Linh Xuân', diaChi: '669 Quốc lộ 1', ghiChu: '' };
-      const taoDon = (hauTo, ngay, trangThai, dongHang, thanhToan, them = {}) => {
-        const ma = 'VNR' + yymmdd(new Date(lui(ngay))) + hauTo;
-        const dsDong = dongHang.filter(Boolean);
-        const tamTinh = dsDong.reduce((t, d) => t + d.donGia * d.soLuong, 0);
-        const giamGia = them.giamGia || 0;
-        const phiGiao = tamTinh >= 2000000 ? 0 : 30000;
-        return Object.assign({
-          ma, khachHang: idKhach, ngayDat: lui(ngay), trangThai, sanPham: dsDong, tamTinh, giamGia, maUuDai: them.maUuDai || '',
-          phiGiao, tongTien: tamTinh - giamGia + phiGiao, giaoHang: { ma: 'tieu-chuan', ten: 'Giao tiêu chuẩn có bảo hiểm' },
-          nguoiNhan: nhan, sdtKhach: DEMO.sdt, goiQua: true, thanhToan, yeuCauHuy: null, daDanhGia: false, lichSu: [],
-        }, them.khac || {});
-      };
-      const don1 = taoDon('K7Q2', 73, 'Delivered', [dong('NDINO131LDIA', 1, { size: 12, khacChu: 'M & A 2026', kieuChu: 'co-dien' }), dong('BT408', 1)],
-        { phuongThuc: 'VNPAY', trangThai: 'Success', maGiaoDich: 'SBX1786700000000', luc: lui(73) }, { khac: { ngayNhan: lui(69, 15), daDanhGia: true } });
-      don1.lichSu = [
-        { luc: lui(73), noiDung: 'Đặt hàng thành công, đơn chờ cửa hàng xác nhận.', boi: 'Khách hàng', trangThai: 'Pending' },
-        { luc: lui(73, 11), noiDung: 'Thanh toán thành công qua Cổng VNPay.', boi: 'Cổng thanh toán', trangThai: 'Pending' },
-        { luc: lui(72), noiDung: 'Cửa hàng xác nhận đơn và bàn giao cho đơn vị vận chuyển.', boi: 'Cửa hàng', trangThai: 'Shipping' },
-        { luc: lui(69, 15), noiDung: 'Khách hàng xác nhận đã nhận đủ sản phẩm.', boi: 'Khách hàng', trangThai: 'Delivered' },
-        { luc: lui(69, 15), noiDung: 'Hệ thống kích hoạt 2 thẻ bảo hành điện tử.', boi: 'Hệ thống', trangThai: 'Delivered' },
-      ];
-      const don2 = taoDon('P3M8', 5, 'Shipping', [dong('NCZ113', 2, { size: 14, mau: 'Vàng Vàng', khacChu: 'Forever', kieuChu: 'viet-tay' })],
-        { phuongThuc: 'COD', trangThai: 'Pending', maGiaoDich: null });
-      don2.lichSu = [
-        { luc: lui(5), noiDung: 'Đặt hàng thành công, đơn chờ cửa hàng xác nhận.', boi: 'Khách hàng', trangThai: 'Pending' },
-        { luc: lui(4), noiDung: 'Cửa hàng xác nhận đơn và bàn giao cho đơn vị vận chuyển.', boi: 'Cửa hàng', trangThai: 'Shipping' },
-      ];
-      const don3 = taoDon('H6T4', 1, 'Pending', [dong('DCBTCC86', 1), dong('MDZ117', 1)],
-        { phuongThuc: 'BANK', trangThai: 'Success', maGiaoDich: 'SBX1792900000000', luc: lui(1) }, { giamGia: 200000, maUuDai: 'CHAOBAN200' });
-      don3.lichSu = [
-        { luc: lui(1), noiDung: 'Đặt hàng thành công, đơn chờ cửa hàng xác nhận.', boi: 'Khách hàng', trangThai: 'Pending' },
-        { luc: lui(1, 11), noiDung: 'Thanh toán thành công qua Chuyển khoản VietQR.', boi: 'Cổng thanh toán', trangThai: 'Pending' },
-      ];
-      const don4 = taoDon('B2C9', 26, 'Cancelled', [dong('NZ081', 1, { size: 10 })], { phuongThuc: 'COD', trangThai: 'Pending' },
-        { khac: { yeuCauHuy: { luc: lui(26, 14), lyDo: 'Tôi muốn đổi sang mẫu hoặc size khác', daHuy: true } } });
-      don4.lichSu = [
-        { luc: lui(26), noiDung: 'Đặt hàng thành công, đơn chờ cửa hàng xác nhận.', boi: 'Khách hàng', trangThai: 'Pending' },
-        { luc: lui(26, 14), noiDung: 'Khách hàng hủy đơn. Lý do: Tôi muốn đổi sang mẫu hoặc size khác.', boi: 'Khách hàng', trangThai: 'Cancelled' },
-      ];
-      // Đơn ví MoMo vừa đặt 3 giờ trước, chưa thanh toán -> đồng hồ đếm ngược 24 giờ
-      const datLuc5 = new Date(Date.now() - 3 * 3600000 - 12 * 60000);
-      const don5 = taoDon('M5R1', 0, 'Pending', [dong('BT161B', 1)], { phuongThuc: 'MOMO', trangThai: 'Pending', maGiaoDich: null });
-      don5.ma = 'VNR' + yymmdd(datLuc5) + 'M5R1'; don5.ngayDat = datLuc5.toISOString();
-      don5.hanThanhToan = new Date(datLuc5.getTime() + VN.HAN_THANH_TOAN_GIO * 3600000).toISOString();
-      don5.lichSu = [
-        { luc: don5.ngayDat, noiDung: 'Đặt hàng thành công, đơn chờ cửa hàng xác nhận.', boi: 'Khách hàng', trangThai: 'Pending' },
-        { luc: new Date(datLuc5.getTime() + 60000).toISOString(), noiDung: 'Khách hàng chưa hoàn tất thanh toán qua Ví MoMo.', boi: 'Cổng thanh toán', trangThai: 'Pending' },
-      ];
-      const dsDon = VN.donHang.tatCa().filter((d) => d.khachHang !== idKhach);
-      VN.donHang.luuTatCa(dsDon.concat([don1, don2, don3, don4, don5]));
-
-      // Thẻ bảo hành cho đơn đã nhận + lịch sử dịch vụ mẫu
-      VN.baoHanh.luuTatCa(VN.baoHanh.tatCa().filter((t) => t.khachHang !== idKhach));
-      const the = VN.baoHanh.kichHoatChoDon(don1, don1.ngayNhan);
-      const dsLich = VN.lichHen.tatCa().filter((l) => l.khachHang !== idKhach);
-      if (the[0]) {
-        const theBh = VN.baoHanh.tatCa();
-        const t0 = theBh.find((t) => t.ma === the[0].ma);
-        t0.daDung.Cleaning = 1; t0.daDung.Polishing = 1;
-        t0.lichSuDichVu = [
-          { luc: lui(40, 16), loai: 'Cleaning', noiDung: 'Làm sạch tại Vinora Linh Xuân', maLich: 'LH260916001' },
-          { luc: lui(40, 16), loai: 'Polishing', noiDung: 'Đánh bóng & xi mới tại Vinora Linh Xuân', maLich: 'LH260916001' },
-        ];
-        VN.baoHanh.luuTatCa(theBh);
-        const ngayToi = new Date(); ngayToi.setDate(ngayToi.getDate() + 4);
-        const maLich1 = 'LH' + yymmdd(new Date(lui(40))) + '001'; const maLich2 = 'LH' + yymmdd(new Date(lui(2))) + '002';
-        t0.lichSuDichVu.forEach((x) => { x.maLich = maLich1; });
-        VN.baoHanh.luuTatCa(theBh);
-        dsLich.push(
-          { ma: maLich1, khachHang: idKhach, maBaoHanh: t0.ma, loai: 'Polishing', ngayHen: VN.ngayIso(lui(40)), khungGio: '15:30', cuaHang: 'HCM-LX', tenCuaHang: 'Vinora Linh Xuân', sdt: DEMO.sdt, ghiChu: 'Làm sạch và xi mới trước dịp kỷ niệm.', trangThai: 'Completed', taoLuc: lui(43), lichSu: [] },
-          { ma: maLich2, khachHang: idKhach, maBaoHanh: t0.ma, loai: 'Resizing', ngayHen: VN.ngayIso(ngayToi), khungGio: '11:00', cuaHang: 'HCM-SG', tenCuaHang: 'Vinora Đồng Khởi', sdt: DEMO.sdt, sizeMoi: 13, ghiChu: 'Nới size 12 lên 13.', trangThai: 'Confirmed', taoLuc: lui(2), lichSu: [] },
-        );
-      }
-      VN.lichHen.luuTatCa(dsLich);
-      const dsDg = VN.danhGia.tatCa().filter((d) => d.khachHang !== idKhach);
-      dsDg.push({ ma: 'DGDEMO1', donHang: don1.ma, khachHang: idKhach, soSao: 5, noiDung: 'Nhẫn sáng, đóng gói rất sang. Chữ khắc đẹp đúng như bản xem trước.', chuDe: ['Độ sáng bóng', 'Đóng gói sang trọng'], camXuc: 'Positive', luc: lui(68) });
-      VN.kho.ghi('danhGia', dsDg);
-      VN.kho.ghi('demoDaTao2', idKhach);
-    },
-    async khoiPhuc() {
-      await this.damBaoTaiKhoan();
-      await this.damBaoDuLieu('KHDEMO', true);
-    },
-  };
-
+  /* ================= 11. KHỞI ĐỘNG ================= */
   VN.khoiDong = () => {
     xuLyAnhLoi();
     khoiTaoMenu();
@@ -1528,11 +1012,11 @@
     capNhatSoYeuThich();
     capNhatTaiKhoanDauTrang();
     VN.hienDan();
-    window.addEventListener('vinora:gio', () => { capNhatSoGio(true); });
+    window.addEventListener('vinora:gio', (e) => { capNhatSoGio(!!(e.detail && e.detail.nhay)); });
     window.addEventListener('vinora:tai-khoan', capNhatTaiKhoanDauTrang);
     // Đồng bộ giỏ hàng giữa các thẻ trình duyệt đang mở
     window.addEventListener('storage', (e) => {
-      if (e.key === TIEN_TO + 'gioHang') capNhatSoGio(false);
+      if (e.key === TIEN_TO + 'gioHang' && !VN.taiKhoan.hienTai()) VN.gioHang.nap().catch(() => {});   // giỏ của khách chưa đăng nhập đổi ở thẻ khác
       if (e.key === TIEN_TO + 'yeuThich') { capNhatSoYeuThich(); VN.capNhatNutTim(); }
       const SU_KIEN = { donHang: 'don-hang', hoTro: 'ho-tro', lichHen: 'lich-hen', baoHanh: 'bao-hanh', danhGia: 'danh-gia', nguoiDung: 'nguoi-dung', qtSanPham: 'san-pham' };
       const khoa = String(e.key || '').replace(TIEN_TO, '');
@@ -1541,7 +1025,10 @@
     // Tải trước dữ liệu khi trình duyệt rảnh để tìm kiếm phản hồi tức thì
     const ranh = window.requestIdleCallback || ((f) => setTimeout(f, 600));
     ranh(() => VN.duLieu.coBan().catch((loi) => console.error(loi)));
+    // Đã đăng nhập: tải danh sách đơn để đầu trang đếm số đơn đang xử lý
+    VN.sanSang.then(() => { if (VN.taiKhoan.hienTai()) ranh(() => VN.donHang.nap().catch(() => {})); });
   };
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', VN.khoiDong);
-  else VN.khoiDong();
+  // Chạy sau khi mọi script của trang (đều defer) đã chạy xong, để các mô-đun api.js và session.js đã có mặt
+  if (document.readyState === 'complete') VN.khoiDong();
+  else window.addEventListener('DOMContentLoaded', VN.khoiDong);
 })();

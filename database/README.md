@@ -125,9 +125,9 @@ Backend **gọi thủ tục**, không tự viết lại logic (giá, tồn kho, 
 | `sp_ConfirmOrderReceived` | `@OrderID, @CustomerID` | Nút "Đã nhận được hàng" |
 | `sp_StartOrderProduction` | `@OrderID, @AdminUserID` | Admin đánh dấu đơn đã xác nhận bắt đầu chế tác (từ đó không hủy được) |
 | `sp_BookAfterSalesService` | `@WarrantyCode, @CustomerID, @ServiceType ('Cleaning'/'Polishing'/'Replating'/'Resizing'), @PreferredDate, @NewRingSize=NULL, @CustomerNote=NULL,` **`@ServiceID`** | Đặt lịch hậu mãi |
-| `sp_ScheduleAfterSalesService` | `@ServiceID, @AdminUserID, @AppointmentDate` | Admin xác nhận/đổi lịch |
-| `sp_CompleteAfterSalesService` | `@ServiceID, @AdminUserID, @ResultNote=NULL, @PaidFee=50000` | Admin hoàn tất dịch vụ (tự trừ lượt) |
-| `sp_CancelAfterSalesService` | `@ServiceID, @CustomerID` | Khách hủy lịch (không mất lượt) |
+| `sp_ScheduleAfterSalesService` | `@ServiceID, @AdminUserID, @AppointmentDate` | Admin xác nhận/đổi lịch. API: `POST /api/admin/services/<id>/schedule` |
+| `sp_CompleteAfterSalesService` | `@ServiceID, @AdminUserID, @ResultNote=NULL, @PaidFee=50000` | Admin hoàn tất dịch vụ (tự trừ lượt). API: `POST /api/admin/services/<id>/complete` |
+| `sp_CancelAfterSalesService` | `@ServiceID, @CustomerID` | Khách hủy lịch (không mất lượt). Admin hủy qua `POST /api/admin/services/<id>/cancel`: máy chủ truyền mã khách của chủ thẻ |
 | `sp_TrackProductView` | `@CustomerID, @ProductID` | Gọi khi khách mở trang chi tiết sản phẩm |
 
 Thủ tục và API tương ứng của backend (xem code trong `backend/app/routes/`):

@@ -1,7 +1,8 @@
 /* =====================================================================
    CỔNG THANH TOÁN SANDBOX (MÔ PHỎNG) – FR11
    VN.congThanhToan.mo(don) -> Promise<{ok, lyDo}>: ok = true khi giao dịch thành công.
-   Kết quả được ghi vào đơn bằng VN.donHang.ghiThanhToan (Pending -> Success / Failed).
+   Giao dịch thành công được ghi vào đơn qua API (VN.donHang.thanhToan -> POST /api/orders/<mã>/pay, mô phỏng cổng
+   thanh toán). Giao dịch thất bại hoặc bị hủy thì đơn giữ nguyên chờ thanh toán đến hết 15 phút.
    VN.qrMinhHoa(chuoi): vẽ mã QR minh họa (SVG) – KHÔNG phải mã QR thanh toán thật.
    ===================================================================== */
 (function () {
@@ -34,12 +35,14 @@
   };
   let henGio = null; let ketThuc = null; let donDangTT = null;
 
-  const dong = (thanhCong, lyDo = '') => {
+  const dong = async (thanhCong, lyDo = '') => {
     if (!ketThuc) return;
     const xong = ketThuc; ketThuc = null;
     clearInterval(henGio);
     let ok = thanhCong;
-    try { VN.donHang.ghiThanhToan(donDangTT.ma, thanhCong); } catch (loi) { ok = false; lyDo = loi.message; }   // đơn đã quá hạn và tự hủy
+    if (thanhCong) {
+      try { await VN.donHang.thanhToan(donDangTT.ma); } catch (loi) { ok = false; lyDo = loi.message; }   // ví dụ: đơn đã quá 15 phút và bị hủy
+    }
     if (hop.open) hop.close(ok ? 'thanh-cong' : 'that-bai');
     xong({ ok, lyDo });
   };

@@ -213,3 +213,21 @@ def test_huge_email_is_rejected_fast(client, clean_users):
 
 def test_oversized_body_is_413(client):
     assert client.post("/api/auth/login", json={"email": "x" * 20000, "password": "y"}).status_code == 413
+
+
+# ---------- "remember me" ----------
+
+def login_cookie(client, **extra):
+    res = client.post("/api/auth/login", json={"email": EMAIL, "password": PASSWORD, **extra})
+    assert res.status_code == 200
+    return next(c for c in res.headers.getlist("Set-Cookie") if c.startswith("session="))
+
+
+def test_login_cookie_ends_with_the_browser_unless_the_customer_asks_to_be_remembered(client, clean_users):
+    register(client)
+    assert "Expires=" not in login_cookie(client)                               # a session cookie
+    assert "Expires=" not in login_cookie(client, remember=False)
+    assert "Expires=" not in login_cookie(client, remember="yes")               # only a real true counts
+    remembered = login_cookie(client, remember=True)
+    assert "Expires=" in remembered and "SameSite=Lax" in remembered           # kept for 14 days
+    assert client.get("/api/auth/me").status_code == 200

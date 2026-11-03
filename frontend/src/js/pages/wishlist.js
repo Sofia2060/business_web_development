@@ -97,19 +97,22 @@
 
   /* ================= THÊM VÀO GIỎ ================= */
   const dongGio = (s) => (s.mau[0] ? { ma: s.ma, soLuong: 1, mau: s.mau[0] } : { ma: s.ma, soLuong: 1 });
-  luoi.addEventListener('click', (e) => {
+  luoi.addEventListener('click', async (e) => {
     const nut = e.target.closest('[data-them-gio]'); if (!nut) return;
-    const { vuotMuc } = VN.gioHang.them(dongGio(tt.sp.theoMa[nut.dataset.themGio]), tt.ch.soLuongToiDaMoiDong);
-    VN.moGioMini();
-    if (vuotMuc) VN.thongBao({ tieuDe: `Tối đa ${tt.ch.soLuongToiDaMoiDong} sản phẩm cho mỗi lựa chọn`, noiDung: 'Số lượng trong giỏ đã ở mức tối đa.' });
+    try {
+      const { vuotMuc } = await VN.gioHang.them(dongGio(tt.sp.theoMa[nut.dataset.themGio]), tt.ch.soLuongToiDaMoiDong);
+      VN.moGioMini();
+      if (vuotMuc) VN.thongBao({ tieuDe: `Tối đa ${tt.ch.soLuongToiDaMoiDong} sản phẩm cho mỗi lựa chọn`, noiDung: 'Số lượng trong giỏ đã ở mức tối đa.' });
+    } catch (loi) { VN.thongBao({ tieuDe: 'Chưa thêm được vào giỏ', noiDung: VN.thoat(loi.message), loai: 'loi' }); }
   });
-  VN.$('#yt-them-tat-ca').addEventListener('click', () => {
+  VN.$('#yt-them-tat-ca').addEventListener('click', async () => {
     let n = 0; let boQua = 0;
-    tt.tat.forEach(({ sp: s }) => {
-      if (s.coTheMua && !s.canChonSize) { VN.gioHang.them(dongGio(s), tt.ch.soLuongToiDaMoiDong); n++; } else boQua++;
-    });
+    for (const { sp: s } of tt.tat) {
+      if (!s.coTheMua || s.canChonSize) { boQua++; continue; }
+      try { await VN.gioHang.them(dongGio(s), tt.ch.soLuongToiDaMoiDong); n++; } catch (loi) { boQua++; }
+    }
     VN.moGioMini();
-    VN.thongBao({ tieuDe: `Đã thêm ${n} mẫu vào giỏ hàng`, noiDung: boQua ? `${boQua} mẫu cần chọn size hoặc báo giá nên chưa được thêm.` : '', loai: 'thanh-cong' });
+    VN.thongBao({ tieuDe: `Đã thêm ${n} mẫu vào giỏ hàng`, noiDung: boQua ? `${boQua} mẫu cần chọn size, báo giá hoặc tạm hết hàng nên chưa được thêm.` : '', loai: 'thanh-cong' });
   });
 
   /* ================= BỎ TẤT CẢ (có hoàn tác) ================= */
