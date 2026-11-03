@@ -68,16 +68,17 @@ def check_voucher():
     if not code or len(code) > MAX_CODE:
         return jsonify(error="code is required"), 400
     user = current_user()
-    if user is not None:
-        customer = query("SELECT CustomerID FROM dbo.Customers WHERE UserID = ?", (user["UserID"],))
-        if not customer:
-            return jsonify(error="Customer account required"), 403
+    customer = query("SELECT CustomerID FROM dbo.Customers WHERE UserID = ?", (user["UserID"],)) if user is not None else []
+    if customer:
         subtotal = cart_subtotal(customer[0]["CustomerID"])
         if not subtotal:
             return jsonify(error="The cart is empty"), 400
     elif "items" not in data:
+        # a logged-in user without a customer account (the admin) has no cart: 403; a visitor is asked to log in or send items
+        if user is not None:
+            return jsonify(error="Customer account required"), 403
         return jsonify(error="Login required, or send the cart lines as items"), 401
-    else:
+    else:      # a visitor, or an admin whose browser shows the shop as a visitor
         subtotal, failure = _guest_subtotal(data["items"])
         if failure:
             return jsonify(failure[0]), failure[1]
