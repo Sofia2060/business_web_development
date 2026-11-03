@@ -21,7 +21,10 @@
 
   Promise.all([VN.duLieu.coBan(), VN.sanSang]).then(async ([{ ch }]) => {
     u = VN.taiKhoan.hienTai();
-    tt.ch = ch; tt.dong = await VN.gioHang.chiTiet();
+    if (VN.matKetNoi()) return;       // thông báo mất kết nối đang hiện; giỏ chưa đọc được không phải giỏ trống
+    tt.ch = ch;
+    await boDongKhongBan();
+    tt.dong = await VN.gioHang.chiTiet();
     if (!tt.dong.length) { location.replace(VN.url('gioHang')); return; }
     await khoiTaoDiaChi();
     vePhuongThuc();
@@ -35,6 +38,15 @@
     console.error(loi);
     VN.thongBao({ tieuDe: 'Chưa tải được dữ liệu', noiDung: 'Vui lòng kiểm tra kết nối mạng rồi tải lại trang.', loai: 'loi' });
   });
+
+  /** Bỏ khỏi giỏ các dòng của sản phẩm cửa hàng đã ngừng bán (không đặt được, và không có chỗ nào ở trang này để xóa). Trả về số dòng đã bỏ. */
+  const boDongKhongBan = async () => {
+    const bo = await VN.gioHang.dongKhongBan();
+    if (!bo.length) return 0;
+    await VN.gioHang.goBo(bo.map((d) => VN.gioHang.khoa(d)));
+    VN.thongBao({ tieuDe: 'Đã bỏ sản phẩm ngừng bán khỏi giỏ', noiDung: bo.map((d) => VN.thoat(d.ten || d.ma)).join(', '), thoiGian: 8000 });
+    return bo.length;
+  };
 
   /** Kiểm tra mã ưu đãi với máy chủ; ghi tt.uuDai (dùng được, có số tiền giảm) hoặc tt.loiMa (lý do chưa dùng được) */
   const kiemTraMa = async (ma) => {
@@ -215,13 +227,17 @@
     let diaChiTam = null;     // địa chỉ vừa thêm trong lần đặt này: bị xóa nếu đặt hàng lỗi (thử lại không sinh địa chỉ trùng), hoặc khách không muốn lưu vào sổ
     try {
       // FR10: kiểm tra lại giá & số lượng ngay trước khi tạo đơn (máy chủ vẫn tính lại khi đặt)
+      await VN.gioHang.canKetNoi();
+      VN.duLieu.lamMoi();                // danh mục trong trình duyệt có thể cũ đến 5 phút: đọc lại giá và hàng đang bán
       await VN.gioHang.nap();
+      const daBo = await boDongKhongBan();
       const dongMoi = await VN.gioHang.chiTiet();
       if (!dongMoi.length) { location.replace(VN.url('gioHang')); return; }
       const doiGia = dongMoi.length !== tt.dong.length || dongMoi.some((d, i) => !tt.dong[i] || d.donGia !== tt.dong[i].donGia || d.soLuong !== tt.dong[i].soLuong);
       if (doiGia) {
         tt.dong = dongMoi; await kiemTraMa(tt.tc.maUuDai);
-        thongBaoChung('Giá hoặc số lượng trong giỏ vừa thay đổi. Vui lòng kiểm tra lại tổng tiền trước khi đặt hàng.');
+        thongBaoChung(daBo ? 'Một số sản phẩm vừa ngừng bán nên đã được bỏ khỏi giỏ. Vui lòng kiểm tra lại tổng tiền trước khi đặt hàng.'
+          : 'Giá hoặc số lượng trong giỏ vừa thay đổi. Vui lòng kiểm tra lại tổng tiền trước khi đặt hàng.');
         moLai();
         return;
       }

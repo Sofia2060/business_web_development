@@ -15,25 +15,47 @@
   const LoiApi = VN.LoiApi;
 
   /* ================= 1. ACCOUNT ================= */
+  const MAT_KET_NOI = 'Chưa kết nối được máy chủ nên chưa lưu được thay đổi. Vui lòng thử lại sau ít giây.';
+  /** Run `ham` up to `lan` times with a short wait between tries (a network blip or a busy server often passes in a second) */
+  const thuLai = async (ham, lan = 3) => {
+    for (let i = 1; ; i++) {
+      try { return await ham(); } catch (loi) { if (i >= lan) throw loi; await new Promise((xong) => setTimeout(xong, 700 * i)); }
+    }
+  };
+
   VN.taiKhoan = {
     nguoi: null,     // the logged-in customer as the pages know them, or null
+    // true when the server could not say who is logged in (network or server error). That is not the same as a
+    // visitor: a customer must not be treated as a visitor, whose cart lives in this browser and is never merged.
+    khongRo: false,
     hienTai() { return this.nguoi; },
     tenGoi(nguoi) { const p = String(nguoi?.hoTen || '').trim().split(/\s+/); return p[p.length - 1] || ''; },
-    /** Go to the login page unless a customer is logged in; returns the customer when there is one */
+    /** Go to the login page unless a customer is logged in; returns the customer when there is one.
+     *  When the server could not be reached we do not know, so the page stays (the pages show a notice). */
     yeuCau(quayLai = location.pathname + location.search) {
-      if (!this.nguoi) { location.href = VN.url('taiKhoan', { tiep: quayLai }); return null; }
+      if (!this.nguoi) { if (!this.khongRo) location.href = VN.url('taiKhoan', { tiep: quayLai }); return null; }
       return this.nguoi;
     },
-    /** Ask the server who is logged in (the login is a cookie) and load the profile and the address book */
+    /** Ask the server who is logged in (the login is a cookie) and load the profile and the address book.
+     *  A visitor (401) is a normal answer; any other failure throws and sets khongRo. */
     async nap() {
-      this.nguoi = null;
-      let ai = null;
-      try { ai = await VN.api.get('/api/auth/me'); } catch (loi) { if (loi.trangThai !== 401) console.error(loi); }
-      if (ai && ai.role === 'Customer') {
-        const [ho, diaChi] = await Promise.all([VN.api.get('/api/profile'), VN.api.get('/api/addresses')]);
-        this.nguoi = VN.khachTuApi(ai, ho, diaChi);
+      this.nguoi = null; this.khongRo = false;
+      try {
+        const ai = await VN.api.get('/api/auth/me');
+        if (ai && ai.role === 'Customer') {
+          const [ho, diaChi] = await Promise.all([VN.api.get('/api/profile'), VN.api.get('/api/addresses')]);
+          this.nguoi = VN.khachTuApi(ai, ho, diaChi);
+        }
+      } catch (loi) {
+        this.nguoi = null;
+        if (loi.trangThai !== 401) { this.khongRo = true; throw loi; }
       }
       return this.nguoi;
+    },
+    /** Load the account right after the server accepted a login or a registration. If the server cannot be reached the
+     *  person is logged in already, so say that clearly instead of a failed login. */
+    async napSauKhiVao(thongDiep) {
+      try { await thuLai(() => this.nap()); } catch (loi) { throw new LoiApi(thongDiep, { trangThai: 0 }); }
     },
     async napDiaChi() {
       this.nguoi.diaChi = VN.khachTuApi({}, { fullName: '', email: '' }, await VN.api.get('/api/addresses')).diaChi;
@@ -51,7 +73,7 @@
         return { vaiTro: 'admin', hoTen: u.fullName, email: u.email };
       }
       VN.quanTri.xoaPhien();
-      await this.nap();
+      await this.napSauKhiVao('Đã đăng nhập nhưng chưa tải được thông tin tài khoản. Vui lòng tải lại trang.');
       await VN.gioHang.gopGioKhach();
       VN.phatSuKien('tai-khoan', this.nguoi);
       return this.nguoi;
@@ -60,7 +82,7 @@
     async dangKy({ hoTen, email, matKhau, sdt = '', otp = '', sizeNhan = null }) {
       const r = await VN.api.post('/api/auth/register', { fullName: hoTen, email, password: matKhau, phone: sdt, otp });
       VN.quanTri.xoaPhien();
-      await this.nap();
+      await this.napSauKhiVao('Tài khoản đã được tạo nhưng chưa tải được thông tin. Vui lòng tải lại trang.');
       if (sizeNhan) await this.capNhat({ sizeNhan }).catch(() => {});   // the account exists already: a refused size must not look like a failed sign up
       await VN.gioHang.gopGioKhach();
       this.nguoi.donDaLienKet = r.linkedOrders || 0;
@@ -126,14 +148,28 @@
   VN.gioHang = {
     dong: [],        // lines of the cart now: from the database for a customer, from this browser for a visitor
     imLang: false,   // true while one change takes several calls (change size = remove + add): the pages hear about it once at the end
+    khongTai: false, // true when the account cart could not be read from the server
     ds() { return this.dong; },
     coMayChu() { return !!VN.taiKhoan.hienTai(); },
+    /** Before a change: when the account or the cart could not be loaded, try once more. If the server is still out of
+     *  reach, stop with a clear message, so nothing is written to the wrong place (a customer's line into this browser). */
+    async canKetNoi() {
+      if (!VN.taiKhoan.khongRo && !this.khongTai) return;
+      try {
+        await VN.taiKhoan.nap();
+        await this.nap();
+        VN.phatSuKien('tai-khoan', VN.taiKhoan.hienTai());
+      } catch (loi) { throw new LoiApi(MAT_KET_NOI, { trangThai: 0 }); }
+    },
     /** A line is told apart by code + colour + size + engraving text + style */
     khoa(d) { return [d.ma, d.mau || '', d.size || '', d.khacChu || '', d.kieuChu || ''].join('|'); },
     tongSoLuong() { return this.dong.reduce((t, d) => t + (d.soLuong || 0), 0); },
     /** Load the cart: the account cart from the server, or the cart kept in this browser. nhay = make the cart badge blink. */
     async nap(nhay = false) {
-      this.dong = this.coMayChu() ? (await VN.api.get('/api/cart')).items.map(VN.dongGioTuApi) : VN.kho.doc('gioHang', []);
+      try {
+        this.dong = this.coMayChu() ? (await VN.api.get('/api/cart')).items.map(VN.dongGioTuApi) : VN.kho.doc('gioHang', []);
+        this.khongTai = false;
+      } catch (loi) { this.khongTai = true; throw loi; }
       if (!this.imLang) VN.phatSuKien('gio', { nhay, dong: this.dong });
       return this.dong;
     },
@@ -143,6 +179,7 @@
     },
     /** Add a line (d = { ma, mau, size, khacChu, kieuChu, soLuong }). Resolves to { ds, vuotMuc }: vuotMuc = the cap per line stopped it. */
     async them(d, toiDa = 5) {
+      await this.canKetNoi();
       const sl = Math.max(1, Number(d.soLuong) || 1);
       const co = dongTrungKhoa(this.dong, (x) => this.khoa(x), d);
       const coSan = co ? co.soLuong : 0;
@@ -164,6 +201,7 @@
       return { ds: this.dong, vuotMuc };
     },
     async datSoLuong(khoa, sl) {
+      await this.canKetNoi();
       const d = this.dong.find((x) => this.khoa(x) === khoa); if (!d) return;
       if (this.coMayChu()) {
         try { await VN.api.patch('/api/cart/' + d.id, { quantity: sl }); } finally { await this.nap(); }
@@ -175,6 +213,7 @@
     },
     /** Remove a line; resolves to the removed line so the page can offer "undo" */
     async xoa(khoa) {
+      await this.canKetNoi();
       const d = this.dong.find((x) => this.khoa(x) === khoa); if (!d) return null;
       if (this.coMayChu()) await VN.api.del('/api/cart/' + d.id).catch((loi) => { if (loi.trangThai !== 404) throw loi; });
       else luuGioKhach(VN.kho.doc('gioHang', []).filter((x) => this.khoa(x) !== khoa));
@@ -208,6 +247,7 @@
       return khoaMoi;
     },
     async xoaHet() {
+      await this.canKetNoi();
       if (this.coMayChu()) { for (const d of this.dong.slice()) await VN.api.del('/api/cart/' + d.id).catch(() => {}); }
       else VN.kho.xoa('gioHang');
       await this.nap();
@@ -227,6 +267,11 @@
       VN.kho.xoa('gioHang');
       await this.nap();
     },
+    /** Lines of products the shop does not sell online any more (stopped, hidden or quote only). They cannot be ordered. */
+    async dongKhongBan() {
+      const { sp } = await VN.duLieu.coBan();
+      return this.dong.filter((d) => { const s = sp.theoMa[d.ma]; return !s || !s.coTheMua; });
+    },
     /** Lines with their product, unit price and line total. Lines of products that are not sold online any more are left out. */
     async chiTiet() {
       const { sp } = await VN.duLieu.coBan();
@@ -239,10 +284,13 @@
     },
     /** The cart lines of a visitor in the form the API takes (guest order, voucher check) */
     async dongGuiLen() {
+      const { sp } = await VN.duLieu.coBan();
       const ds = VN.kho.doc('gioHang', []); let doi = false;
-      for (const d of ds) if (!d.bienThe) { d.bienThe = (await timBienThe(d.ma, d.mau, d.size)).ma; doi = true; }
+      // A product that is not on sale any more would make the whole order or voucher check fail, so those lines are left out
+      const ban = ds.filter((d) => { const s = sp.theoMa[d.ma]; return s && s.coTheMua; });
+      for (const d of ban) if (!d.bienThe) { d.bienThe = (await timBienThe(d.ma, d.mau, d.size)).ma; doi = true; }
       if (doi) luuGioKhach(ds);
-      return ds.map((d) => ({ variantSku: d.bienThe, quantity: d.soLuong, engravingText: d.khacChu || '', engravingStyle: d.khacChu ? VN.kieuChuMayChu(d.kieuChu) : '' }));
+      return ban.map((d) => ({ variantSku: d.bienThe, quantity: d.soLuong, engravingText: d.khacChu || '', engravingStyle: d.khacChu ? VN.kieuChuMayChu(d.kieuChu) : '' }));
     },
   };
 
@@ -324,6 +372,7 @@
      * Resolves to { ma, tongTien, phiGiao }.
      */
     async tao(d) {
+      await VN.gioHang.canKetNoi();
       const chung = { paymentMethod: VN.PT_THANH_TOAN[d.phuongThuc], checkoutToken: d.token, voucherCode: d.maUuDai || '', note: d.ghiChu || '' };
       let r;
       if (VN.taiKhoan.hienTai()) r = await VN.api.post('/api/orders', Object.assign({ addressId: d.diaChiId }, chung));
@@ -370,9 +419,16 @@
 
   /* ================= 5. READY ================= */
   /** Done when the account and the cart are loaded. Pages that need them start with `await VN.sanSang`. */
+  /** True while the account or the cart could not be loaded from the server (and has not been loaded since) */
+  VN.matKetNoi = () => VN.taiKhoan.khongRo || VN.gioHang.khongTai;
   VN.sanSang = (async () => {
-    try { await VN.taiKhoan.nap(); } catch (loi) { console.error(loi); }
-    try { await VN.gioHang.nap(); } catch (loi) { console.error(loi); }
+    try { await thuLai(() => VN.taiKhoan.nap()); } catch (loi) { console.error(loi); }
+    // The cart of a visitor is read from this browser, so it is only worth reading when we know the visitor is one
+    if (!VN.taiKhoan.khongRo) { try { await thuLai(() => VN.gioHang.nap()); } catch (loi) { console.error(loi); } }
+    if (VN.matKetNoi()) {
+      // Stays on screen (an error notice does not close by itself) until the person reloads
+      VN.thongBao({ tieuDe: 'Chưa kết nối được máy chủ', noiDung: 'Đăng nhập và giỏ hàng chưa tải được nên tạm thời chưa thay đổi được giỏ hàng.', loai: 'loi', hanhDong: { chu: 'Tải lại', khiBam: () => location.reload() } });
+    }
     VN.phatSuKien('tai-khoan', VN.taiKhoan.hienTai());
   })();
 })();

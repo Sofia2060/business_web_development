@@ -110,7 +110,8 @@ Cách một trang dùng: `await VN.sanSang`, đọc trạng thái bằng hàm th
 
 - **Sản phẩm.** Trang tải cả danh mục một lần (5 lần gọi `GET /api/products?limit=100`, lưu trong `sessionStorage` tối đa 5 phút) rồi lọc, đếm và sắp xếp ngay trên trình duyệt. Với 443 sản phẩm cách này nhanh và giữ nguyên bộ lọc cũ. Giá và tồn kho vẫn được máy chủ kiểm tra lại khi thêm giỏ và đặt hàng. Trang chi tiết gọi thêm `GET /api/products/<mã>` để lấy đủ ảnh, đá và các biến thể (màu, size, tồn kho). Chỉ hiện các size đang có trong kho.
 - **Sản phẩm chỉ báo giá** (`IsQuoteOnly`): hiện "Liên hệ báo giá", không có nút mua.
-- **Giỏ hàng.** Khách có tài khoản: giỏ nằm trong database. Khách chưa đăng nhập: giỏ nằm trong `localStorage` của trình duyệt, gửi kèm khi đặt hàng. Khi đăng nhập hoặc đăng ký, giỏ của trình duyệt được gộp vào giỏ tài khoản. Mỗi dòng giỏ mua tối đa 5 (giới hạn của giao diện, database cho 10).
+- **Giỏ hàng.** Khách có tài khoản: giỏ nằm trong database. Khách chưa đăng nhập: giỏ nằm trong `localStorage` của trình duyệt, gửi kèm khi đặt hàng. Khi đăng nhập hoặc đăng ký, giỏ của trình duyệt được gộp vào giỏ tài khoản. Mỗi dòng giỏ mua tối đa 5 (giới hạn của giao diện, database cho 10). Nếu lúc tải trang máy chủ không trả lời (mạng chập chờn), trang thử lại 3 lần. Vẫn lỗi thì hiện thông báo "Chưa kết nối được máy chủ" kèm nút Tải lại, và chặn thay đổi giỏ cho tới khi kết nối lại. Khách đã đăng nhập không bị coi là khách vãng lai trong lúc đó, nên giỏ không bị ghi nhầm vào trình duyệt.
+- **Trước khi đặt**, trang thanh toán đọc lại danh mục từ máy chủ (bỏ bản lưu 5 phút), bỏ khỏi giỏ các sản phẩm đã ngừng bán hoặc ẩn rồi báo cho khách, và so lại giá. Giá đổi hoặc có dòng bị bỏ thì đơn chưa đặt, khách xem lại tổng tiền rồi bấm đặt lần nữa.
 - **Đặt hàng.** Có tài khoản: chọn địa chỉ trong sổ (địa chỉ mới được thêm vào sổ, xóa lại sau khi đặt nếu khách bỏ chọn "Lưu địa chỉ"). Không tài khoản: `POST /api/orders/guest`, số điện thoại là mã khách. Mua tặng người khác thì số người đặt dùng để tra cứu, số người nhận để giao. Mã đơn và số điện thoại của khách không tài khoản được nhớ trong `localStorage` (khóa `donKhach`) để xem lại đơn trên trình duyệt đó.
 - **Thanh toán trực tuyến** (VNPay, MoMo) là mô phỏng: cổng giả trên trang gọi `POST /api/orders/<mã>/pay`. Phải xong trong 15 phút, trang kết quả và trang đơn hàng đếm ngược. Hết giờ máy chủ tự hủy đơn.
 - **Hủy đơn.** Nút "Hủy đơn" theo `CancelChannel`: `Web` thì hiện bước chọn lý do rồi popup nhắc mất voucher (giữ hoặc hủy); `Hotline` thì hiện hướng dẫn gọi hotline; đơn đang chế tác không có nút.
@@ -285,7 +286,7 @@ Khách chưa đăng nhập vẫn đặt hàng được. **Số điện thoại l
 uv run pytest
 ```
 
-Test nằm trong `backend/tests/` (557 test, chạy khoảng bốn phút). Test không đụng vào dữ liệu thật. Mỗi lần chạy, `backend/tests/conftest.py` dựng lại một database riêng tên `VinoraJewelry_Test` từ file `database/01_*.sql` (mất khoảng 5 giây). Cần quyền tạo database trên SQL Server. Nếu không kết nối được, các test bị bỏ qua và pytest in lý do.
+Test nằm trong `backend/tests/` (564 test, chạy khoảng bốn phút). Test không đụng vào dữ liệu thật. Mỗi lần chạy, `backend/tests/conftest.py` dựng lại một database riêng tên `VinoraJewelry_Test` từ file `database/01_*.sql` (mất khoảng 5 giây). Cần quyền tạo database trên SQL Server. Nếu không kết nối được, các test bị bỏ qua và pytest in lý do.
 
 ## Quy ước
 

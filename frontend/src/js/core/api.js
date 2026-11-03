@@ -251,6 +251,11 @@
   };
 
   VN.duLieu = {
+    /** Forget the saved catalog so the next read goes to the server (used right before an order is placed) */
+    lamMoi() {
+      try { sessionStorage.removeItem(KHOA_KHO); } catch (e) { /* storage blocked: nothing was saved anyway */ }
+      delete cache.sp; delete cache.coBan;
+    },
     /** All products on sale + an index by code (SKU). ds / theoMa / tatCa hold the same products. */
     sanPham() {
       if (cache.sp) return cache.sp;
