@@ -140,13 +140,13 @@
 
   const htmlDanhGia = (don) => {
     if (don.trangThai !== 'Delivered') return '';
-    const dg = VN.danhGia.theoDon(don.ma);
+    const dg = don.danhGia;
     const noiDung = dg
       ? `<div class="dg-don">${sao(dg.soSao)}
           ${dg.noiDung ? `<blockquote>“${VN.thoat(dg.noiDung)}”</blockquote>` : ''}
           ${dg.chuDe && dg.chuDe.length ? `<div class="chip-nhom">${dg.chuDe.map((c) => `<span class="chip chip--nho">${VN.thoat(c)}</span>`).join('')}</div>` : ''}
           <p class="chu-rat-nho chu-phu">Gửi lúc ${VN.ngayGio(dg.luc)}</p>
-          ${dg.phanHoi ? `<div class="dg-don__phan-hoi"><strong>${VN.bt('chat', 'bt--nho')} Phản hồi từ ${VN.thoat(dg.phanHoi.boi)}</strong><p>${VN.thoat(dg.phanHoi.noiDung)}</p><small>${VN.ngayGio(dg.phanHoi.luc)}</small></div>` : ''}</div>`
+        </div>`
       : `<div class="dg-don__cta"><p>Bạn chưa đánh giá đơn hàng này. Cảm nhận của bạn giúp Vinora hoàn thiện sản phẩm và dịch vụ.</p>
           <a class="nut nut--chinh nut--nho" href="${VN.url('kichHoatBaoHanh', { don: don.ma })}#danh-gia">${VN.bt('sao')} Viết đánh giá</a></div>`;
     return `<section class="khoi-tk" aria-labelledby="td-dg-dh" id="danh-gia-don">
@@ -282,7 +282,7 @@
   // Đơn thay đổi (tự hủy khi hết hạn thanh toán, phản ánh được xử lý…) -> vẽ lại
   window.addEventListener('vinora:don-hang', VN.chongDoi(lamMoi, 60));
   window.addEventListener('vinora:ho-tro', VN.chongDoi(lamMoi, 60));
-  window.addEventListener('storage', (e) => { if (/^vinora\.(hoTro|danhGia)$/.test(e.key || '')) lamMoi(); });
+  window.addEventListener('storage', (e) => { if (/^vinora\.hoTro$/.test(e.key || '')) lamMoi(); });
 
   const moPhanAnh = async (ma) => { if (VN.moPhanAnh) await VN.moPhanAnh(ma); };
 

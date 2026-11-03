@@ -70,3 +70,48 @@ def test_products_not_on_sale_are_left_out_of_what_a_visitor_sends(out):
     assert out["sentToServer"] == ["SP1-V"]
     assert out["notOnSale"] == ["STOP", "QUOTE"]
     assert out["detailLines"] == ["SP1"]
+
+
+def test_a_visitors_history_stays_in_the_browser_and_joins_the_account_at_login(out):
+    assert out["visitorViewed"] == {"list": ["B", "A"], "server": []}           # nothing is sent for a visitor
+    # the browser's list goes up oldest first, the account's own entry stays, and the browser forgets its copy
+    assert out["viewedMerged"] == {"server": ["X", "A", "B"], "list": ["B", "A", "X"], "local": 0}
+
+
+def test_a_customers_history_changes_at_once_and_reaches_the_server_in_the_background(out):
+    assert out["viewedAtOnce"] == ["A", "B", "X"] and out["viewedOnServer"] == ["X", "B", "A"]
+    assert out["removedAtOnce"] == ["A", "X"] and out["removedOnServer"] == ["X", "A"]
+    assert out["clearedAtOnce"] == []
+
+
+def test_a_history_change_the_server_refused_is_taken_back(out):
+    assert out["failedRemoveAtOnce"] == ["A"]
+    assert out["failedRemoveAfterReload"] == ["A", "X"]
+
+
+def test_undo_sends_the_entries_oldest_first(out):
+    assert out["restoredAtOnce"] == ["A", "X"]
+    # sent oldest first. The real database keeps whole seconds, so entries sent in the same second can swap places there
+    assert out["restoredOnServer"] == ["X", "A"]
+
+
+def test_one_restored_entry_comes_back_as_the_newest_on_the_page_and_on_the_server(out):
+    assert out["restoredOneAfter"] == {"list": ["X", "A"], "server": ["A", "X"]}
+    assert out["restoredOneReload"] == ["X", "A"]              # reading the server again gives the same order as the page showed
+
+
+def test_the_login_merge_skips_a_product_that_is_gone_and_keeps_the_list_when_it_fails(out):
+    assert out["mergeSkipsGone"] == {"server": ["X", "A"], "local": 0}
+    for status, result in zip((500, 401, 0), out["mergeFailures"]):
+        # the error comes out, this browser keeps its list for the next login, and the page shows the account's own list
+        assert result == {"status": status, "rejected": True, "local": 1, "list": ["A", "X"]}, result
+
+
+def test_a_removal_and_its_undo_reach_the_server_in_that_order(out):
+    assert out["removeThenUndo"] == {"list": ["A"], "server": ["A"]}
+
+
+def test_a_review_is_sent_as_the_api_wants_it_and_comes_back_in_the_page_shape(out):
+    assert out["review"]["sent"] == {"rating": 4, "text": "Đẹp", "topics": ["Đúng size"]}      # a customer sends no phone
+    assert out["review"]["result"] == {"ma": 7, "donHang": "VN123", "soSao": 4, "noiDung": "Đẹp",
+                                       "luc": "2030-01-01T09:00:00", "chuDe": ["Đúng size"]}

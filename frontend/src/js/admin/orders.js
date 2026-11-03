@@ -65,7 +65,7 @@
     const ma = d.ma;
     tt.ma = ma;
     const k = qt.khach(d); const nn = d.nguoiNhan; const yc = d.yeuCauHuy;
-    const pa = VN.hoTro.theoDon(d.ma); const dg = VN.danhGia.theoDon(d.ma);
+    const pa = VN.hoTro.theoDon(d.ma); const dg = d.danhGia;
     const the = theBaoHanh.filter((t) => t.OrderCode === d.ma).map((t) => ({ ma: t.WarrantyCode }));
     const html = `
       <div class="qt-ct__muc"><div class="hang hang--quan">${qt.nhanDon(d)} ${qt.nhanTT(d)} ${hanHtml(d)}</div>${nutThaoTac(d)}

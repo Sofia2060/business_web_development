@@ -13,6 +13,7 @@ from ..db import ProcError, call, named_lock, query, transaction
 from ..validation import INT_MAX, body, is_int, normalize_phone, text, utf16_len
 from .addresses import LIMITS, full_address_error, read_fields
 from .cart import add_line, cart_subtotal, read_line, shipping_fee
+from .feedback import feedbacks_where
 
 bp = Blueprint("orders", __name__, url_prefix="/api/orders")
 
@@ -234,8 +235,11 @@ def list_orders():
             "JOIN dbo.Orders o ON o.OrderID = oi.OrderID WHERE o.CustomerID = ? ORDER BY oi.OrderID, oi.OrderItemID",
             (g.customer_id,)):
         items.setdefault(item.pop("OrderID"), []).append(item)
+    reviews = feedbacks_where("f.CustomerID = ?", (g.customer_id,))
     for order in orders:
-        order["items"] = items.get(order.pop("OrderID"), [])
+        order_id = order.pop("OrderID")
+        order["items"] = items.get(order_id, [])
+        order["feedback"] = reviews.get(order_id)      # null until the customer reviews the delivered order
     return jsonify(orders)
 
 
@@ -267,6 +271,7 @@ def order_detail(code: str, customer_id: int | None = None):
     order["pendingCancelRequest"] = ({"RequestID": pending[0]["RequestID"], "VoucherCode": order["VoucherCode"],
                                       "VoucherDiscount": order["DiscountAmount"], "Subtotal": order["Subtotal"],
                                       "TotalAmount": order["TotalAmount"]} if pending else None)
+    order["feedback"] = feedbacks_where("f.OrderID = ?", (order["OrderID"],)).get(order["OrderID"])
     del order["OrderID"]
     return order
 

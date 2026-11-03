@@ -63,7 +63,8 @@ APPOINTMENT_NOTE = "Showroom: Showroom Quận 1 | SĐT: 0901234567 | Ảnh chọ
 
 
 def warranty_samples():
-    """The real answers of GET /api/warranties and GET /api/after-sales for a customer with a delivered ring and one booking."""
+    """The real answers of GET /api/warranties, GET /api/after-sales and the order for a customer with a delivered ring, one booking
+    and a review of the order."""
     customer, address = new_customer()
     assert add_to_cart(customer, RING).status_code == 201
     code = checkout(customer, address).get_json()["OrderCode"]
@@ -76,7 +77,10 @@ def warranty_samples():
     res = customer.post("/api/after-sales", json={"warrantyCode": card["WarrantyCode"], "serviceType": "Polishing",
                                                   "preferredDate": when.isoformat(), "note": APPOINTMENT_NOTE})
     assert res.status_code == 201, res.get_json()
-    return customer.get("/api/warranties").get_json(), customer.get("/api/after-sales").get_json()
+    assert customer.post(f"/api/orders/{code}/feedback", json={"rating": 4, "text": "Đẹp", "topics": ["Đúng size", "Nhầm size nhẫn"]}).status_code == 201
+    row = next(o for o in customer.get("/api/orders").get_json() if o["OrderCode"] == code)
+    return (customer.get("/api/warranties").get_json(), customer.get("/api/after-sales").get_json(),
+            customer.get(f"/api/orders/{code}").get_json(), row)
 
 
 @pytest.fixture(scope="module")
@@ -106,7 +110,7 @@ def adapted(db_ready, tmp_path_factory):
     samples["guestOrder"] = client.application.test_client().get(f"/api/orders/{res.get_json()['OrderCode']}",
                                                                   query_string={"phone": phone}).get_json()
     samples["errors"] = real_errors(client, address_id)
-    samples["warranties"], samples["services"] = warranty_samples()
+    samples["warranties"], samples["services"], samples["reviewedOrder"], samples["reviewedRow"] = warranty_samples()
     path = tmp_path_factory.mktemp("adapters") / "samples.json"
     path.write_text(json.dumps(samples), encoding="utf-8")
     run = subprocess.run([NODE, str(HARNESS), str(API_JS), str(path)], capture_output=True, text=True, encoding="utf-8", timeout=60)
@@ -207,9 +211,19 @@ def test_an_appointment_in_page_shape_and_its_note_reads_back(adapted):
     assert adapted["noteRoundTrip"] == APPOINTMENT_NOTE
 
 
+def test_an_order_carries_its_review(adapted):
+    expected = {"ma": adapted["reviewedOrder"]["danhGia"]["ma"], "donHang": adapted["reviewedOrder"]["ma"], "soSao": 4,
+                "noiDung": "Đẹp", "chuDe": ["Đúng size", "Nhầm size nhẫn"]}
+    for order in (adapted["reviewedOrder"], adapted["reviewedRow"]):               # the detail and the list row
+        assert order["daDanhGia"] is True and isinstance(order["danhGia"]["ma"], int) and DATE.match(order["danhGia"]["luc"][:10])
+        assert {k: order["danhGia"][k] for k in expected} == expected
+    cash = adapted["orderDetails"][0]
+    assert cash["daDanhGia"] is False and cash["danhGia"] is None             # an order nobody reviewed
+
+
 def test_the_pages_do_not_use_the_removed_demo_data():
     """The demo accounts and the browser-only order store are gone; a page that still calls them would break at run time."""
-    gone = re.compile(r"VN\.(demo|DEMO|otp|QUAN_TRI_DEMO|bamMatKhau)\b|VN\.donHang\.(tatCa|luuTatCa|tao\(\{\s*sanPham|doiSangCOD|ghiThanhToan)|VN\.gioHang\.(luu|ds\(\)\.find)|VN\.baoHanh\.(kichHoatChoDon|ghiDichVu|taoMa|luuTatCa)|VN\.lichHen\.(capNhat|luuTatCa)")
+    gone = re.compile(r"VN\.(demo|DEMO|otp|QUAN_TRI_DEMO|bamMatKhau)\b|VN\.donHang\.(tatCa|luuTatCa|tao\(\{\s*sanPham|doiSangCOD|ghiThanhToan)|VN\.gioHang\.(luu|ds\(\)\.find)|VN\.baoHanh\.(kichHoatChoDon|ghiDichVu|taoMa|luuTatCa)|VN\.lichHen\.(capNhat|luuTatCa)|VN\.danhGia\.(tatCa|theoDon|phanLoai|phanHoi)")
     offenders = []
     for path in sorted((FRONTEND_DIR / "src" / "js").glob("*/*.js")):
         if path.parent.name == "admin":      # the admin pages are not connected yet: admin.js replaces tatCa() with an empty list

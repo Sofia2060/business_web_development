@@ -26,11 +26,12 @@ vm.runInContext(fs.readFileSync(apiFile, 'utf8'), sandbox);
 vm.runInContext(fs.readFileSync(sessionFile, 'utf8'), sandbox);
 
 // The scripted server: up/down, who is logged in, the account cart
-const server = { up: true, me: null, cart: [], services: [], listDown: false };
+const server = { up: true, me: null, cart: [], services: [], listDown: false, viewed: [], delDown: false, reviews: [] };
 const loi = (trangThai) => new VN.LoiApi('x', { trangThai });
 VN.api.get = async (url) => {
   if (!server.up) throw loi(0);
   if (url === '/api/after-sales') { if (server.listDown) throw loi(0); return server.services; }
+  if (url.startsWith('/api/recently-viewed')) return server.viewed.slice().reverse().map((sku, i) => ({ SKU: sku, LastViewedAt: new Date(1e12 - i * 1000).toISOString() }));
   if (url === '/api/auth/me') { if (!server.me) throw loi(401); return server.me; }
   if (url === '/api/profile') return { fullName: 'Khách A', email: 'a@example.test', phone: '0911000111' };
   if (url === '/api/addresses') return [];
@@ -41,6 +42,13 @@ VN.api.post = async (url, body) => {
   if (!server.up) throw loi(0);
   if (url === '/api/auth/login') { server.me = { role: 'Customer', id: 5 }; return server.me; }
   if (url === '/api/auth/logout') return {};
+  if (url === '/api/recently-viewed' && server.postFails != null) throw loi(server.postFails);
+  if (url === '/api/recently-viewed' && (server.gone || []).includes(body.sku)) throw loi(404);
+  if (url === '/api/recently-viewed') { server.viewed = server.viewed.filter((x) => x !== body.sku).concat(body.sku); return null; }
+  if (/^\/api\/orders\/[^/]+\/feedback$/.test(url)) {
+    server.reviews.push(body);
+    return { FeedbackID: 7, RatingStar: body.rating, ReviewText: body.text, CreatedAt: '2030-01-01T09:00:00', aspects: body.topics.map((t) => ({ AspectName: t, Polarity: 'Positive' })) };
+  }
   if (url === '/api/after-sales') {
     const row = { ServiceID: 11, ServiceType: body.serviceType, PreferredDate: body.preferredDate, Status: 'Pending', WarrantyCode: body.warrantyCode, CustomerNote: body.note, CreatedAt: '2030-01-01T09:00:00' };
     server.services.push(row); return row;
@@ -54,6 +62,13 @@ const theoMa = { SP1: { ma: 'SP1', coTheMua: true, giaBan: 1000 }, QUOTE: { ma: 
 VN.duLieu.coBan = async () => ({ sp: { theoMa } });
 VN.duLieu.chiTietSanPham = async () => ({ coTheMua: true, canChonSize: false, bienThe: [{ ma: 'SP1-V', mau: 'Vàng', size: null, tonKho: 9 }] });
 
+VN.api.del = async (url) => {
+  if (server.delDown) throw loi(0);
+  if (server.delDelay) await new Promise((r) => setTimeout(r, server.delDelay));
+  if (url === '/api/recently-viewed') server.viewed = [];
+  else server.viewed = server.viewed.filter((x) => x !== decodeURIComponent(url.split('/').pop()));
+};
+const tick = () => new Promise((r) => setTimeout(r, 30));      // lets the background requests finish
 const attempt = async (ham) => { try { return { ok: true, value: await ham() }; } catch (e) { return { ok: false, message: e.message, status: e.trangThai }; } };
 const gioKhach = () => VN.kho.doc('gioHang', []);
 
@@ -117,5 +132,56 @@ const gioKhach = () => VN.kho.doc('gioHang', []);
   server.listDown = false; VN.baoHanh.ds = [{ ma: 'VNW26110000001-1' }];
   await VN.taiKhoan.dangXuat();
   out.afterLogout = { cards: VN.baoHanh.ds.length, services: VN.lichHen.ds.length };
+
+  // 9. Recently viewed: a visitor's list stays here; at login it joins the account's; a customer's list is on the server
+  const ma = () => VN.daXem.ds().map((x) => x.ma);
+  VN.taiKhoan.nguoi = null; server.me = null;
+  VN.daXem.ghi('A'); VN.daXem.ghi('B');
+  out.visitorViewed = { list: ma(), server: server.viewed.slice() };
+  VN.kho.ghi('daXem', [{ ma: 'B', luc: 2000 }, { ma: 'A', luc: 1000 }]);
+  server.viewed = ['X']; VN.taiKhoan.nguoi = { id: 5 };
+  await VN.daXem.gopKhach();
+  out.viewedMerged = { server: server.viewed.slice(), list: ma(), local: VN.kho.doc('daXem', []).length };
+  VN.daXem.ghi('A');
+  out.viewedAtOnce = ma(); await tick();
+  out.viewedOnServer = server.viewed.slice();
+  VN.daXem.xoa('B');
+  out.removedAtOnce = ma(); await tick();
+  out.removedOnServer = server.viewed.slice();
+  server.delDown = true; VN.daXem.xoa('X');
+  out.failedRemoveAtOnce = ma(); await tick();
+  out.failedRemoveAfterReload = ma();                       // the server still has X, so the list shows it again
+  server.delDown = false; VN.daXem.xoaHet();
+  out.clearedAtOnce = ma(); await tick();
+  VN.daXem.khoiPhuc([{ ma: 'X', luc: 3000 }, { ma: 'A', luc: 5000 }]);
+  out.restoredAtOnce = ma(); await tick();
+  out.restoredOnServer = server.viewed.slice();
+  VN.daXem.xoa('X'); await tick();
+  VN.daXem.khoiPhuc([{ ma: 'X', luc: 1 }]); await tick();      // an old entry comes back as the newest, on the page and on the server
+  out.restoredOneAfter = { list: ma(), server: server.viewed.slice() };
+  await VN.daXem.nap();
+  out.restoredOneReload = ma();
+
+  // 9b. The merge at login: a product that is gone (404) is skipped; any other failure keeps this browser's list and still shows the account's
+  server.viewed = ['X']; server.gone = ['GONE']; VN.kho.ghi('daXem', [{ ma: 'GONE', luc: 2 }, { ma: 'A', luc: 1 }]);
+  await VN.daXem.gopKhach();
+  out.mergeSkipsGone = { server: server.viewed.slice(), local: VN.kho.doc('daXem', []).length };
+  out.mergeFailures = [];
+  for (const status of [500, 401, 0]) {
+    server.postFails = status; VN.kho.ghi('daXem', [{ ma: 'B', luc: 1 }]);
+    const merged = await attempt(() => VN.daXem.gopKhach());
+    out.mergeFailures.push({ status, rejected: !merged.ok, local: VN.kho.doc('daXem', []).length, list: ma() });
+  }
+  server.postFails = null; VN.kho.ghi('daXem', []);
+
+  // 9c. A removal followed at once by its undo must reach the server in that order, even when the removal is slow
+  server.viewed = ['A']; VN.daXem.luu = [{ ma: 'A', luc: Date.now() }]; server.delDelay = 40;
+  VN.daXem.xoa('A'); VN.daXem.khoiPhuc([{ ma: 'A', luc: 1 }]);
+  await new Promise((r) => setTimeout(r, 200)); server.delDelay = 0;
+  out.removeThenUndo = { list: ma(), server: server.viewed.slice() };
+
+  // 10. A review goes to the server as the API wants it, and comes back in the shape the pages use
+  const review = await attempt(() => VN.danhGia.tao({ donHang: 'VN123', soSao: 4, noiDung: 'Đẹp', chuDe: ['Đúng size'] }));
+  out.review = { sent: server.reviews[0], ok: review.ok, result: review.value };
   console.log(JSON.stringify(out));
 })().catch((e) => { console.error(e); process.exit(1); });

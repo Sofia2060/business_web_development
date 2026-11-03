@@ -76,6 +76,7 @@
       VN.quanTri.xoaPhien();
       await this.napSauKhiVao('Đã đăng nhập nhưng chưa tải được thông tin tài khoản. Vui lòng tải lại trang.');
       await VN.gioHang.gopGioKhach();
+      await VN.daXem.gopKhach().catch(() => {});      // the history of this browser joins the account's (a failure only leaves it here)
       VN.phatSuKien('tai-khoan', this.nguoi);
       return this.nguoi;
     },
@@ -86,6 +87,7 @@
       await this.napSauKhiVao('Tài khoản đã được tạo nhưng chưa tải được thông tin. Vui lòng tải lại trang.');
       if (sizeNhan) await this.capNhat({ sizeNhan }).catch(() => {});   // the account exists already: a refused size must not look like a failed sign up
       await VN.gioHang.gopGioKhach();
+      await VN.daXem.gopKhach().catch(() => {});
       this.nguoi.donDaLienKet = r.linkedOrders || 0;
       VN.phatSuKien('tai-khoan', this.nguoi);
       return this.nguoi;
@@ -93,7 +95,7 @@
     async dangXuat() {
       try { await VN.api.post('/api/auth/logout'); } catch (loi) { console.error(loi); }
       this.nguoi = null;
-      VN.baoHanh.ds = []; VN.lichHen.ds = [];     // the cards and appointments belonged to the account that left
+      VN.baoHanh.ds = []; VN.lichHen.ds = []; VN.daXem.luu = [];     // these belonged to the account that left
       VN.quanTri.xoaPhien();
       await VN.gioHang.nap();
       VN.phatSuKien('tai-khoan', null);
@@ -128,7 +130,7 @@
   window.addEventListener('vinora:het-phien', () => {
     if (!VN.taiKhoan.nguoi) return;
     VN.taiKhoan.nguoi = null;
-    VN.baoHanh.ds = []; VN.lichHen.ds = [];
+    VN.baoHanh.ds = []; VN.lichHen.ds = []; VN.daXem.luu = [];
     VN.gioHang.nap().catch(() => {});
     VN.phatSuKien('tai-khoan', null);
   });
@@ -509,7 +511,77 @@
     },
   };
 
-  /* ================= 6. READY ================= */
+  /* ================= 6. RECENTLY VIEWED ================= */
+  const LICH_SU_XEM_TOI_DA = 40;
+  /**
+   * Products the person opened lately: [{ ma, luc }], newest first. A customer's list is on the server (kept here in
+   * `luu`); a visitor's list stays in this browser. The methods answer at once and tell the server in the background.
+   */
+  VN.daXem = {
+    luu: [],
+    hang: Promise.resolve(),      // the background requests, one after the other
+    ds() { return VN.taiKhoan.hienTai() ? this.luu : VN.kho.doc('daXem', []); },
+    /** Read the customer's list from the server (a visitor has nothing to read) */
+    async nap() {
+      this.luu = VN.taiKhoan.hienTai()
+        ? (await VN.api.get('/api/recently-viewed?limit=' + LICH_SU_XEM_TOI_DA)).map((r) => ({ ma: r.SKU, luc: new Date(r.LastViewedAt).getTime() }))
+        : [];
+      return this.luu;
+    },
+    /** A request to the server that the person does not wait for. Requests go one after the other (a removal and its undo
+     *  must not swap places). If one fails, read the list again so the page shows the truth. */
+    nen(viec) { this.hang = this.hang.then(viec).catch(() => this.nap().catch(() => {})); },
+    ghi(ma) {
+      const ds = this.ds().filter((x) => x.ma !== ma);
+      ds.unshift({ ma, luc: Date.now() });
+      if (!VN.taiKhoan.hienTai()) { VN.kho.ghi('daXem', ds.slice(0, LICH_SU_XEM_TOI_DA)); return; }
+      this.luu = ds.slice(0, LICH_SU_XEM_TOI_DA);
+      this.nen(() => VN.api.post('/api/recently-viewed', { sku: ma }));
+    },
+    xoa(ma) {
+      if (!VN.taiKhoan.hienTai()) { VN.kho.ghi('daXem', this.ds().filter((x) => x.ma !== ma)); return; }
+      this.luu = this.luu.filter((x) => x.ma !== ma);
+      this.nen(() => VN.api.del('/api/recently-viewed/' + encodeURIComponent(ma)));
+    },
+    xoaHet() {
+      if (!VN.taiKhoan.hienTai()) { VN.kho.ghi('daXem', []); return; }
+      this.luu = [];
+      this.nen(() => VN.api.del('/api/recently-viewed'));
+    },
+    /** Undo a removal: put the entries back. A visitor's keep the time of their last view. On the server a view is stamped
+     *  "now", so a customer's restored entries come back as the newest ones (oldest of them first; the server keeps whole
+     *  seconds, so entries sent in the same second may swap places after a reload). */
+    khoiPhuc(dsMuc) {
+      const hienCo = this.ds(); const co = new Set(hienCo.map((x) => x.ma));
+      const them = [].concat(dsMuc).filter((x) => x && !co.has(x.ma)).sort((a, b) => a.luc - b.luc);
+      if (!VN.taiKhoan.hienTai()) { VN.kho.ghi('daXem', hienCo.concat(them).sort((a, b) => b.luc - a.luc).slice(0, LICH_SU_XEM_TOI_DA)); return; }
+      const bayGio = Date.now();
+      this.luu = them.map((x, i) => ({ ma: x.ma, luc: bayGio + i })).reverse().concat(hienCo).slice(0, LICH_SU_XEM_TOI_DA);
+      this.nen(async () => { for (const x of them) await VN.api.post('/api/recently-viewed', { sku: x.ma }); });
+    },
+    /** After a login: the history of this browser goes to the account, then this browser forgets it */
+    async gopKhach() {
+      const cuaMay = VN.kho.doc('daXem', []).slice().sort((a, b) => a.luc - b.luc);
+      try {
+        for (const x of cuaMay) { try { await VN.api.post('/api/recently-viewed', { sku: x.ma }); } catch (loi) { if (loi.trangThai !== 404) throw loi; } }   // a product that is gone (404) is skipped
+        if (cuaMay.length) VN.kho.ghi('daXem', []);       // only after every entry went up: on a failure this browser keeps its list for the next login
+      } finally { await this.nap().catch(() => {}); }      // show the account's list whatever happened
+      return this.luu;
+    },
+  };
+
+  /* ================= 7. REVIEWS ================= */
+  /** The review of a delivered order. The server keeps it, one per order; an order read from the API carries it as `danhGia`. */
+  VN.danhGia = {
+    /** Send a review: { donHang, soSao, noiDung, chuDe[] }. Resolves to the saved review, or throws (for example 409 when the order has one). */
+    async tao({ donHang, soSao, noiDung, chuDe }) {
+      const r = await VN.api.post(`/api/orders/${encodeURIComponent(donHang)}/feedback`,
+        { rating: soSao, text: noiDung, topics: chuDe, phone: VN.donHang.soDienThoai(donHang) || undefined });
+      return VN.danhGiaTuApi(r, donHang);
+    },
+  };
+
+  /* ================= 8. READY ================= */
   /** True while the account or the cart could not be loaded from the server (and has not been loaded since) */
   VN.matKetNoi = () => VN.taiKhoan.khongRo || VN.gioHang.khongTai;
   /** Done when the account and the cart are loaded. Pages that need them start with `await VN.sanSang`. */
@@ -517,6 +589,7 @@
     try { await thuLai(() => VN.taiKhoan.nap()); } catch (loi) { console.error(loi); }
     // The cart of a visitor is read from this browser, so it is only worth reading when we know the visitor is one
     if (!VN.taiKhoan.khongRo) { try { await thuLai(() => VN.gioHang.nap()); } catch (loi) { console.error(loi); } }
+    if (VN.taiKhoan.hienTai()) await VN.daXem.nap().catch((loi) => console.error(loi));      // a customer's recently viewed list is on the server
     if (VN.matKetNoi()) {
       // Stays on screen (an error notice does not close by itself) until the person reloads
       VN.thongBao({ tieuDe: 'Chưa kết nối được máy chủ', noiDung: 'Đăng nhập và giỏ hàng chưa tải được nên tạm thời chưa thay đổi được giỏ hàng.', loai: 'loi', hanhDong: { chu: 'Tải lại', khiBam: () => location.reload() } });

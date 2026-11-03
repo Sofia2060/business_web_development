@@ -116,3 +116,36 @@ def test_hidden_products_are_not_listed_or_tracked(client):
         with transaction() as cur:
             cur.execute("UPDATE dbo.Products SET Status = 'Active' WHERE ProductID = ?", (pid,))
     assert len(c.get("/api/recently-viewed").get_json()) == 1
+
+
+def test_remove_one_product_from_the_list(client):
+    c, _ = new_customer(with_address=False)
+    for sku in SKUS:
+        view(c, sku)
+    assert c.delete(f"/api/recently-viewed/{SKUS[1]}").status_code == 204
+    assert sorted(i["SKU"] for i in c.get("/api/recently-viewed").get_json()) == sorted([SKUS[0], SKUS[2]])
+    assert c.delete(f"/api/recently-viewed/{SKUS[1]}").status_code == 204        # quiet when it is not there
+    assert c.delete("/api/recently-viewed/NO-SUCH-SKU").status_code == 204
+
+
+def test_clear_the_whole_list_touches_only_my_own(client):
+    a, _ = new_customer(with_address=False)
+    b, _ = new_customer(with_address=False)
+    for sku in SKUS:
+        view(a, sku)
+    view(b, SKUS[0])
+    assert a.delete("/api/recently-viewed").status_code == 204
+    assert a.get("/api/recently-viewed").get_json() == []
+    assert [i["SKU"] for i in b.get("/api/recently-viewed").get_json()] == [SKUS[0]]
+    assert b.delete(f"/api/recently-viewed/{SKUS[0]}").status_code == 204
+    assert b.get("/api/recently-viewed").get_json() == []
+
+
+def test_removing_needs_a_customer_login(client):
+    assert client.delete("/api/recently-viewed").status_code == 401
+    assert client.delete(f"/api/recently-viewed/{SKUS[0]}").status_code == 401
+    admin = create_app().test_client()
+    email = f"rv-admin-{uuid.uuid4().hex[:8]}@example.test"
+    make_user(email, role="Admin")
+    admin.post("/api/auth/login", json={"email": email, "password": PASSWORD})
+    assert admin.delete("/api/recently-viewed").status_code == 403
