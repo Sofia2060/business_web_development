@@ -58,7 +58,7 @@
         <td>${VN.thoat(k.ten)}<small>${VN.thoat(k.sdt)}</small></td><td class="so">${VN.tien(d.tongTien)}</td><td>${qt.nhanDon(d)}</td></tr>`; }).join('')}</tbody>`
       : `<tbody><tr><td>${qt.trong('Chưa có đơn hàng.')}</td></tr></tbody>`;
 
-    const { theoMa } = await VN.duLieu.sanPham();
+    const { theoMa } = await VN.duLieu.sanPham().catch(() => ({ theoMa: {} }));     // without the catalog the rows keep the image from the order
     const dem = {};
     don.filter((d) => d.trangThai !== 'Cancelled').forEach((d) => d.sanPham.forEach((s) => { dem[s.ma] = dem[s.ma] || { ten: s.ten, anh: s.anh, sl: 0, tien: 0 }; dem[s.ma].sl += s.soLuong; dem[s.ma].tien += s.soLuong * s.donGia; }));
     const top = Object.entries(dem).sort((a, b) => b[1].sl - a[1].sl || b[1].tien - a[1].tien).slice(0, 6);

@@ -26,10 +26,11 @@ vm.runInContext(fs.readFileSync(apiFile, 'utf8'), sandbox);
 vm.runInContext(fs.readFileSync(sessionFile, 'utf8'), sandbox);
 
 // The scripted server: up/down, who is logged in, the account cart
-const server = { up: true, me: null, cart: [] };
+const server = { up: true, me: null, cart: [], services: [], listDown: false };
 const loi = (trangThai) => new VN.LoiApi('x', { trangThai });
 VN.api.get = async (url) => {
   if (!server.up) throw loi(0);
+  if (url === '/api/after-sales') { if (server.listDown) throw loi(0); return server.services; }
   if (url === '/api/auth/me') { if (!server.me) throw loi(401); return server.me; }
   if (url === '/api/profile') return { fullName: 'Khách A', email: 'a@example.test', phone: '0911000111' };
   if (url === '/api/addresses') return [];
@@ -39,6 +40,12 @@ VN.api.get = async (url) => {
 VN.api.post = async (url, body) => {
   if (!server.up) throw loi(0);
   if (url === '/api/auth/login') { server.me = { role: 'Customer', id: 5 }; return server.me; }
+  if (url === '/api/auth/logout') return {};
+  if (url === '/api/after-sales') {
+    const row = { ServiceID: 11, ServiceType: body.serviceType, PreferredDate: body.preferredDate, Status: 'Pending', WarrantyCode: body.warrantyCode, CustomerNote: body.note, CreatedAt: '2030-01-01T09:00:00' };
+    server.services.push(row); return row;
+  }
+  if (url === '/api/after-sales/11/cancel') { server.services[0].Status = 'Cancelled'; return server.services[0]; }
   if (url === '/api/cart') { server.cart.push({ CartItemID: server.cart.length + 1, VariantSKU: body.variantSku, SKU: 'SP1', ProductName: 'Nhẫn', Quantity: body.quantity, UnitPrice: 1000, StockQuantity: 9 }); return {}; }
   throw new Error('unexpected POST ' + url);
 };
@@ -97,5 +104,18 @@ const gioKhach = () => VN.kho.doc('gioHang', []);
   out.sentToServer = (await VN.gioHang.dongGuiLen()).map((l) => l.variantSku);
   out.notOnSale = (await VN.gioHang.dongKhongBan()).map((d) => d.ma);
   out.detailLines = (await VN.gioHang.chiTiet()).map((d) => d.ma);
+
+  // 7. A booking or a cancellation that went through is not reported as failed when the list cannot be reloaded after it
+  VN.taiKhoan.nguoi = { id: 5 }; VN.taiKhoan.khongRo = false; VN.gioHang.khongTai = false;
+  server.up = true; server.listDown = true;
+  const booked = await attempt(() => VN.lichHen.tao({ maBaoHanh: 'VNW26110000001-1', loai: 'Cleaning', ngay: '2030-02-01', gio: '10:00', tenCuaHang: 'Showroom A', sdt: '0911000111', soAnh: 0, ghiChu: '' }));
+  out.bookedWhileListDown = { ok: booked.ok, id: booked.ok ? booked.value.id : null, listed: VN.lichHen.ds.map((l) => l.id) };
+  const cancelled = await attempt(() => VN.lichHen.huy('LH11'));
+  out.cancelledWhileListDown = { ok: cancelled.ok, status: VN.lichHen.ds.map((l) => l.trangThai) };
+
+  // 8. Logging out empties the cards and appointments of the account that left
+  server.listDown = false; VN.baoHanh.ds = [{ ma: 'VNW26110000001-1' }];
+  await VN.taiKhoan.dangXuat();
+  out.afterLogout = { cards: VN.baoHanh.ds.length, services: VN.lichHen.ds.length };
   console.log(JSON.stringify(out));
 })().catch((e) => { console.error(e); process.exit(1); });

@@ -57,6 +57,15 @@ def test_login_that_cannot_load_the_account_says_so(out):
     assert failed["ok"] is False and "Đã đăng nhập" in failed["message"] and "tải lại trang" in failed["message"]
 
 
+def test_a_saved_booking_or_cancellation_is_not_reported_as_failed_when_the_reload_fails(out):
+    assert out["bookedWhileListDown"] == {"ok": True, "id": 11, "listed": [11]}
+    assert out["cancelledWhileListDown"] == {"ok": True, "status": ["Cancelled"]}
+
+
+def test_logging_out_empties_the_cards_and_appointments(out):
+    assert out["afterLogout"] == {"cards": 0, "services": 0}
+
+
 def test_products_not_on_sale_are_left_out_of_what_a_visitor_sends(out):
     assert out["sentToServer"] == ["SP1-V"]
     assert out["notOnSale"] == ["STOP", "QUOTE"]

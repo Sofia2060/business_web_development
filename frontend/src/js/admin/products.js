@@ -69,7 +69,9 @@
     const f = e.target.closest('[data-form-sp]'); if (!f) return;
     e.preventDefault();
     const ma = f.dataset.formSp; const s = tt.tatCa.find((x) => x.ma === ma);
-    const thayDoi = { status: f.trangThai.value };
+    // Send only what changed, so a price another admin set meanwhile is not written back by a status-only edit
+    const thayDoi = {};
+    if (f.trangThai.value !== s.trangThai) thayDoi.status = f.trangThai.value;
     if (s.coDinh) {
       const gia = Number(String(f.gia.value).replace(/\D/g, ''));
       const giaCu = Number(String(f.giaCu.value).replace(/\D/g, '')) || null;
@@ -77,12 +79,20 @@
       VN.baoLoiTruong(f.gia, okGia ? '' : 'Nhập giá hợp lệ (từ 1.000 ₫).');
       VN.baoLoiTruong(f.giaCu, okCu ? '' : 'Giá trước giảm không được thấp hơn giá bán.');
       if (!okGia || !okCu) return;
-      Object.assign(thayDoi, { price: gia, originalPrice: giaCu });
+      if (gia !== s.gia) thayDoi.price = gia;
+      if (giaCu !== (s.giaCu || null)) thayDoi.originalPrice = giaCu;
     }
+    if (!Object.keys(thayDoi).length) { qt.dongChiTiet(); return; }      // nothing changed
     const ok = await qt.lam(() => VN.api.patch('/api/admin/products/' + encodeURIComponent(ma), thayDoi), 'Đã lưu sản phẩm ' + ma);
     if (!ok) return;
-    const moi = (await VN.api.get('/api/admin/products')).find((p) => p.SKU === ma);       // lấy lại bản vừa lưu
+    // Read the saved row back; if that fails the change is saved all the same, so show it from the form
+    const moi = (await VN.api.get('/api/admin/products').catch(() => [])).find((p) => p.SKU === ma);
     if (moi) tt.tatCa[tt.tatCa.findIndex((x) => x.ma === ma)] = sanPhamTuApi(moi);
+    else {
+      if ('status' in thayDoi) s.trangThai = thayDoi.status;
+      if ('price' in thayDoi) s.gia = thayDoi.price;
+      if ('originalPrice' in thayDoi) s.giaCu = thayDoi.originalPrice || 0;
+    }
     qt.dongChiTiet(); ve();
   });
   VN.$('#qt-sp-bang').addEventListener('click', (e) => { const b = e.target.closest('[data-sua]'); if (b) moSua(b.dataset.sua); });

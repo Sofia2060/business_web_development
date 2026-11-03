@@ -13,6 +13,7 @@
   const tt = { tab: VN.thamSo('tt') || 'tat-ca', pt: '', tim: '', trang: 1, ma: VN.thamSo('ma') || '' };
   if (!TAB.some(([k]) => k === tt.tab)) tt.tab = 'tat-ca';
   const TEN_KIEU = { 'co-dien': 'Cổ điển', 'hien-dai': 'Hiện đại', 'viet-tay': 'Viết tay' };
+  let theBaoHanh = [];     // all warranty cards (GET /api/admin/warranties), loaded when a delivered order is opened
 
   const hopTab = (d, k) => (k === 'tat-ca' ? true : d.trangThai === k);
   const hanHtml = (d) => {
@@ -64,7 +65,8 @@
     const ma = d.ma;
     tt.ma = ma;
     const k = qt.khach(d); const nn = d.nguoiNhan; const yc = d.yeuCauHuy;
-    const pa = VN.hoTro.theoDon(d.ma); const dg = VN.danhGia.theoDon(d.ma); const the = VN.baoHanh.theoDon(d.ma);
+    const pa = VN.hoTro.theoDon(d.ma); const dg = VN.danhGia.theoDon(d.ma);
+    const the = theBaoHanh.filter((t) => t.OrderCode === d.ma).map((t) => ({ ma: t.WarrantyCode }));
     const html = `
       <div class="qt-ct__muc"><div class="hang hang--quan">${qt.nhanDon(d)} ${qt.nhanTT(d)} ${hanHtml(d)}</div>${nutThaoTac(d)}
         ${d.trangThai === 'Pending' && qt.chuaTra(d) && d.thanhToan.phuongThuc !== 'BANK' ? `<p class="chu-nho chu-phu">Đơn chờ khách thanh toán qua cổng trực tuyến; quá ${VN.HAN_THANH_TOAN_PHUT} phút hệ thống tự hủy.</p>` : ''}</div>
@@ -105,7 +107,12 @@
 
   /** Lấy chi tiết một đơn từ máy chủ rồi mở ngăn chi tiết */
   const moDon = async (ma, moMoi = true) => {
-    try { veChiTiet(await qt.napMotDon(ma), moMoi); }
+    try {
+      const d = await qt.napMotDon(ma);
+      // Warranty cards are made by the database when an order is delivered, so only a delivered order has any
+      if (d.trangThai === 'Delivered') theBaoHanh = await VN.api.get('/api/admin/warranties').catch(() => theBaoHanh);
+      veChiTiet(d, moMoi);
+    }
     catch (loi) { VN.thongBao({ tieuDe: 'Không mở được đơn ' + ma, noiDung: VN.thoat(loi.message), loai: 'loi' }); }
   };
 
