@@ -5,13 +5,14 @@
 (function () {
   'use strict';
   const VN = window.Vinora;
-  VN.soTheDep = (ma) => String(ma).replace(/^(VNRA)(\d{4})(\d{4})(\d{4})$/, '$1 $2 $3 $4');
+  // Card code of the database: VNW + year-month + 7 digits + "-" + number of the unit, e.g. VNW26110000443-1
+  VN.soTheDep = (ma) => String(ma).replace(/^(VNW)(\d{4})(\d{7})(-\d+)$/, '$1 $2 $3$4');
   VN.htmlTheBaoHanh = (the, ch, chuThe) => {
     const k = VN.khongDau(the.mau || '');
     const kieu = k.includes('trang') || k.includes('bac') ? 'trang' : k.includes('hong') ? 'hong' : 'vang';
     const logo = (VN.duongDan.hinh || '') + 'logo/logo-vinora-sang.svg';
     const ql = ch.baoHanh.quyenLoi.filter((q) => q.datLich && (!q.chiChoNhan || the.laNhan));
-    const conLai = (q) => { const n = VN.baoHanh.conLai(the, ch, q.ma); return n === Infinity ? 'Trọn đời' : `Còn ${n}/${q.luot}`; };
+    const conLai = (q) => { const n = VN.baoHanh.conLai(the, ch, q.ma); return n === Infinity ? 'Trọn đời' : `Còn ${n}/${the.hanMuc[q.ma]}`; };
     return `
       <div class="the-bh the-bh--${kieu}" data-the="${VN.thoat(the.ma)}" role="button" tabindex="0" aria-label="Thẻ bảo hành ${VN.thoat(the.ma)} – bấm để lật xem quyền lợi">
         <div class="the-bh__lat">

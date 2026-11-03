@@ -1,7 +1,7 @@
 /* =====================================================================
    KÍCH HOẠT THẺ BẢO HÀNH & ĐÁNH GIÁ (?don=mã đơn) – FR14, FR15, FR18, FR25
    Trang mở sau khi khách bấm "Đã nhận được hàng": hiển thị các thẻ đã kích hoạt
-   (gọi lại kichHoatChoDon không tạo thêm thẻ) và biểu mẫu đánh giá 1 – 5 sao.
+   (database tạo thẻ, trang chỉ hiển thị) và biểu mẫu đánh giá 1 – 5 sao.
    Khách đặt hàng không cần tài khoản vẫn xem thẻ và đánh giá được (đơn đã mở trên trình duyệt này).
    ===================================================================== */
 (function () {
@@ -18,7 +18,7 @@
     await VN.sanSang;
     u = VN.taiKhoan.hienTai();
     const ch = await VN.duLieu.cauHinh();
-    const don = await VN.donHang.napMot(maDon).catch(() => null);   // đơn lấy từ máy chủ; thẻ bảo hành vẫn lưu trên trình duyệt (chờ nối API)
+    const don = await VN.donHang.napMot(maDon).catch(() => null);   // đơn và thẻ bảo hành đều lấy từ máy chủ (đánh giá còn lưu trên trình duyệt, chờ nhóm C7)
     if (!don || don.trangThai !== 'Delivered') {
       VN.$('#kh-td').textContent = don ? 'Đơn hàng chưa ở trạng thái Đã nhận' : 'Không tìm thấy đơn hàng';
       VN.$('#kh-mo-ta').textContent = don ? 'Thẻ bảo hành được kích hoạt khi bạn bấm “Đã nhận được hàng” trên đơn đang giao.' : 'Vui lòng mở trang này từ mục Đơn hàng, hoặc tra cứu đơn bằng mã đơn và số điện thoại.';
@@ -26,7 +26,14 @@
     }
     VN.$('#kh-dd').textContent = 'Đơn ' + don.ma;
     VN.$('#kh-xem-don').href = VN.url('donHang', { ma: don.ma });
-    const dsThe = VN.baoHanh.kichHoatChoDon(don, don.ngayNhan);   // xử lý lặp: không tạo thêm thẻ (FR15)
+    // Thẻ do database tự tạo khi đơn được xác nhận đã nhận (FR15), trang chỉ hiển thị
+    let dsThe;
+    try { dsThe = await VN.baoHanh.napDon(don.ma); } catch (loi) { dsThe = []; VN.thongBao({ tieuDe: 'Chưa tải được thẻ bảo hành', noiDung: VN.thoat(loi.message), loai: 'loi' }); }
+    if (!dsThe.length) {
+      VN.$('#kh-mo-ta').textContent = 'Chưa thấy thẻ bảo hành của đơn này. Vui lòng tải lại trang sau ít phút.';
+      VN.$('#kh-dat-lich').href = VN.url('congBaoHanh');
+      veDanhGia(don); return;
+    }
     VN.$('#kh-mo-ta').innerHTML = `Đơn <strong>${VN.thoat(don.ma)}</strong> · ${dsThe.length} thẻ trọn đời kích hoạt ngày ${VN.ngay(dsThe[0].ngayKichHoat)}. Bấm vào thẻ để lật xem quyền lợi.`;
     const chuThe = u ? u.hoTen : don.nguoiNhan.hoTen;
     khungThe.innerHTML = dsThe.map((t, i) => `<div class="o-the hien-dan" style="transition-delay:${i * 120}ms">${VN.htmlTheBaoHanh(t, ch, chuThe)}

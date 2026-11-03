@@ -1,10 +1,11 @@
 /* =====================================================================
-   5.2.8 CỔNG BẢO HÀNH ĐIỆN TỬ & ĐẶT LỊCH HẬU MÃI (FR15, FR16, FR17)
-   - Thẻ bảo hành dạng thẻ ATM, quyền lợi & số lượt còn lại, lịch sử dịch vụ
+   5.2.8 CỔNG BẢO HÀNH ĐIỆN TỬ & ĐẶT LỊCH HẬU MÃI (FR15, FR16, FR17) – nối API /api/warranties, /api/after-sales
+   - Thẻ bảo hành dạng thẻ ATM, quyền lợi & số lượt còn lại, lịch sử dịch vụ (thẻ do database tạo khi đơn giao xong)
    - Đặt lịch: thẻ hợp lệ, dịch vụ (làm sạch / đánh bóng & xi mới / chỉnh size), showroom đọc từ XML (AJAX),
-     ngày trong 30 ngày tới, khung giờ, ảnh tình trạng (xem trước bằng FileReader)
-   - Lịch hẹn: Chờ xác nhận -> Đã xác nhận -> Hoàn tất (dịch vụ có giới hạn mới trừ lượt) / Đã hủy (không mất lượt)
-   - Khách đặt hàng không cần tài khoản: xem thẻ của các đơn đã mở trên trình duyệt này, tra cứu thẻ;
+     ngày trong 30 ngày tới, khung giờ (ghi vào giờ hẹn), ảnh tình trạng (BẢN DEMO: chỉ xem trước bằng FileReader,
+     không gửi đi; số ảnh đã chọn ghi vào ghi chú để cửa hàng biết)
+   - Lịch hẹn: Chờ xác nhận -> Đã xác nhận / Đã đổi giờ -> Hoàn tất (database trừ lượt) / Đã hủy (không mất lượt)
+   - Khách đặt hàng không cần tài khoản: xem thẻ của các đơn đã mở trên trình duyệt này (mã đơn + số điện thoại), tra cứu thẻ;
      đặt lịch cần tài khoản (tạo bằng số điện thoại đã đặt hàng để thẻ tự liên kết)
    ===================================================================== */
 (function () {
@@ -38,10 +39,10 @@
   });
 
   /* ================= THẺ BẢO HÀNH ================= */
-  const conLaiChu = (the, q) => { const n = VN.baoHanh.conLai(the, tt.ch, q.ma); return n === Infinity ? q.hienThi : `${n}/${q.luot} lượt`; };
-  /** Thẻ hiển thị: của tài khoản, hoặc (khách chưa đăng nhập) thẻ của các đơn đã mở trên trình duyệt này */
-  const dsThe = () => (u ? VN.baoHanh.cuaToi() : VN.baoHanh.tatCa().filter((t) => !t.khachHang && VN.donHang.coQuyen(t.donHang)).sort((a, b) => new Date(b.ngayKichHoat) - new Date(a.ngayKichHoat)));
-  const chuTheCua = (the) => { if (u) return u.hoTen; const d = VN.donHang.lay(the.donHang); return d && d.nguoiNhan ? d.nguoiNhan.hoTen : ''; };
+  const conLaiChu = (the, q) => { const n = VN.baoHanh.conLai(the, tt.ch, q.ma); return n === Infinity ? q.hienThi : `${n}/${the.hanMuc[q.ma]} lượt`; };
+  /** Thẻ hiển thị: của tài khoản, hoặc (khách chưa đăng nhập) thẻ của các đơn đã mở trên trình duyệt này (VN.baoHanh.nap chọn sẵn) */
+  const dsThe = () => VN.baoHanh.tatCa();
+  const chuTheCua = (the) => the.chuThe || '';
   const veDsThe = () => {
     const ds = dsThe();
     VN.$$('[data-dem-the]').forEach((x) => { x.textContent = ds.length || ''; });
@@ -65,7 +66,7 @@
   const veCtThe = () => {
     const the = VN.baoHanh.lay(tt.the); if (!the) return;
     const ql = tt.ch.baoHanh.quyenLoi;
-    const lich = VN.lichHen.tatCa().filter((l) => l.maBaoHanh === the.ma && ['Pending', 'Confirmed'].includes(l.trangThai));
+    const lich = VN.lichHen.tatCa().filter((l) => l.maBaoHanh === the.ma && l.dangMo);
     VN.$('#bh-ct-the').innerHTML = `
       <section class="khoi-tk ct-the__khung" aria-labelledby="td-ct-the">
         <div class="ct-the__the">${VN.htmlTheBaoHanh(the, tt.ch, chuTheCua(the))}<p class="chu-rat-nho chu-phu">Bấm vào thẻ để lật mặt sau</p></div>
@@ -174,7 +175,7 @@
   });
   form.addEventListener('reset', () => setTimeout(() => { VN.$('#dl-xem-anh').innerHTML = ''; veFormThe(); khoiTaoNgay(); VN.$('#dl-cua-hang-chu').textContent = ''; form.sdt.value = u ? u.sdt || '' : ''; }, 0));
 
-  form.addEventListener('submit', (e) => {
+  form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const the = VN.baoHanh.lay(form.maBaoHanh.value);
     const loai = (VN.$('input[name="loai"]:checked', form) || {}).value;
@@ -189,34 +190,42 @@
     VN.baoLoiTruong(form.sdt, VN.sdtHopLe(form.sdt.value) ? '' : 'Số điện thoại gồm 10 số, bắt đầu bằng 03, 05, 07, 08 hoặc 09.'); ok.push(VN.sdtHopLe(form.sdt.value));
     if (!ok.every(Boolean)) { const dau = VN.$('.co-loi, .loi-truong:not(:empty)', form); if (dau) dau.scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
     if (VN.baoHanh.conLai(the, tt.ch, loai) <= 0) { VN.thongBao({ tieuDe: 'Đã hết lượt miễn phí cho dịch vụ này', loai: 'loi' }); return; }
-    const trung = VN.lichHen.cuaToi().some((l) => l.maBaoHanh === the.ma && l.ngayHen === ngay && l.khungGio === gio && ['Pending', 'Confirmed'].includes(l.trangThai));
-    if (trung) { VN.thongBao({ tieuDe: 'Bạn đã có lịch hẹn vào khung giờ này', noiDung: 'Vui lòng chọn ngày hoặc khung giờ khác.', loai: 'loi' }); return; }
+    // Mỗi thẻ chỉ có một lịch đang mở cho mỗi loại dịch vụ (database cũng chặn)
+    if (VN.lichHen.tatCa().some((l) => l.maBaoHanh === the.ma && l.loai === loai && l.dangMo)) {
+      VN.thongBao({ tieuDe: 'Thẻ đã có lịch hẹn cho dịch vụ này', noiDung: 'Hãy hủy lịch cũ hoặc đợi cửa hàng xử lý xong rồi đặt lịch mới.', loai: 'loi' }); return;
+    }
     const ch = tt.cuaHang.find((x) => x.ma === form.cuaHang.value);
-    const lich = VN.lichHen.tao({
-      maBaoHanh: the.ma, loai, ngayHen: ngay, khungGio: gio, cuaHang: ch.ma, tenCuaHang: ch.ten, sdt: form.sdt.value.replace(/[\s.]/g, ''),
-      ghiChu: form.ghiChu.value.trim(), sizeMoi: loai === 'Resizing' ? Number(form.sizeMoi.value) : null, soAnh: VN.$$('#dl-xem-anh img').length,
-    });
-    form.reset();
-    VN.thongBao({ tieuDe: 'Đã gửi yêu cầu đặt lịch', noiDung: `Mã lịch ${lich.ma} · ${VN.TEN_DICH_VU[loai]} ngày ${VN.ngay(ngay + 'T00:00')} lúc ${gio}. Trạng thái: Chờ xác nhận.`, loai: 'thanh-cong', thoiGian: 6000 });
-    tt.moiTao = lich.ma;
-    veDsLich(); moTab('lich-hen');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    const nut = VN.$('[type="submit"]', form); nut.disabled = true;
+    try {
+      const lich = await VN.lichHen.tao({
+        maBaoHanh: the.ma, loai, ngay, gio, sizeMoi: loai === 'Resizing' ? Number(form.sizeMoi.value) : null, tenCuaHang: ch.ten,
+        sdt: form.sdt.value.replace(/[\s.]/g, ''), soAnh: VN.$$('#dl-xem-anh img').length, ghiChu: form.ghiChu.value.trim(),
+      });
+      form.reset();
+      VN.thongBao({ tieuDe: 'Đã gửi yêu cầu đặt lịch', noiDung: `Mã lịch ${VN.thoat(lich.ma)} · ${VN.thoat(VN.TEN_DICH_VU[loai])} ngày ${VN.ngay(ngay + 'T00:00')} lúc ${VN.thoat(gio)}. Trạng thái: Chờ xác nhận.`, loai: 'thanh-cong', thoiGian: 6000 });
+      tt.moiTao = lich.ma;
+      veDsLich(); veDsThe(); moTab('lich-hen');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (loi) {
+      VN.thongBao({ tieuDe: 'Chưa đặt được lịch', noiDung: VN.thoat(loi.message), loai: 'loi' });
+    } finally { nut.disabled = false; }
   });
 
   /* ================= LỊCH HẸN ================= */
   const veDsLich = () => {
     const ds = VN.lichHen.cuaToi();
-    const sapToi = ds.filter((l) => ['Pending', 'Confirmed'].includes(l.trangThai)).sort((a, b) => (a.ngayHen + a.khungGio).localeCompare(b.ngayHen + b.khungGio));
-    const khac = ds.filter((l) => !['Pending', 'Confirmed'].includes(l.trangThai));
+    const sapToi = ds.filter((l) => l.dangMo).sort((a, b) => (a.ngayHen + a.khungGio).localeCompare(b.ngayHen + b.khungGio));
+    const khac = ds.filter((l) => !l.dangMo);
     VN.$$('[data-dem-lich]').forEach((x) => { x.textContent = sapToi.length || ''; });
     const the = (ma) => VN.baoHanh.lay(ma) || {};
     // Chỉ nói tới "lượt" với dịch vụ có giới hạn số lần (vd. đánh bóng & xi mới); dịch vụ trọn đời không nhắc lượt
     const ghiChuLuot = (l, tb) => {
-      const q = tt.ch.baoHanh.quyenLoi.find((x) => x.ma === l.loai);
-      const coGioiHan = q && q.luot !== null;
+      const han = tb.hanMuc ? tb.hanMuc[l.loai] : null;
+      const coGioiHan = han !== null && han !== undefined;
       if (l.trangThai === 'Completed') {
-        if (!coGioiHan) return ' · Dịch vụ trọn đời, không giới hạn số lần';
-        return tb.ma ? ` · Đã dùng 1 lượt, còn ${Math.max(0, q.luot - (tb.daDung[l.loai] || 0))}/${q.luot} lượt` : ' · Đã dùng 1 lượt';
+        const phi = l.mienPhi === false ? ` · Đã hết lượt miễn phí, tính phí ${VN.tien(l.phi)}` : '';
+        if (!coGioiHan) return ' · Dịch vụ trọn đời, không giới hạn số lần' + phi;
+        return ` · Đã dùng 1 lượt, còn ${VN.baoHanh.conLai(tb, tt.ch, l.loai)}/${han} lượt${phi}`;
       }
       if (l.trangThai === 'Cancelled' && coGioiHan) return ' · Không bị trừ lượt';
       return '';
@@ -225,14 +234,16 @@
       const t = VN.TRANG_THAI_LICH[l.trangThai]; const tb = the(l.maBaoHanh);
       const d = new Date(l.ngayHen + 'T00:00');
       const nut = [];
-      if (['Pending', 'Confirmed'].includes(l.trangThai)) nut.push(`<button type="button" class="nut nut--chu nut-huy-lich" data-lich="huy" data-ma="${l.ma}">Hủy lịch</button>`);
+      if (l.dangMo) nut.push(`<button type="button" class="nut nut--chu nut-huy-lich" data-lich="huy" data-ma="${l.ma}">Hủy lịch</button>`);
       return `<article class="the-lich the-lich--${l.trangThai.toLowerCase()}${l.ma === tt.moiTao ? ' moi-tao' : ''}">
         <div class="the-lich__ngay"><span>${VN.thu(d)}</span><strong class="so-deu">${String(d.getDate()).padStart(2, '0')}</strong><span class="so-deu">Th${d.getMonth() + 1}/${d.getFullYear()}</span><em class="so-deu">${VN.thoat(l.khungGio)}</em></div>
         <div class="the-lich__chu">
           <div class="the-lich__dau"><h3 class="t-4">${VN.thoat(VN.TEN_DICH_VU[l.loai] || l.loai)}${l.sizeMoi ? ` → size ${l.sizeMoi}` : ''}</h3><span class="nhan ${t.lop}">${t.ten}</span></div>
-          <p>${VN.bt('cua-hang', 'bt--nho')} ${VN.thoat(l.tenCuaHang)}</p>
-          <p>${VN.bt('khien', 'bt--nho')} ${VN.thoat(tb.tenSP || '')} · <span class="so-deu">${VN.soTheDep(l.maBaoHanh)}</span></p>
+          ${l.tenCuaHang ? `<p>${VN.bt('cua-hang', 'bt--nho')} ${VN.thoat(l.tenCuaHang)}</p>` : ''}
+          <p>${VN.bt('khien', 'bt--nho')} ${VN.thoat(l.tenSP || tb.tenSP || '')} · <span class="so-deu">${VN.soTheDep(l.maBaoHanh)}</span></p>
+          ${l.trangThai === 'Rescheduled' ? `<p class="hop-bao hop-bao--vang">${VN.bt('thong-tin')}<span>Cửa hàng đã đổi giờ hẹn (bạn chọn ${VN.ngayGio(l.gioKhachChon)}). Nếu giờ mới chưa phù hợp, bạn hủy lịch và đặt lại.</span></p>` : ''}
           ${l.ghiChu ? `<p class="chu-phu">“${VN.thoat(l.ghiChu)}”</p>` : ''}
+          ${l.ketQua ? `<p class="chu-phu">Kết quả: ${VN.thoat(l.ketQua)}</p>` : ''}
           <p class="chu-rat-nho chu-phu">Mã lịch ${VN.thoat(l.ma)} · Gửi ${VN.ngayGio(l.taoLuc)}${ghiChuLuot(l, tb)}</p>
           ${nut.length ? `<div class="the-lich__nut">${nut.join('')}</div>` : ''}
         </div></article>`;
@@ -245,12 +256,14 @@
     if (e.target.closest('[data-tab-di]')) { moTab('the'); return; }
     const b = e.target.closest('[data-lich]'); if (!b) return;
     const l = VN.lichHen.tatCa().find((x) => x.ma === b.dataset.ma);
-    if (b.dataset.lich === 'huy') {
-      const q = tt.ch.baoHanh.quyenLoi.find((x) => x.ma === l.loai); const coGioiHan = q && q.luot !== null;
+    if (b.dataset.lich === 'huy' && l) {
+      const han = (VN.baoHanh.lay(l.maBaoHanh) || { hanMuc: {} }).hanMuc[l.loai]; const coGioiHan = han !== null && han !== undefined;
       const ok = await VN.xacNhan({ nhan: 'Lịch hẹn ' + l.ma, tieuDe: 'Hủy lịch hẹn này?', noiDung: `${coGioiHan ? 'Lượt dịch vụ miễn phí được giữ nguyên. ' : ''}Bạn có thể đặt lịch khác bất cứ lúc nào.`, chuDongY: 'Hủy lịch', chuHuy: 'Giữ lịch', nguy: true });
       if (!ok) return;
-      VN.lichHen.capNhat(l.ma, 'Cancelled', 'Khách hàng hủy lịch hẹn.', 'Khách hàng');
-      VN.thongBao({ tieuDe: 'Đã hủy lịch hẹn', noiDung: coGioiHan ? 'Lượt miễn phí không bị trừ.' : '' });
+      try {
+        await VN.lichHen.huy(l.ma);
+        VN.thongBao({ tieuDe: 'Đã hủy lịch hẹn', noiDung: coGioiHan ? 'Lượt miễn phí không bị trừ.' : '' });
+      } catch (loi) { VN.thongBao({ tieuDe: 'Chưa hủy được lịch hẹn', noiDung: VN.thoat(loi.message), loai: 'loi' }); }
     }
     veDsLich(); veDsThe();
   });
@@ -266,27 +279,38 @@
   });
 
   /* ================= TRA CỨU ================= */
-  VN.$('#form-tra-cuu').addEventListener('submit', (e) => {
+  VN.$('#form-tra-cuu').addEventListener('submit', async (e) => {
     e.preventDefault();
     const ma = e.target.ma.value.replace(/\s/g, '').toUpperCase();
     const kq = VN.$('#kq-tra-cuu');
-    if (!/^VNRA\d{12}$/.test(ma)) { kq.innerHTML = `<p class="hop-bao hop-bao--do">${VN.bt('canh-bao')}<span>Mã thẻ gồm “VNRA” và 12 chữ số, ví dụ VNRA 2608 1234 5678.</span></p>`; return; }
-    const the = VN.baoHanh.lay(ma);
-    if (!the) { kq.innerHTML = `<p class="hop-bao hop-bao--cam">${VN.bt('thong-tin')}<span>Không tìm thấy thẻ <strong>${VN.soTheDep(ma)}</strong>. Thẻ chỉ có sau khi đơn hàng được xác nhận đã nhận.</span></p>`; return; }
-    const cuaToi = u && the.khachHang === u.id;
-    const coQuyen = cuaToi || (!the.khachHang && VN.donHang.coQuyen(the.donHang));
-    kq.innerHTML = `<div class="kq-tra-cuu">${VN.htmlTheBaoHanh(the, tt.ch, coQuyen ? chuTheCua(the) : '***')}
-      <div><p class="nhan nhan--ngoc">Thẻ hợp lệ · ${VN.thoat(the.hieuLuc)}</p><h3 class="t-3">${VN.thoat(the.tenSP)}</h3>
-      <p class="chu-phu">Mã ${VN.thoat(the.maSP)} · Kích hoạt ${VN.ngay(the.ngayKichHoat)}</p>
-      ${cuaToi ? `<button type="button" class="nut nut--chinh nut--nho" data-chon-the="${VN.thoat(the.ma)}">Xem chi tiết &amp; đặt lịch</button>`
-        : coQuyen ? `<div class="hang hang--quan"><button type="button" class="nut nut--chinh nut--nho" data-chon-the="${VN.thoat(the.ma)}">Xem chi tiết thẻ</button><button type="button" class="nut nut--vien nut--nho" data-xem-gcn="${VN.thoat(the.ma)}">${VN.bt('chung-nhan')} Giấy chứng nhận</button></div>`
-        : '<p class="chu-rat-nho chu-phu">Đăng nhập bằng tài khoản chủ thẻ (hoặc tạo tài khoản bằng số điện thoại đã đặt hàng) để xem lịch sử và đặt lịch.</p>'}</div></div>`;
+    if (!/^VNW\d{11}-\d{1,3}$/.test(ma)) { kq.innerHTML = `<p class="hop-bao hop-bao--do">${VN.bt('canh-bao')}<span>Mã thẻ gồm “VNW”, 11 chữ số, dấu gạch ngang và số thứ tự, ví dụ VNW 2608 0001234-1.</span></p>`; return; }
+    const the = VN.baoHanh.lay(ma);                 // thẻ của chính khách (hoặc của đơn đã mở trên trình duyệt này)
+    if (the) {
+      kq.innerHTML = `<div class="kq-tra-cuu">${VN.htmlTheBaoHanh(the, tt.ch, chuTheCua(the))}
+        <div><p class="nhan nhan--ngoc">Thẻ hợp lệ · ${VN.thoat(the.hieuLuc)}</p><h3 class="t-3">${VN.thoat(the.tenSP)}</h3>
+        <p class="chu-phu">Mã ${VN.thoat(the.maSP)} · Kích hoạt ${VN.ngay(the.ngayKichHoat)}</p>
+        ${u ? `<button type="button" class="nut nut--chinh nut--nho" data-chon-the="${VN.thoat(the.ma)}">Xem chi tiết &amp; đặt lịch</button>`
+          : `<div class="hang hang--quan"><button type="button" class="nut nut--chinh nut--nho" data-chon-the="${VN.thoat(the.ma)}">Xem chi tiết thẻ</button><button type="button" class="nut nut--vien nut--nho" data-xem-gcn="${VN.thoat(the.ma)}">${VN.bt('chung-nhan')} Giấy chứng nhận</button></div>`}</div></div>`;
+      return;
+    }
+    // Thẻ của người khác: máy chủ chỉ cho biết thẻ có thật và là sản phẩm nào, không cho biết chủ thẻ
+    try {
+      const r = await VN.baoHanh.traCuu(ma);
+      kq.innerHTML = `<div class="kq-tra-cuu"><div><p class="nhan ${r.Status === 'Active' ? 'nhan--ngoc' : 'nhan--do'}">${r.Status === 'Active' ? 'Thẻ hợp lệ · Trọn đời' : 'Thẻ đã hết hiệu lực'}</p><h3 class="t-3">${VN.thoat(r.ProductName)}</h3>
+        <p class="chu-phu">Mã ${VN.thoat(r.ProductSKU)} · Kích hoạt ${VN.ngay(r.IssueDate)}</p>
+        <p class="chu-rat-nho chu-phu">Đăng nhập bằng tài khoản chủ thẻ (hoặc tạo tài khoản bằng số điện thoại đã đặt hàng) để xem lịch sử và đặt lịch.</p></div></div>`;
+    } catch (loi) {
+      kq.innerHTML = loi.trangThai === 404
+        ? `<p class="hop-bao hop-bao--cam">${VN.bt('thong-tin')}<span>Không tìm thấy thẻ <strong>${VN.soTheDep(ma)}</strong>. Thẻ chỉ có sau khi đơn hàng được xác nhận đã nhận.</span></p>`
+        : `<p class="hop-bao hop-bao--do">${VN.bt('canh-bao')}<span>${VN.thoat(loi.message)}</span></p>`;
+    }
   });
 
   /* ================= KHỞI TẠO ================= */
   const batDau = async () => {
     const [ch, cuaHang] = await Promise.all([VN.duLieu.cauHinh(), VN.duLieu.cuaHang()]);
     tt.ch = ch; tt.cuaHang = cuaHang;
+    await VN.baoHanh.nap().catch((loi) => VN.thongBao({ tieuDe: 'Chưa tải được thẻ bảo hành', noiDung: VN.thoat(loi.message), loai: 'loi' }));
     form.cuaHang.innerHTML = '<option value="">Chọn showroom</option>' + cuaHang.map((c) => `<option value="${VN.thoat(c.ma)}">${VN.thoat(c.ten)} – ${VN.thoat(c.khuVuc)}</option>`).join('');
     veGio(); khoiTaoNgay();
     if (u) form.sdt.value = u.sdt || '';

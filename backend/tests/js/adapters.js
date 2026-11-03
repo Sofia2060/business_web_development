@@ -36,8 +36,13 @@ vm.runInContext(fs.readFileSync(apiFile, 'utf8'), sandbox);
     orders: samples.orders.map((o) => VN.donHangTuApi(o, { khachId: samples.me.id })),
     orderDetails: samples.orderDetails.map((o) => VN.donHangTuApi(o, { khachId: samples.me.id })),
     guestOrder: VN.donHangTuApi(samples.guestOrder, { sdtKhach: '0912345678' }),
+    cards: samples.warranties.map(VN.theBaoHanhTuApi),
+    services: samples.services.map(VN.lichHenTuApi),
     errors: [],
   };
+  // What a page writes into the note of an appointment must read back the same
+  const note = out.services[0];
+  out.noteRoundTrip = VN.ghiChuLich({ tenCuaHang: note.tenCuaHang, sdt: note.sdt, soAnh: note.soAnh, ghiChu: note.ghiChu });
   for (let i = 0; i < (samples.errors || []).length; i += 1) {
     try { await VN.api.get('/api/error/' + i); out.errors.push(null); } catch (e) { out.errors.push({ message: e.message, status: e.trangThai, reason: e.lyDo, code: e.maLoi }); }
   }

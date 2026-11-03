@@ -110,7 +110,8 @@ Cách một trang dùng: `await VN.sanSang`, đọc trạng thái bằng hàm th
 
 - **Sản phẩm.** Trang tải cả danh mục một lần (5 lần gọi `GET /api/products?limit=100`, lưu trong `sessionStorage` tối đa 5 phút) rồi lọc, đếm và sắp xếp ngay trên trình duyệt. Với 443 sản phẩm cách này nhanh và giữ nguyên bộ lọc cũ. Giá và tồn kho vẫn được máy chủ kiểm tra lại khi thêm giỏ và đặt hàng. Trang chi tiết gọi thêm `GET /api/products/<mã>` để lấy đủ ảnh, đá và các biến thể (màu, size, tồn kho). Chỉ hiện các size đang có trong kho.
 - **Sản phẩm chỉ báo giá** (`IsQuoteOnly`): hiện "Liên hệ báo giá", không có nút mua.
-- **Giỏ hàng.** Khách có tài khoản: giỏ nằm trong database. Khách chưa đăng nhập: giỏ nằm trong `localStorage` của trình duyệt, gửi kèm khi đặt hàng. Khi đăng nhập hoặc đăng ký, giỏ của trình duyệt được gộp vào giỏ tài khoản. Mỗi dòng giỏ mua tối đa 5 (giới hạn của giao diện, database cho 10).
+- **Giỏ hàng.** Khách có tài khoản: giỏ nằm trong database. Khách chưa đăng nhập: giỏ nằm trong `localStorage` của trình duyệt, gửi kèm khi đặt hàng. Khi đăng nhập hoặc đăng ký, giỏ của trình duyệt được gộp vào giỏ tài khoản. Mỗi dòng giỏ mua tối đa 5 (giới hạn của giao diện, database cho 10). Nếu lúc tải trang máy chủ không trả lời (mạng chập chờn), trang thử lại 3 lần. Vẫn lỗi thì hiện thông báo "Chưa kết nối được máy chủ" kèm nút Tải lại, và chặn thay đổi giỏ cho tới khi kết nối lại. Khách đã đăng nhập không bị coi là khách vãng lai trong lúc đó, nên giỏ không bị ghi nhầm vào trình duyệt.
+- **Trước khi đặt**, trang thanh toán đọc lại danh mục từ máy chủ (bỏ bản lưu 5 phút), bỏ khỏi giỏ các sản phẩm đã ngừng bán hoặc ẩn rồi báo cho khách, và so lại giá. Giá đổi hoặc có dòng bị bỏ thì đơn chưa đặt, khách xem lại tổng tiền rồi bấm đặt lần nữa.
 - **Đặt hàng.** Có tài khoản: chọn địa chỉ trong sổ (địa chỉ mới được thêm vào sổ, xóa lại sau khi đặt nếu khách bỏ chọn "Lưu địa chỉ"). Không tài khoản: `POST /api/orders/guest`, số điện thoại là mã khách. Mua tặng người khác thì số người đặt dùng để tra cứu, số người nhận để giao. Mã đơn và số điện thoại của khách không tài khoản được nhớ trong `localStorage` (khóa `donKhach`) để xem lại đơn trên trình duyệt đó.
 - **Thanh toán trực tuyến** (VNPay, MoMo) là mô phỏng: cổng giả trên trang gọi `POST /api/orders/<mã>/pay`. Phải xong trong 15 phút, trang kết quả và trang đơn hàng đếm ngược. Hết giờ máy chủ tự hủy đơn.
 - **Hủy đơn.** Nút "Hủy đơn" theo `CancelChannel`: `Web` thì hiện bước chọn lý do rồi popup nhắc mất voucher (giữ hoặc hủy); `Hotline` thì hiện hướng dẫn gọi hotline; đơn đang chế tác không có nút.
@@ -118,7 +119,8 @@ Cách một trang dùng: `await VN.sanSang`, đọc trạng thái bằng hàm th
 - **Trang quản trị (nhóm C8).** Sáu trong bảy trang đã nối API: **Đơn hàng**, **Tổng quan**, **Khách hàng**, **Đánh giá**, **Bảo hành và lịch hẹn**, **Sản phẩm**. Đơn hàng và lịch hẹn được nạp một lần khi mở trang (`admin.js` giữ trong `qt.don` và `qt.lich`, đơn nạp 100 đơn mỗi lần gọi). Mở một đơn thì gọi thêm `GET /api/admin/orders/<mã>`. Trang **Phản ánh** vẫn đọc dữ liệu mô phỏng trong trình duyệt vì database chưa có bảng phản ánh (đầu trang có dòng nhắc). Database cũng chưa có: hoàn tiền hai bước (`RefundPending`), ghi chú nội bộ của đơn, phản hồi của cửa hàng cho đánh giá, khung giờ và showroom của lịch hẹn (chỉ có một mốc ngày giờ). Các trang này chỉ cập nhật khi tải lại hoặc sau thao tác của admin.
 - **Giá và trạng thái sản phẩm** sửa ở trang Sản phẩm, lưu thẳng vào database (`PATCH /api/admin/products/<sku>`). Cửa hàng giữ danh mục 5 phút trong trình duyệt (`sessionStorage`), nên khách thấy giá mới sau tối đa 5 phút.
 - **Luồng xử lý đơn ở trang admin:** Chờ xử lý → *Xác nhận đơn* (`Confirmed`) → *Bắt đầu chế tác* (không bắt buộc, từ đó không ai hủy được) → *Bàn giao vận chuyển* (`Shipping`) → *Giao thành công* (`Delivered`, kích hoạt thẻ bảo hành, đơn COD ghi nhận đã thu tiền). Đơn chuyển khoản phải bấm *Xác nhận đã nhận tiền* trước. Hủy đơn được khi `Pending` hoặc `Confirmed` chưa chế tác.
-- **Bảo hành, đặt lịch, đánh giá, phản ánh, yêu thích, đã xem:** còn lưu trong `localStorage`, chờ nhóm C6 và C7. Database đã tạo thẻ bảo hành thật khi khách xác nhận nhận hàng, nhưng trang bảo hành chưa đọc chúng.
+- **Bảo hành và lịch hẹn của khách (nhóm C6)** đã nối API: thẻ do database tạo khi đơn giao xong, trang Cổng bảo hành đọc thẻ và lịch hẹn thật, khách đặt và hủy lịch, cửa hàng xác nhận ở trang admin. Database chỉ có một mốc ngày giờ cho lịch hẹn, nên **khung giờ** ghi vào giờ hẹn, còn **showroom**, số điện thoại liên hệ và số ảnh đã chọn ghi vào dòng đầu của ghi chú (`Showroom: ... | SĐT: ... | Ảnh chọn: 2 (chưa lưu)`). **Ảnh tình trạng chỉ là bản demo:** trang xem trước ảnh trên máy khách, không gửi đi và không lưu. Khách vãng lai xem thẻ của các đơn đã mở trên trình duyệt (mã đơn và số điện thoại), muốn đặt lịch phải có tài khoản. Tra cứu theo mã thẻ chỉ cho biết thẻ có thật và là sản phẩm nào, không lộ chủ thẻ.
+- **Đánh giá, phản ánh, yêu thích, đã xem:** còn lưu trong `localStorage`, chờ nhóm C7. Trang kích hoạt thẻ vẫn chứa form đánh giá lưu trong trình duyệt.
 - Kiểm tra: `backend/tests/test_frontend_adapters.py` chạy các hàm đổi dữ liệu của `api.js` bằng Node trên câu trả lời thật của API (bỏ qua nếu máy chưa cài Node).
 
 ## Môi trường Python (back-end)
@@ -216,6 +218,12 @@ Các API này cần đăng nhập bằng tài khoản khách (`Customer`). Tài 
 | `POST /api/orders/<mã đơn>/pay` | Thanh toán mô phỏng cho đơn VNPay hoặc MoMo, luôn thành công (`sp_RecordPaymentResult`). Đơn đã hủy hoặc quá 15 phút trả 409. Đơn COD và chuyển khoản trả 400 |
 | `POST /api/orders/<mã đơn>/cancel/respond` | Khách chọn trong popup (`sp_RespondCancelPopup`): `keepOrder: true` giữ đơn, `keepOrder: false` hủy đơn, trả tồn kho, mất voucher |
 | `POST /api/orders/<mã đơn>/confirm-received` | Xác nhận đã nhận hàng (`sp_ConfirmOrderReceived`). Chỉ khi đơn đang giao. Database tự tạo thẻ bảo hành |
+| `GET /api/warranties` | Thẻ bảo hành của tôi (khách đã đăng nhập): sản phẩm, size hiện tại, hạn mức và số lượt đã dùng của từng dịch vụ (`null` là không giới hạn) |
+| `GET /api/orders/<mã đơn>/warranties` | Thẻ của một đơn của tôi. Khách vãng lai gửi `?phone=` như các API đơn hàng |
+| `GET /api/warranties/<mã thẻ>` | Tra cứu thẻ bằng mã (ai cũng gọi được): chỉ trả mã thẻ, ngày kích hoạt, trạng thái, sản phẩm, không trả chủ thẻ |
+| `GET /api/after-sales` | Lịch hẹn hậu mãi của tôi, mới nhất trước |
+| `POST /api/after-sales` | Đặt lịch (`sp_BookAfterSalesService`): `warrantyCode`, `serviceType`, `preferredDate` (giờ địa phương, trong tương lai, tối đa 1 năm), `newRingSize` (chỉ khi chỉnh size), `note` (tối đa 500). Mỗi thẻ chỉ có một lịch đang mở cho mỗi loại dịch vụ (409) |
+| `POST /api/after-sales/<id>/cancel` | Khách hủy lịch chưa hoàn tất (`sp_CancelAfterSalesService`), không mất lượt. Lịch của người khác hoặc đã xong trả 409 |
 | `GET /api/admin/orders` | Admin xem mọi đơn, mỗi đơn kèm `items`, `PaymentDeadline`, `PaidAt`. Tham số `status`, `page`, `limit` (tối đa 100) |
 | `GET /api/admin/orders/<mã đơn>` | Admin xem một đơn đầy đủ (cùng dạng `GET /api/orders/<mã>`) kèm khối `customer` (tên, email, số điện thoại, `IsGuest`) |
 | `POST /api/admin/orders/<mã đơn>/status` | Admin đổi trạng thái (`sp_UpdateOrderStatus`): `Confirmed`, `Shipping`, `Delivered`, `Cancelled`. Nhảy bước trả 409. Hủy đơn đã bắt đầu chế tác trả 409 |
@@ -285,7 +293,7 @@ Khách chưa đăng nhập vẫn đặt hàng được. **Số điện thoại l
 uv run pytest
 ```
 
-Test nằm trong `backend/tests/` (557 test, chạy khoảng bốn phút). Test không đụng vào dữ liệu thật. Mỗi lần chạy, `backend/tests/conftest.py` dựng lại một database riêng tên `VinoraJewelry_Test` từ file `database/01_*.sql` (mất khoảng 5 giây). Cần quyền tạo database trên SQL Server. Nếu không kết nối được, các test bị bỏ qua và pytest in lý do.
+Test nằm trong `backend/tests/` (581 test, chạy khoảng năm phút). Test không đụng vào dữ liệu thật. Mỗi lần chạy, `backend/tests/conftest.py` dựng lại một database riêng tên `VinoraJewelry_Test` từ file `database/01_*.sql` (mất khoảng 5 giây). Cần quyền tạo database trên SQL Server. Nếu không kết nối được, các test bị bỏ qua và pytest in lý do.
 
 ## Quy ước
 

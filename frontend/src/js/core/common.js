@@ -215,72 +215,6 @@
     doiTuong.lichSu.push({ luc: new Date().toISOString(), noiDung, boi, trangThai: trangThai || doiTuong.trangThai });
   };
 
-  VN.baoHanh = {
-    tatCa() { return VN.kho.doc('baoHanh', []); },
-    luuTatCa(ds) { VN.kho.ghi('baoHanh', ds); phatSuKien('bao-hanh', ds); },
-    cuaToi() { const u = VN.taiKhoan.hienTai(); return u ? this.tatCa().filter((t) => t.khachHang === u.id).sort((a, b) => new Date(b.ngayKichHoat) - new Date(a.ngayKichHoat)) : []; },
-    lay(ma) { ma = String(ma || '').replace(/\s/g, '').toUpperCase(); return this.tatCa().find((t) => t.ma === ma) || null; },
-    theoDon(maDon) { return this.tatCa().filter((t) => t.donHang === maDon); },
-    taoMa(ds) { let ma; do { ma = 'VNRA' + yymmdd().slice(0, 4) + VN.ngauNhien(8); } while (ds.some((t) => t.ma === ma)); return ma; },
-    /** Mỗi sản phẩm (từng đơn vị) nhận một thẻ; gọi lặp không tạo thêm thẻ (FR15) */
-    kichHoatChoDon(don, ngayKichHoat) {
-      const ds = this.tatCa(); const moi = [];
-      don.sanPham.forEach((dong, viTri) => {
-        for (let donVi = 1; donVi <= dong.soLuong; donVi++) {
-          if (ds.some((t) => t.donHang === don.ma && t.viTri === viTri && t.donVi === donVi)) continue;
-          const the = {
-            ma: this.taoMa(ds), khachHang: don.khachHang || null, sdtKhach: don.sdtKhach || '', donHang: don.ma, viTri, donVi,
-            maSP: dong.ma, tenSP: dong.ten, anh: dong.anh, chatLieu: dong.chatLieu, mau: dong.mau || '', size: dong.size || null,
-            khacChu: dong.khacChu || '', laNhan: !!dong.laNhan, ngayKichHoat: ngayKichHoat || new Date().toISOString(),
-            hieuLuc: 'Trọn đời', daDung: { Cleaning: 0, Polishing: 0, Resizing: 0, Repair: 0 }, lichSuDichVu: [],
-          };
-          ds.push(the); moi.push(the);
-        }
-      });
-      this.luuTatCa(ds);
-      return moi.length ? moi : ds.filter((t) => t.donHang === don.ma);
-    },
-    /** Số lượt còn lại theo cấu hình quyền lợi; lượt đang chờ hẹn được giữ chỗ */
-    conLai(the, ch, loai) {
-      const ql = ch.baoHanh.quyenLoi.find((q) => q.ma === loai);
-      if (!ql || ql.luot === null) return Infinity;
-      const dangHen = VN.lichHen.tatCa().filter((l) => l.maBaoHanh === the.ma && l.loai === loai && ['Pending', 'Confirmed'].includes(l.trangThai)).length;
-      return Math.max(0, ql.luot - (the.daDung[loai] || 0) - dangHen);
-    },
-    ghiDichVu(maThe, loai, noiDung, maLich) {
-      const ds = this.tatCa(); const the = ds.find((t) => t.ma === maThe); if (!the) return;
-      the.daDung[loai] = (the.daDung[loai] || 0) + 1;
-      the.lichSuDichVu.push({ luc: new Date().toISOString(), loai, noiDung, maLich });
-      this.luuTatCa(ds);
-    },
-  };
-
-  VN.lichHen = {
-    tatCa() { return VN.kho.doc('lichHen', []); },
-    luuTatCa(ds) { VN.kho.ghi('lichHen', ds); phatSuKien('lich-hen', ds); },
-    cuaToi() { const u = VN.taiKhoan.hienTai(); return u ? this.tatCa().filter((l) => l.khachHang === u.id).sort((a, b) => new Date(b.taoLuc) - new Date(a.taoLuc)) : []; },
-    tao(duLieu) {
-      const u = VN.taiKhoan.hienTai(); const ds = this.tatCa();
-      let ma; do { ma = 'LH' + yymmdd() + VN.ngauNhien(3); } while (ds.some((l) => l.ma === ma));
-      const lich = Object.assign({ ma, khachHang: u.id, trangThai: 'Pending', taoLuc: new Date().toISOString(), lichSu: [] }, duLieu);
-      ghiLichSu(lich, 'Khách hàng gửi yêu cầu đặt lịch.', 'Khách hàng', 'Pending');
-      ds.push(lich); this.luuTatCa(ds); return lich;
-    },
-    capNhat(ma, trangThai, noiDung, boi) {
-      const ds = this.tatCa(); const lich = ds.find((l) => l.ma === ma); if (!lich) return null;
-      lich.trangThai = trangThai; ghiLichSu(lich, noiDung, boi, trangThai); this.luuTatCa(ds);
-      // Chỉ trừ lượt khi dịch vụ hoàn tất; lịch bị hủy không mất lượt (FR17)
-      if (trangThai === 'Completed') {
-        VN.baoHanh.ghiDichVu(lich.maBaoHanh, lich.loai, `${VN.TEN_DICH_VU[lich.loai]} tại ${lich.tenCuaHang}`, lich.ma);
-        if (lich.loai === 'Resizing' && lich.sizeMoi) {   // chỉnh size xong -> cập nhật size mới trên thẻ
-          const dsThe = VN.baoHanh.tatCa(); const t = dsThe.find((x) => x.ma === lich.maBaoHanh);
-          if (t) { t.size = lich.sizeMoi; VN.baoHanh.luuTatCa(dsThe); }
-        }
-      }
-      return lich;
-    },
-  };
-
   VN.danhGia = {
     tatCa() { return VN.kho.doc('danhGia', []); },
     theoDon(maDon) { return this.tatCa().find((d) => d.donHang === maDon) || null; },
@@ -779,7 +713,7 @@
       }
       const dem = (n) => (n ? `<span class="menu-tk__dem">${n}</span>` : '');
       const donMo = VN.donHang.cuaToi().filter((d) => ['Pending', 'Confirmed', 'Shipping'].includes(d.trangThai)).length;
-      const lichMo = VN.lichHen.cuaToi().filter((l) => ['Pending', 'Confirmed'].includes(l.trangThai)).length;
+      const lichMo = VN.lichHen.cuaToi().filter((l) => l.dangMo).length;
       return `<div class="xn__nguoi"><span class="menu-tk__chu-cai" aria-hidden="true">${VN.thoat(VN.taiKhoan.tenGoi(u).charAt(0).toUpperCase())}</span>
           <span><strong>${VN.thoat(u.hoTen)}</strong><small>${VN.thoat(u.email)}</small></span></div>
         <ul class="xn__menu">
@@ -953,10 +887,12 @@
       const dem = (sel, n) => VN.$$(sel, menu).forEach((el) => { el.textContent = n; el.hidden = !n; });
       dem('[data-tk-dem-don]', u ? VN.donHang.cuaToi().filter((d) => ['Pending', 'Confirmed', 'Shipping'].includes(d.trangThai)).length : 0);
       dem('[data-tk-dem-the]', u ? VN.baoHanh.cuaToi().length : 0);
-      dem('[data-tk-dem-lich]', u ? VN.lichHen.cuaToi().filter((l) => ['Pending', 'Confirmed'].includes(l.trangThai)).length : 0);
+      dem('[data-tk-dem-lich]', u ? VN.lichHen.cuaToi().filter((l) => l.dangMo).length : 0);
       dem('[data-tk-dem-yeu-thich]', VN.yeuThich.ds().length);
     };
     ve();
+    // The cards and appointments come from the server: load them once for the counters (nap() announces them, which draws again)
+    VN.sanSang.then(() => { if (VN.taiKhoan.hienTai()) VN.baoHanh.nap().catch(() => {}); });
     ['vinora:don-hang', 'vinora:bao-hanh', 'vinora:lich-hen', 'vinora:tai-khoan', 'vinora:yeu-thich'].forEach((ten) => window.addEventListener(ten, ve));
   };
   const khoiTaoDangXuat = () => {
