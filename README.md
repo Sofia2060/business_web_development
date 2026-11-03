@@ -266,6 +266,7 @@ Khách chưa đăng nhập vẫn đặt hàng được. **Số điện thoại l
 
 - Khi khách vãng lai đăng ký tài khoản bằng đúng số đó, đơn, địa chỉ và thẻ bảo hành cũ tự thuộc về tài khoản (dòng khách hàng được gắn thêm `UserID`). Cần mã xác minh: gửi `otp` trong `POST /api/auth/register`. Thiếu mã trả 409 `reason: otp_required`, sai mã trả 400 `reason: otp_invalid`, thành công trả `linkedOrders` (số đơn nhận lại).
 - **Mã xác minh là mã giả `123456`** (hằng `DEMO_OTP` trong `backend/app/config.py`), vì cửa hàng không gửi SMS. Ai biết số điện thoại của khách vãng lai và mã này đều nhận được đơn cũ của số đó, nên đây chỉ dùng để demo. Muốn dùng thật phải gửi mã ngẫu nhiên qua SMS.
+- **Admin đăng nhập cùng trình duyệt.** Giao diện cửa hàng coi trình duyệt đó là khách vãng lai và gửi bằng chứng của khách vãng lai (số điện thoại của đơn, hoặc các dòng giỏ trong `items` khi kiểm tra mã giảm giá). Máy chủ chấp nhận bằng chứng đó từ phiên admin như từ bất kỳ khách nào, và coi yêu cầu là của khách vãng lai (nhật ký ghi `Guest:`, không ghi admin). Không gửi bằng chứng thì admin vẫn nhận 403. Khách có tài khoản thì không bao giờ rơi về cách xét bằng số điện thoại. Số điện thoại của khách có tài khoản không phải bằng chứng, kể cả với admin.
 - Khách vãng lai không có danh sách đơn (cần mã đơn). Admin thấy đơn của họ trong `GET /api/admin/orders` với `IsGuest: true`, tên người nhận và số điện thoại.
 - Các yêu cầu đặt hàng cùng một số điện thoại chạy lần lượt (khóa theo số, chờ tối đa 10 giây, quá thì trả 409), vì dùng chung một giỏ tạm. Đặt hàng thất bại thì không để lại khách, địa chỉ hay giỏ nào.
 - Số điện thoại được chuẩn hóa: `+84901234567`, `84901234567`, `0084901234567` và `0901234567` là một số.
@@ -297,7 +298,7 @@ Khách chưa đăng nhập vẫn đặt hàng được. **Số điện thoại l
 uv run pytest
 ```
 
-Test nằm trong `backend/tests/` (635 test, chạy khoảng năm phút). Test không đụng vào dữ liệu thật. Mỗi lần chạy, `backend/tests/conftest.py` dựng lại một database riêng tên `VinoraJewelry_Test` từ file `database/01_*.sql` (mất khoảng 5 giây). Cần quyền tạo database trên SQL Server. Nếu không kết nối được, các test bị bỏ qua và pytest in lý do.
+Test nằm trong `backend/tests/` (644 test, chạy khoảng năm phút). Test không đụng vào dữ liệu thật. Mỗi lần chạy, `backend/tests/conftest.py` dựng lại một database riêng tên `VinoraJewelry_Test` từ file `database/01_*.sql` (mất khoảng 5 giây). Cần quyền tạo database trên SQL Server. Nếu không kết nối được, các test bị bỏ qua và pytest in lý do.
 
 ## Quy ước
 
