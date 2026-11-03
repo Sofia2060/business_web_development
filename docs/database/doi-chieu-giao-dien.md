@@ -55,7 +55,7 @@ Size 21 đến 24 và tồn kho là hai chỗ giao diện phải xử lý thêm:
 ## 5. Chưa có trong database
 
 - Lưu yêu cầu báo giá: form liên hệ (`Nhận báo giá`) hiện chỉ lưu trong trình duyệt (khóa `lienHe`), cửa hàng không nhận được. Cần bảng và API nhận yêu cầu liên hệ.
-- Ảnh tình trạng của lịch hẹn hậu mãi (hiện chỉ xem trước trên máy khách), danh sách yêu thích, phản ánh đơn hàng kèm ảnh, phản hồi của cửa hàng cho đánh giá.
+- Ảnh tình trạng của lịch hẹn hậu mãi (hiện chỉ xem trước trên máy khách), danh sách yêu thích, phản ánh đơn hàng kèm ảnh, phản hồi của cửa hàng cho đánh giá, form liên hệ báo giá, đăng ký nhận tin.
 - Giao hỏa tốc (60.000 đ) và mã miễn phí giao `FREESHIP`: database không có, giao diện đã bỏ. Gói quà và lời nhắn thiệp chỉ nằm trong ghi chú của đơn.
 - Đổi sang thanh toán khi nhận hàng (COD) sau khi đã đặt đơn trả trước: chưa có API, nút đã bỏ khỏi giao diện.
 - Danh sách đơn của khách không có tài khoản: máy chủ không có, trình duyệt tự nhớ mã đơn và số điện thoại đã đặt hoặc đã tra cứu.

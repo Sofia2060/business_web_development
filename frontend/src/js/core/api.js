@@ -171,6 +171,12 @@
     diaChi: (diaChi || []).map((a) => ({ id: a.AddressID, hoTen: a.RecipientName, sdt: a.Phone, tinh: a.Province, phuongXa: a.Ward, diaChi: a.AddressLine, macDinh: !!a.IsDefault })),
   });
 
+  /** A review of the API (`feedback` of an order, or the answer of POST /api/orders/<code>/feedback) -> the review the pages use */
+  VN.danhGiaTuApi = (f, maDon) => ({
+    ma: f.FeedbackID, donHang: maDon, soSao: f.RatingStar, noiDung: f.ReviewText || '', luc: f.CreatedAt,
+    chuDe: (f.aspects || []).map((a) => a.AspectName),
+  });
+
   const TEN_THANH_TOAN_LS = { COD: 'thanh toán khi nhận hàng', BANK: 'chuyển khoản', VNPAY: 'VNPay', MOMO: 'MoMo' };
   /**
    * An order of the API (list row or detail) -> the order the pages use.
@@ -196,7 +202,7 @@
       hanThanhToan: choTraOnline ? r.PaymentDeadline : null,
       kenhHuy: r.CancelChannel || null,            // "Web" = can cancel here, "Hotline" = call the shop, null = cannot cancel
       coKhacChu: !!r.HasEngraving,
-      daDanhGia: !!(VN.danhGia && VN.danhGia.theoDon(r.OrderCode)), lichSu: [],
+      daDanhGia: !!r.feedback, danhGia: r.feedback ? VN.danhGiaTuApi(r.feedback, r.OrderCode) : null, lichSu: [],
     };
     if (r.ShipRecipientName !== undefined) {   // the detail of one order
       don.nguoiNhan = { hoTen: r.ShipRecipientName, sdt: r.ShipPhone, tinh: '', phuongXa: '', diaChi: r.ShipAddress, ghiChu: r.Note || '', email: '' };

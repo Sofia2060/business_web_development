@@ -77,7 +77,7 @@ Các nút “Mô phỏng: …” trước đây ở giao diện khách (cửa h�
 | Menu Nhẫn / Trang sức / BST / Quà tặng rối | Gộp còn **Trang sức** (rê vào *Nhẫn* hiện các loại nhẫn, rê vào *Quà tặng* hiện theo ngân sách) · Bộ sưu tập · Ưu đãi · Bảo hành điện tử · **Về Vinora** |
 | Hover đồng hồ / avatar / giỏ | Rê chuột hiện hộp xem nhanh: 5 sản phẩm đã xem, 5 sản phẩm yêu thích, menu tài khoản (như cột trái), các món trong giỏ |
 | Giấy chứng nhận | Huy hiệu “Đã kiểm định chất lượng” ở trang sản phẩm mở giấy chứng nhận (trình bày như phiếu bảo hành); mỗi thẻ bảo hành có giấy chứng nhận riêng |
-| Thêm / bỏ yêu thích | Nút trái tim trên mọi thẻ sản phẩm và trang chi tiết; trang `wishlist.html` |
+| Thêm / bỏ yêu thích | Nút trái tim trên mọi thẻ sản phẩm và trang chi tiết; trang `wishlist.html`. Bản demo: lưu trong trình duyệt, có dòng ghi chú trên trang |
 | Bắt đăng nhập khi thanh toán | Đặt hàng không cần tài khoản, **số điện thoại là mã khách hàng**; tra cứu đơn bằng mã đơn + SĐT; tạo tài khoản bằng SĐT đó và xác minh OTP thì đơn + thẻ bảo hành tự liên kết |
 | 4 ô tổng quan ở Hồ sơ | Đã bỏ, trang chỉ còn thông tin cá nhân |
 | Hạn thanh toán | Đơn trả trực tuyến có đồng hồ đếm ngược 24 giờ; quá hạn hệ thống tự hủy |

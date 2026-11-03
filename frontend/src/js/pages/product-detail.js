@@ -41,8 +41,7 @@
     const s = Object.assign(goc, { anh: ct.anh, moTa: ct.moTa, coMoTa: ct.coMoTa, da: ct.da, bienThe: ct.bienThe, khacDuoc: ct.khacDuoc, mau: ct.mau });
     Object.assign(tt, { sp: s, ch, bangSize, toiDa: ch.soLuongToiDaMoiDong || 5, toiDaKhac: ch.khacChu.toiDaKyTu || 15 });
 
-    VN.daXem.ghi(s.ma);
-    if (VN.taiKhoan.hienTai()) VN.api.post('/api/recently-viewed', { sku: s.ma }).catch(() => {});   // khách có tài khoản: máy chủ cũng ghi nhận
+    VN.daXem.ghi(s.ma);      // khách có tài khoản: ghi lên máy chủ; khách vãng lai: ghi trong trình duyệt
     veDauTrang(s);
     veGia(s, ch);
     veThongSo(s, ch);

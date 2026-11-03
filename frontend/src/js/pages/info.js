@@ -38,7 +38,7 @@
       const ma = 'LHE' + Date.now().toString(36).toUpperCase();
       ds.push({ ma, luc: new Date().toISOString(), hoTen: f.hoTen.value.trim(), sdt: f.sdt.value, email: f.email.value.trim(), chuDe: f.chuDe.value, maSanPham: f.maSanPham.value.trim(), noiDung: f.noiDung.value.trim(), kenh: f.kenh.value });
       VN.kho.ghi('lienHe', ds); f.noiDung.value = '';
-      VN.thongBao({ tieuDe: 'Đã gửi yêu cầu ' + ma, noiDung: 'Chuyên viên Vinora sẽ liên hệ lại trong giờ làm việc.', loai: 'thanh-cong', thoiGian: 6000 });
+      VN.thongBao({ tieuDe: 'Đã ghi nhận yêu cầu ' + ma, noiDung: 'Bản demo: yêu cầu chỉ được lưu trong trình duyệt này, cửa hàng chưa nhận được.', loai: 'thanh-cong', thoiGian: 6000 });
     });
   }
 

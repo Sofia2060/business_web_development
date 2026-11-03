@@ -38,6 +38,8 @@ vm.runInContext(fs.readFileSync(apiFile, 'utf8'), sandbox);
     guestOrder: VN.donHangTuApi(samples.guestOrder, { sdtKhach: '0912345678' }),
     cards: samples.warranties.map(VN.theBaoHanhTuApi),
     services: samples.services.map(VN.lichHenTuApi),
+    reviewedOrder: VN.donHangTuApi(samples.reviewedOrder, { khachId: samples.me.id }),
+    reviewedRow: VN.donHangTuApi(samples.reviewedRow, { khachId: samples.me.id }),
     errors: [],
   };
   // What a page writes into the note of an appointment must read back the same

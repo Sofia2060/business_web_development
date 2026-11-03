@@ -1,8 +1,8 @@
-"""Products the logged-in customer opened recently. Guests keep this list in their browser instead."""
+"""Products the logged-in customer opened recently (list, add one, remove one, clear). Guests keep this list in their browser instead."""
 from flask import Blueprint, g, jsonify, request
 
 from ..auth import customer_required
-from ..db import call, query
+from ..db import call, query, transaction
 from ..validation import body, page_number, text
 
 bp = Blueprint("recently_viewed", __name__, url_prefix="/api/recently-viewed")
@@ -36,4 +36,23 @@ def track_view():
     if not rows:
         return jsonify(error="Product not found"), 404
     call("EXEC dbo.sp_TrackProductView @CustomerID = ?, @ProductID = ?", (g.customer_id, rows[0]["ProductID"]))
+    return "", 204
+
+
+@bp.delete("/<sku>")
+@customer_required
+def forget_one(sku: str):
+    """Take one product off my list. Quiet when it is not on the list."""
+    with transaction() as cur:
+        cur.execute("DELETE r FROM dbo.RecentlyViewedProducts r JOIN dbo.Products p ON p.ProductID = r.ProductID "
+                    "WHERE r.CustomerID = ? AND p.SKU = ?", (g.customer_id, sku))
+    return "", 204
+
+
+@bp.delete("")
+@customer_required
+def forget_all():
+    """Clear my whole list."""
+    with transaction() as cur:
+        cur.execute("DELETE FROM dbo.RecentlyViewedProducts WHERE CustomerID = ?", (g.customer_id,))
     return "", 204

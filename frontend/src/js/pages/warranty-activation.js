@@ -58,12 +58,11 @@
       ${dg.noiDung ? `<blockquote>“${VN.thoat(dg.noiDung)}”</blockquote>` : ''}
       ${dg.chuDe && dg.chuDe.length ? `<div class="chip-nhom">${dg.chuDe.map((c) => `<span class="chip chip--nho">${VN.thoat(c)}</span>`).join('')}</div>` : ''}
       <p class="chu-rat-nho chu-phu">Gửi lúc ${VN.ngayGio(dg.luc)}. Bạn có thể xem lại đánh giá trong chi tiết đơn hàng.</p>
-      ${dg.phanHoi ? `<p class="hop-bao">${VN.bt('chat')}<span><strong>Phản hồi từ ${VN.thoat(dg.phanHoi.boi)}:</strong> ${VN.thoat(dg.phanHoi.noiDung)}</span></p>` : ''}
       ${coVanDe ? `<p class="hop-bao hop-bao--cam">${VN.bt('chat')}<span>Rất tiếc vì trải nghiệm chưa trọn vẹn. <a class="lien-ket" href="${VN.url('donHang', { ma: dg.donHang, phananh: 1 })}">Gửi phản ánh kèm ảnh</a> để Vinora liên hệ và xử lý trong 24 giờ.</span></p>` : ''}`;
   };
 
   const veDanhGia = (don) => {
-    const daCo = VN.danhGia.theoDon(don.ma);
+    const daCo = don.danhGia;
     if (daCo) { veKetQua(daCo); return; }
     const form = VN.$('#form-danh-gia');
     VN.$('#dg-chu-de').innerHTML = CHU_DE.tot.concat(CHU_DE.chua).map((c) => `<label><input class="an-chu" type="checkbox" name="chuDe" value="${c}"><span class="chip chip--nho chip--tron${CHU_DE.chua.includes(c) ? ' chip--chua' : ''}">${c}</span></label>`).join('');
@@ -71,15 +70,17 @@
       if (e.target.name === 'soSao') { VN.$('#chu-sao').textContent = `${e.target.value}/5 · ${CHU_SAO[e.target.value]}`; VN.$('#loi-sao').textContent = ''; }
     });
     form.noiDung.addEventListener('input', () => { VN.$('#dg-dem').textContent = `${form.noiDung.value.length}/500`; });
-    form.addEventListener('submit', (e) => {
+    form.addEventListener('submit', async (e) => {
       e.preventDefault();
       const sao = VN.$('input[name="soSao"]:checked', form);
       if (!sao) { VN.$('#loi-sao').textContent = 'Vui lòng chọn số sao.'; return; }
+      const nut = VN.$('[type="submit"]', form); nut.disabled = true;      // one click, one review
       try {
-        const dg = VN.danhGia.tao({ donHang: don.ma, soSao: Number(sao.value), noiDung: form.noiDung.value.trim(), chuDe: VN.$$('input[name="chuDe"]:checked', form).map((x) => x.value) });
+        const dg = await VN.danhGia.tao({ donHang: don.ma, soSao: Number(sao.value), noiDung: form.noiDung.value.trim(), chuDe: VN.$$('input[name="chuDe"]:checked', form).map((x) => x.value) });
+        don.danhGia = dg;
         veKetQua(dg);
         VN.thongBao({ tieuDe: 'Đã gửi đánh giá', loai: 'thanh-cong' });
-      } catch (loi) { VN.thongBao({ tieuDe: 'Không gửi được đánh giá', noiDung: loi.message, loai: 'loi' }); }
+      } catch (loi) { nut.disabled = false; VN.thongBao({ tieuDe: 'Không gửi được đánh giá', noiDung: VN.thoat(loi.message), loai: 'loi' }); }
     });
   };
 

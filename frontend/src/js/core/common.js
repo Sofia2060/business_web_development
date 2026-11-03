@@ -215,33 +215,6 @@
     doiTuong.lichSu.push({ luc: new Date().toISOString(), noiDung, boi, trangThai: trangThai || doiTuong.trangThai });
   };
 
-  VN.danhGia = {
-    tatCa() { return VN.kho.doc('danhGia', []); },
-    theoDon(maDon) { return this.tatCa().find((d) => d.donHang === maDon) || null; },
-    /** Phân loại cảm xúc MÔ PHỎNG theo số sao + từ khóa (FR25 – cần ghi rõ khi trình diễn) */
-    phanLoai(soSao, noiDung, chuDe = []) {
-      const am = ['trễ', 'chậm', 'nhầm', 'sai', 'xấu', 'thất vọng', 'lỗi', 'hỏng', 'không vừa', 'trầy', 'xỉn', 'giao trễ'];
-      const chu = VN.khongDau(noiDung + ' ' + chuDe.join(' '));
-      if (soSao >= 4) return 'Positive';
-      if (soSao <= 2) return 'Negative';
-      return am.some((t) => chu.includes(VN.khongDau(t))) ? 'Negative' : 'Positive';
-    },
-    /** Cửa hàng phản hồi đánh giá (hiện trong chi tiết đơn của khách) */
-    phanHoi(ma, noiDung, boi = 'Vinora Jewelry') {
-      const ds = this.tatCa(); const dg = ds.find((x) => x.ma === ma); if (!dg) throw new Error('Không tìm thấy đánh giá.');
-      dg.phanHoi = noiDung ? { noiDung, boi, luc: new Date().toISOString() } : null;
-      VN.kho.ghi('danhGia', ds); phatSuKien('danh-gia', ds);
-      return dg;
-    },
-    tao({ donHang, soSao, noiDung, chuDe }) {
-      const ds = this.tatCa(); const u = VN.taiKhoan.hienTai();
-      if (ds.some((d) => d.donHang === donHang)) throw new Error('Đơn hàng này đã được đánh giá.');
-      const dg = { ma: 'DG' + Date.now().toString(36).toUpperCase(), donHang, khachHang: u ? u.id : null, soSao, noiDung, chuDe, camXuc: this.phanLoai(soSao, noiDung, chuDe), luc: new Date().toISOString() };
-      ds.push(dg); VN.kho.ghi('danhGia', ds);
-      return dg;
-    },
-  };
-
   /* Phản ánh vấn đề của đơn hàng (sản phẩm lỗi, giao sai, thiếu hàng, hoàn tiền…) */
   VN.TRANG_THAI_HO_TRO = {
     Received: { ten: 'Đã tiếp nhận', lop: 'nhan--cam' },
@@ -270,24 +243,6 @@
       if (pa.trangThai === 'Resolved' && !pa.xongLuc) pa.xongLuc = new Date().toISOString();
       this.luuTatCa(ds);
       return pa;
-    },
-  };
-
-  /* ================= 8. SẢN PHẨM ĐÃ XEM ================= */
-  VN.daXem = {
-    ds() { return VN.kho.doc('daXem', []); },
-    ghi(ma) {
-      const ds = this.ds().filter((x) => x.ma !== ma);
-      ds.unshift({ ma, luc: Date.now() });
-      VN.kho.ghi('daXem', ds.slice(0, 40));
-    },
-    xoa(ma) { VN.kho.ghi('daXem', this.ds().filter((x) => x.ma !== ma)); },
-    xoaHet() { VN.kho.ghi('daXem', []); },
-    /** Hoàn tác thao tác xóa: gộp lại các mục và giữ thứ tự theo lần xem gần nhất */
-    khoiPhuc(dsMuc) {
-      const hienCo = this.ds(); const ma = new Set(hienCo.map((x) => x.ma));
-      const gop = hienCo.concat([].concat(dsMuc).filter((x) => x && !ma.has(x.ma)));
-      VN.kho.ghi('daXem', gop.sort((a, b) => b.luc - a.luc).slice(0, 40));
     },
   };
 
@@ -872,7 +827,7 @@
       loi.textContent = ''; const ds = VN.kho.doc('nhanTin', []);
       if (!ds.includes(o.value.trim().toLowerCase())) ds.push(o.value.trim().toLowerCase());
       VN.kho.ghi('nhanTin', ds); form.reset();
-      VN.thongBao({ tieuDe: 'Đăng ký nhận tin thành công', noiDung: 'Bạn sẽ là người đầu tiên biết về bộ sưu tập mới.', loai: 'thanh-cong' });
+      VN.thongBao({ tieuDe: 'Đã ghi nhận email', noiDung: 'Bản demo: email chỉ được lưu trong trình duyệt này, chưa có thư nào được gửi.', loai: 'thanh-cong' });
     });
   };
 
@@ -954,7 +909,7 @@
     window.addEventListener('storage', (e) => {
       if (e.key === TIEN_TO + 'gioHang' && !VN.taiKhoan.hienTai()) VN.gioHang.nap().catch(() => {});   // giỏ của khách chưa đăng nhập đổi ở thẻ khác
       if (e.key === TIEN_TO + 'yeuThich') { capNhatSoYeuThich(); VN.capNhatNutTim(); }
-      const SU_KIEN = { donHang: 'don-hang', hoTro: 'ho-tro', lichHen: 'lich-hen', baoHanh: 'bao-hanh', danhGia: 'danh-gia', nguoiDung: 'nguoi-dung', qtSanPham: 'san-pham' };
+      const SU_KIEN = { donHang: 'don-hang', hoTro: 'ho-tro', lichHen: 'lich-hen', baoHanh: 'bao-hanh', nguoiDung: 'nguoi-dung', qtSanPham: 'san-pham' };
       const khoa = String(e.key || '').replace(TIEN_TO, '');
       if (SU_KIEN[khoa]) phatSuKien(SU_KIEN[khoa]);
     });

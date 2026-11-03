@@ -128,8 +128,11 @@
     });
 
     /* ---------- 8. Sản phẩm đã xem ---------- */
-    const daXem = VN.daXem.ds().map((x) => sp.theoMa[x.ma]).filter(Boolean).slice(0, 8);
-    if (daXem.length) { VN.$('#phan-da-xem').hidden = false; VN.veLuoi(VN.$('#dai-da-xem'), daXem); }
+    // a customer's list comes from the server, so wait until the account is known
+    VN.sanSang.then(() => {
+      const daXem = VN.daXem.ds().map((x) => sp.theoMa[x.ma]).filter(Boolean).slice(0, 8);
+      if (daXem.length) { VN.$('#phan-da-xem').hidden = false; VN.veLuoi(VN.$('#dai-da-xem'), daXem); }
+    });
 
     VN.hienDan();
   }).catch((loi) => {

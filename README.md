@@ -53,7 +53,7 @@ business_web_development/
 │   │   ├── __init__.py
 │   │   ├── config.py
 │   │   ├── models/            # User, Customer, Product, Order, Warranty...
-│   │   ├── routes/            # auth, products, cart, orders, admin (đơn), admin_shop (khách, sản phẩm, đánh giá, bảo hành, lịch hẹn)
+│   │   ├── routes/            # auth, products, cart, orders, admin (đơn), admin_shop (khách, sản phẩm, đánh giá, bảo hành, lịch hẹn), warranty (thẻ và lịch hẹn của khách), feedback (đánh giá của khách), recently_viewed
 │   │   ├── services/          # nghiệp vụ: hủy đơn, kích hoạt bảo hành, phí giao hàng
 │   │   ├── schemas/           # kiểm tra dữ liệu vào/ra
 │   │   ├── templates/         # Jinja templates (nếu dùng server-side render)
@@ -76,8 +76,8 @@ business_web_development/
 ```
 
 > **Trạng thái:** giao diện (`frontend/`), API Flask (`backend/`) và database (`database/`) đã có mã. Luồng mua hàng chạy trọn từ
-> trình duyệt đến database: xem mục "Giao diện nối API". Chưa nối API: bảo hành và đặt lịch, đánh giá, phản ánh, yêu thích,
-> bảy trang quản trị, form liên hệ báo giá. Chi tiết các trang client xem [frontend/README.md](frontend/README.md).
+> trình duyệt đến database: xem mục "Giao diện nối API". Chưa nối API (chạy thử trong trình duyệt): phản ánh, yêu thích,
+> form liên hệ báo giá và đăng ký nhận tin. Chi tiết các trang client xem [frontend/README.md](frontend/README.md).
 
 ## Chạy cả website (giao diện và API)
 
@@ -120,7 +120,8 @@ Cách một trang dùng: `await VN.sanSang`, đọc trạng thái bằng hàm th
 - **Giá và trạng thái sản phẩm** sửa ở trang Sản phẩm, lưu thẳng vào database (`PATCH /api/admin/products/<sku>`). Cửa hàng giữ danh mục 5 phút trong trình duyệt (`sessionStorage`), nên khách thấy giá mới sau tối đa 5 phút.
 - **Luồng xử lý đơn ở trang admin:** Chờ xử lý → *Xác nhận đơn* (`Confirmed`) → *Bắt đầu chế tác* (không bắt buộc, từ đó không ai hủy được) → *Bàn giao vận chuyển* (`Shipping`) → *Giao thành công* (`Delivered`, kích hoạt thẻ bảo hành, đơn COD ghi nhận đã thu tiền). Đơn chuyển khoản phải bấm *Xác nhận đã nhận tiền* trước. Hủy đơn được khi `Pending` hoặc `Confirmed` chưa chế tác.
 - **Bảo hành và lịch hẹn của khách (nhóm C6)** đã nối API: thẻ do database tạo khi đơn giao xong, trang Cổng bảo hành đọc thẻ và lịch hẹn thật, khách đặt và hủy lịch, cửa hàng xác nhận ở trang admin. Database chỉ có một mốc ngày giờ cho lịch hẹn, nên **khung giờ** ghi vào giờ hẹn, còn **showroom**, số điện thoại liên hệ và số ảnh đã chọn ghi vào dòng đầu của ghi chú (`Showroom: ... | SĐT: ... | Ảnh chọn: 2 (chưa lưu)`). **Ảnh tình trạng chỉ là bản demo:** trang xem trước ảnh trên máy khách, không gửi đi và không lưu. Khách vãng lai xem thẻ của các đơn đã mở trên trình duyệt (mã đơn và số điện thoại), muốn đặt lịch phải có tài khoản. Tra cứu theo mã thẻ chỉ cho biết thẻ có thật và là sản phẩm nào, không lộ chủ thẻ.
-- **Đánh giá, phản ánh, yêu thích, đã xem:** còn lưu trong `localStorage`, chờ nhóm C7. Trang kích hoạt thẻ vẫn chứa form đánh giá lưu trong trình duyệt.
+- **Đánh giá và sản phẩm đã xem (nhóm C7)** đã nối API. Khách gửi đánh giá ở trang kích hoạt thẻ (`POST /api/orders/<mã>/feedback`, mỗi đơn đã giao một đánh giá, khách vãng lai gửi kèm số điện thoại của đơn). Đơn trả về từ API mang theo đánh giá trong khối `feedback`. Nhãn tích cực hoặc tiêu cực do máy chủ tính theo cách mô phỏng (4 đến 5 sao tích cực, 1 đến 2 sao tiêu cực, 3 sao tiêu cực nếu có chủ đề than phiền hoặc có nguyên một từ than phiền như "trễ", "trầy", "lỗi"; "xinh" hay "Sài Gòn" không bị tính) và đánh dấu `IsSentimentSimulated`; khách không thấy nhãn. Cửa hàng chưa có chỗ trả lời đánh giá vì database chưa có cột cho việc đó. Danh sách sản phẩm đã xem của khách có tài khoản nằm trên máy chủ (`GET`, `POST`, `DELETE /api/recently-viewed`). Khách vãng lai giữ danh sách trong trình duyệt, lúc đăng nhập danh sách này được gộp vào tài khoản. Bấm hoàn tác một mục đã xóa thì mục đó quay lại như vừa xem. Database lưu giờ xem theo giây, nên các mục gửi lên trong cùng một giây (hoàn tác nhiều mục, gộp lúc đăng nhập) có thể đổi chỗ cho nhau sau khi tải lại.
+- **Còn là bản demo lưu trong trình duyệt (`localStorage`):** sản phẩm yêu thích, phản ánh đơn hàng, form liên hệ báo giá và đăng ký nhận tin. Mỗi chỗ có dòng ghi chú trên trang hoặc trong thông báo.
 - Kiểm tra: `backend/tests/test_frontend_adapters.py` chạy các hàm đổi dữ liệu của `api.js` bằng Node trên câu trả lời thật của API (bỏ qua nếu máy chưa cài Node).
 
 ## Môi trường Python (back-end)
@@ -213,7 +214,7 @@ Các API này cần đăng nhập bằng tài khoản khách (`Customer`). Tài 
 | `POST /api/cart` | Thêm biến thể: `variantSku`, `quantity` (1 đến 10), `engravingText` (khắc tên, tối đa 15 ký tự), `engravingStyle` (`Classic`, `Modern`, `Handwritten`, mặc định `Classic`, bỏ qua nếu không có chữ khắc). Thêm lại cùng biến thể, cùng chữ khắc và cùng kiểu chữ thì cộng dồn số lượng, khác kiểu chữ là dòng riêng. Quá tồn kho trả 409 |
 | `PATCH /api/cart/<id>`, `DELETE /api/cart/<id>` | Đổi số lượng, xóa dòng |
 | `POST /api/orders` | Đặt hàng từ giỏ (`sp_PlaceOrder`). Body: `addressId`, `paymentMethod` (`COD`, `BankTransfer`, `VNPay`, `MoMo`), `checkoutToken`, `voucherCode`, `note`. Trả 201 |
-| `GET /api/orders`, `GET /api/orders/<mã đơn>` | Đơn của chính khách. Đơn của người khác trả 404. Danh sách mỗi đơn có `items` (sản phẩm, kèm `ProductSKU` và `SKUSnap` là mã biến thể). Chi tiết có thêm địa chỉ, các mốc thời gian, `payments` (kèm `TransactionID`) và `pendingCancelRequest` |
+| `GET /api/orders`, `GET /api/orders/<mã đơn>` | Đơn của chính khách. Đơn của người khác trả 404. Danh sách mỗi đơn có `items` (sản phẩm, kèm `ProductSKU` và `SKUSnap` là mã biến thể) và `feedback` (đánh giá của khách, hoặc `null`). Chi tiết có thêm địa chỉ, các mốc thời gian, `payments` (kèm `TransactionID`) và `pendingCancelRequest` |
 | `POST /api/orders/<mã đơn>/cancel` | Khách bấm "Hủy đơn" (`sp_RequestCancelOrder`). Chưa hủy ngay: trả `RequestID`, `VoucherCode`, `VoucherDiscount`, `Subtotal` (giá gốc), `TotalAmount` để hiện popup "hủy sẽ mất voucher, đặt lại chỉ còn giá gốc". Đơn từ 2.000.000 đ hoặc có khắc chữ trả 403 kèm câu "gọi hotline". Đơn đã bắt đầu chế tác trả 409 |
 | `POST /api/orders/<mã đơn>/pay` | Thanh toán mô phỏng cho đơn VNPay hoặc MoMo, luôn thành công (`sp_RecordPaymentResult`). Đơn đã hủy hoặc quá 15 phút trả 409. Đơn COD và chuyển khoản trả 400 |
 | `POST /api/orders/<mã đơn>/cancel/respond` | Khách chọn trong popup (`sp_RespondCancelPopup`): `keepOrder: true` giữ đơn, `keepOrder: false` hủy đơn, trả tồn kho, mất voucher |
@@ -223,6 +224,7 @@ Các API này cần đăng nhập bằng tài khoản khách (`Customer`). Tài 
 | `GET /api/warranties/<mã thẻ>` | Tra cứu thẻ bằng mã (ai cũng gọi được): chỉ trả mã thẻ, ngày kích hoạt, trạng thái, sản phẩm, không trả chủ thẻ |
 | `GET /api/after-sales` | Lịch hẹn hậu mãi của tôi, mới nhất trước |
 | `POST /api/after-sales` | Đặt lịch (`sp_BookAfterSalesService`): `warrantyCode`, `serviceType`, `preferredDate` (giờ địa phương, trong tương lai, tối đa 1 năm), `newRingSize` (chỉ khi chỉnh size), `note` (tối đa 500). Mỗi thẻ chỉ có một lịch đang mở cho mỗi loại dịch vụ (409) |
+| `POST /api/orders/<mã đơn>/feedback` | Gửi đánh giá cho đơn đã giao. Body: `rating` (1 đến 5), `text` (tùy chọn, tối đa 500 ký tự), `topics` (tùy chọn, tên chủ đề trong form đánh giá). Mỗi đơn một đánh giá (lần hai trả 409), đơn chưa giao trả 409. Khách vãng lai gửi thêm `phone`. Trả 201 kèm đánh giá và các chủ đề `aspects` |
 | `POST /api/after-sales/<id>/cancel` | Khách hủy lịch chưa hoàn tất (`sp_CancelAfterSalesService`), không mất lượt. Lịch của người khác hoặc đã xong trả 409 |
 | `GET /api/admin/orders` | Admin xem mọi đơn, mỗi đơn kèm `items`, `PaymentDeadline`, `PaidAt`. Tham số `status`, `page`, `limit` (tối đa 100) |
 | `GET /api/admin/orders/<mã đơn>` | Admin xem một đơn đầy đủ (cùng dạng `GET /api/orders/<mã>`) kèm khối `customer` (tên, email, số điện thoại, `IsGuest`) |
@@ -250,7 +252,7 @@ Các API này cần đăng nhập bằng tài khoản khách (`Customer`). Tài 
 - Khắc tên: database coi chữ hoa và chữ thường là một, và bỏ qua dấu thanh ("Mai" bằng "Mại"). Thêm một chữ khắc chỉ khác kiểu đó vào giỏ trả 409. Các chữ khác nhau thật như "Năm" và "Nam" là hai dòng riêng.
 - Hai yêu cầu chạy cùng lúc gây xung đột (trùng dòng giỏ hàng, mã ưu đãi vừa hết lượt) trả 409 để thử lại. Lỗi database khác trả 500 với câu chung, không lộ nội dung SQL. Khi SQL Server chọn một yêu cầu làm nạn nhân của deadlock (hai yêu cầu chờ nhau), hàm `call()` tự chạy lại thủ tục, tối đa 3 lần.
 - Thanh toán là mô phỏng hoàn toàn: không có cổng thật. Đơn trả trực tuyến (VNPay, MoMo, chuyển khoản) phải thanh toán trong **15 phút** (`fn_PaymentTimeoutMinutes()`), quá hạn thì đơn thất bại: hủy, trả tồn kho, trả lượt voucher, thanh toán chuyển sang `Expired`. `PaymentDeadline` trong thông tin đơn là giờ hết hạn, để giao diện đếm ngược. Backend gọi `sp_ExpireUnpaidOrders` trước mỗi yêu cầu `/api/` nên không cần bộ hẹn giờ.
-- Chưa làm: bảo hành và lịch hẹn hậu mãi, đánh giá, hoàn tiền thật (hủy đơn đã trả tiền chỉ đổi thanh toán sang `Refunded`).
+- Chưa làm: hoàn tiền thật (hủy đơn đã trả tiền chỉ đổi thanh toán sang `Refunded`).
 
 ### Đặt hàng không cần tài khoản
 
@@ -281,6 +283,8 @@ Khách chưa đăng nhập vẫn đặt hàng được. **Số điện thoại l
 | `POST /api/vouchers/check` | Kiểm tra mã giảm giá với giỏ hàng hiện tại. Khách đăng nhập: tính trên giỏ trong database. Khách chưa đăng nhập gửi giỏ của trình duyệt trong `items` (cùng dạng với đơn không tài khoản), thiếu cả đăng nhập lẫn `items` trả 401. Body: `code`. Thành công trả `discount`. Mã không có, đã tắt hoặc chưa tới ngày trả 404. Hết hạn, hết lượt hoặc chưa đủ tiền tối thiểu trả 409 kèm `reason` (`expired`, `used_up`, `min_order`). Cách tính giống `sp_PlaceOrder`; việc đặt hàng mới là lúc giảm giá được chốt |
 | `POST /api/recently-viewed` | Ghi nhận khách vừa mở một sản phẩm. Body: `sku`. Trả 204 (`sp_TrackProductView`) |
 | `GET /api/recently-viewed` | Sản phẩm đã xem, mới nhất trước. Tham số `limit` (mặc định 10, tối đa 50) |
+| `DELETE /api/recently-viewed/<sku>` | Bỏ một sản phẩm khỏi danh sách. Trả 204, không lỗi nếu sản phẩm không có trong danh sách |
+| `DELETE /api/recently-viewed` | Xóa cả danh sách của khách. Trả 204 |
 
 Điểm cần nhớ:
 - Các API tra cứu (`categories`, `collections`, `ring-sizes`, `gold-prices`) không cần đăng nhập.
@@ -293,7 +297,7 @@ Khách chưa đăng nhập vẫn đặt hàng được. **Số điện thoại l
 uv run pytest
 ```
 
-Test nằm trong `backend/tests/` (584 test, chạy khoảng năm phút). Test không đụng vào dữ liệu thật. Mỗi lần chạy, `backend/tests/conftest.py` dựng lại một database riêng tên `VinoraJewelry_Test` từ file `database/01_*.sql` (mất khoảng 5 giây). Cần quyền tạo database trên SQL Server. Nếu không kết nối được, các test bị bỏ qua và pytest in lý do.
+Test nằm trong `backend/tests/` (635 test, chạy khoảng năm phút). Test không đụng vào dữ liệu thật. Mỗi lần chạy, `backend/tests/conftest.py` dựng lại một database riêng tên `VinoraJewelry_Test` từ file `database/01_*.sql` (mất khoảng 5 giây). Cần quyền tạo database trên SQL Server. Nếu không kết nối được, các test bị bỏ qua và pytest in lý do.
 
 ## Quy ước
 

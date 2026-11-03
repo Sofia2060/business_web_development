@@ -16,7 +16,8 @@
 
   VN.$('.luoi-sp', ketQua).innerHTML = VN.theXuong(8);
 
-  VN.duLieu.coBan().then(({ sp, ch }) => {
+  // wait for the account too: a customer's list is on the server and is read when the account is known
+  Promise.all([VN.duLieu.coBan(), VN.sanSang]).then(([{ sp, ch }]) => {
     tt.sp = sp; tt.ch = ch;
     napLai();
   }).catch((loi) => {
