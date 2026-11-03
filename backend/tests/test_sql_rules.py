@@ -2,11 +2,13 @@
 They run on the rebuilt test database. Each test makes its own customers, so tests do not depend on each other."""
 import datetime
 import threading
+import time
 import uuid
 
 import pyodbc
 import pytest
 
+from app.config import db_connection_string
 from app.db import ProcError, call, query, transaction
 from test_orders import MID, SMALL, add_to_cart, checkout, new_admin, new_customer, order_status
 
@@ -200,6 +202,42 @@ def test_two_requests_with_the_same_token_at_once_both_get_the_same_order(db_rea
     [t.start() for t in threads]
     [t.join() for t in threads]
     assert len(set(results)) == 1 and isinstance(results[0], int), results
+    assert query("SELECT COUNT(*) AS n FROM dbo.Orders WHERE CustomerID = ?", (cust,))[0]["n"] == 1
+
+
+def test_a_request_that_passed_the_token_check_before_the_order_existed_gets_that_order_not_an_empty_cart(db_ready):
+    """The race window of the test above, made certain: request A passes the token check and then waits for a row a
+    holder has locked. Request B (same token, another address of the customer) places the order meanwhile and empties
+    the cart. When A goes on it finds an empty cart, and must answer with B's order instead of error 50012."""
+    client, addr = new_customer()
+    add_to_cart(client, MID)
+    cust = query("SELECT MAX(CustomerID) AS c FROM dbo.Customers")[0]["c"]
+    with transaction() as cur:
+        cur.execute("INSERT INTO dbo.CustomerAddresses (CustomerID, RecipientName, Phone, AddressLine, Ward, Province) "
+                    "OUTPUT INSERTED.AddressID VALUES (?, 'B', '0901234567', 'x', 'y', 'z')", (cust,))
+        other_addr = cur.fetchval()
+    place = ("DECLARE @o INT; EXEC dbo.sp_PlaceOrder @CustomerID = ?, @AddressID = ?, @PaymentMethod = 'COD', "
+             "@CheckoutToken = ?, @OrderID = @o OUTPUT; SELECT @o AS id")
+    token, results = str(uuid.uuid4()), {}
+    holder = pyodbc.connect(db_connection_string(), autocommit=False)
+    try:
+        holder.cursor().execute("UPDATE dbo.CustomerAddresses SET Phone = Phone WHERE AddressID = ?", (addr,))   # A waits here
+
+        def request_a():
+            try:
+                results["A"] = call(place, (cust, addr, token))[0]["id"]
+            except Exception as exc:
+                results["A"] = repr(exc)
+
+        thread = threading.Thread(target=request_a)
+        thread.start()
+        time.sleep(1.0)                       # A is past the token check and blocked on the address row
+        results["B"] = call(place, (cust, other_addr, token))[0]["id"]
+    finally:
+        holder.commit()
+        holder.close()
+    thread.join()
+    assert results["A"] == results["B"], results
     assert query("SELECT COUNT(*) AS n FROM dbo.Orders WHERE CustomerID = ?", (cust,))[0]["n"] == 1
 
 

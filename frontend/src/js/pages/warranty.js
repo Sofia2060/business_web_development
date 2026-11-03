@@ -330,5 +330,6 @@
     }
     if (traMa) { VN.$('#o-tra-cuu').value = traMa; moTab('tra-cuu', false); VN.$('#form-tra-cuu').requestSubmit(); }
   };
-  VN.sanSang.then(() => { u = VN.taiKhoan.hienTai(); batDau(); });
+  VN.sanSang.then(() => { u = VN.taiKhoan.hienTai(); return batDau(); })
+    .catch((loi) => VN.thongBao({ tieuDe: 'Chưa tải được trang bảo hành', noiDung: VN.thoat(loi.message), loai: 'loi' }));
 })();

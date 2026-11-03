@@ -93,6 +93,7 @@
     async dangXuat() {
       try { await VN.api.post('/api/auth/logout'); } catch (loi) { console.error(loi); }
       this.nguoi = null;
+      VN.baoHanh.ds = []; VN.lichHen.ds = [];     // the cards and appointments belonged to the account that left
       VN.quanTri.xoaPhien();
       await VN.gioHang.nap();
       VN.phatSuKien('tai-khoan', null);
@@ -127,6 +128,7 @@
   window.addEventListener('vinora:het-phien', () => {
     if (!VN.taiKhoan.nguoi) return;
     VN.taiKhoan.nguoi = null;
+    VN.baoHanh.ds = []; VN.lichHen.ds = [];
     VN.gioHang.nap().catch(() => {});
     VN.phatSuKien('tai-khoan', null);
   });
@@ -493,14 +495,17 @@
       const r = await VN.api.post('/api/after-sales', {
         warrantyCode: d.maBaoHanh, serviceType: d.loai, preferredDate: `${d.ngay}T${d.gio}:00`, newRingSize: d.sizeMoi || null, note: VN.ghiChuLich(d),
       });
-      await this.nap();
-      return this.ds.find((l) => l.id === r.ServiceID) || VN.lichHenTuApi(r);
+      // The booking is saved: a failed reload must not look like a failed booking (a retry would answer 409)
+      await this.nap().catch(() => {});
+      let moi = this.ds.find((l) => l.id === r.ServiceID);
+      if (!moi) { moi = VN.lichHenTuApi(r); this.ds.unshift(moi); }
+      return moi;
     },
     /** Cancel an appointment that is not completed (the card loses no turn) */
     async huy(ma) {
       const l = this.ds.find((x) => x.ma === ma); if (!l) return;
       await VN.api.post(`/api/after-sales/${l.id}/cancel`);
-      await this.nap();
+      await this.nap().catch(() => { l.trangThai = 'Cancelled'; });   // reload failed: mark the row by hand
     },
   };
 

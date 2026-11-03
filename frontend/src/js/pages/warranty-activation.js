@@ -83,5 +83,5 @@
     });
   };
 
-  batDau();
+  batDau().catch((loi) => VN.thongBao({ tieuDe: 'Chưa tải được trang', noiDung: VN.thoat(loi.message), loai: 'loi' }));
 })();

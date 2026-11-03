@@ -39,15 +39,15 @@
     if (!dangNap) {
       dangNap = (async () => {
         await VN.duLieu.sanPham().catch(() => {});      // ảnh sản phẩm cho các dòng đơn
-        const ds = [];
+        const theoMa = new Map();      // keyed by order code: an order placed between two pages must not show twice
         for (let trang = 1, tong = 1; trang <= tong; trang++) {
           const r = await VN.api.get(`/api/admin/orders?limit=100&page=${trang}`);
           tong = Math.ceil(r.total / 100);
-          r.items.forEach((x) => ds.push(qt.donTuApi(x)));
+          r.items.forEach((x) => { const d = qt.donTuApi(x); theoMa.set(d.ma, d); });
         }
-        qt.don = ds;
+        qt.don = [...theoMa.values()];
         VN.phatSuKien('don-hang');
-        return ds;
+        return qt.don;
       })().finally(() => { dangNap = null; });
     }
     return dangNap;

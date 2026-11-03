@@ -116,7 +116,7 @@ Backend **gọi thủ tục**, không tự viết lại logic (giá, tồn kho, 
 
 | Thủ tục | Tham số (OUTPUT in đậm) | Dùng cho |
 |---|---|---|
-| `sp_PlaceOrder` | `@CustomerID, @AddressID, @PaymentMethod ('COD'/'BankTransfer'/'VNPay'/'MoMo'), @CheckoutToken UNIQUEIDENTIFIER, @ShippingFee=0, @VoucherCode=NULL, @Note=NULL,` **`@OrderID`** | Đặt hàng từ giỏ. Tạo `CheckoutToken = uuid4()` khi mở trang thanh toán; bấm lặp cùng token sẽ trả về cùng đơn |
+| `sp_PlaceOrder` | `@CustomerID, @AddressID, @PaymentMethod ('COD'/'BankTransfer'/'VNPay'/'MoMo'), @CheckoutToken UNIQUEIDENTIFIER, @ShippingFee=0, @VoucherCode=NULL, @Note=NULL,` **`@OrderID`** | Đặt hàng từ giỏ. Tạo `CheckoutToken = uuid4()` khi mở trang thanh toán; bấm lặp cùng token sẽ trả về cùng đơn, kể cả khi hai yêu cầu chạy sát nhau (yêu cầu đến sau thấy giỏ đã rỗng thì tra lại token và trả về đơn vừa tạo) |
 | `sp_RecordPaymentResult` | `@PaymentID, @IsSuccess BIT, @TransactionID, @ResponseCode=NULL, @Amount=NULL` (nếu truyền thì phải khớp số tiền đơn) | Ghi kết quả thanh toán. Hiện backend gọi khi thanh toán mô phỏng thành công. Đơn đã hủy hoặc quá hạn báo lỗi 50050 |
 | `sp_ExpireUnpaidOrders` | `@Expired INT OUTPUT` (không bắt buộc) | Hủy đơn trả trực tuyến quá 15 phút chưa thanh toán. Backend gọi trước mỗi yêu cầu API |
 | `sp_RequestCancelOrder` | `@OrderID, @CustomerID, @Reason=NULL,` **`@RequestID, @VoucherCode, @VoucherDiscount`** | Khách bấm "Hủy đơn" (đơn ≤ 5 triệu). Dùng `@VoucherCode`, `@VoucherDiscount` để hiện popup nhắc nhở |

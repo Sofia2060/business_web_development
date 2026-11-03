@@ -892,7 +892,17 @@ BEGIN
         WHERE ci.CustomerID = @CustomerID;
 
         IF NOT EXISTS (SELECT 1 FROM @Items)
+        BEGIN
+            -- A request with the same token may have placed the order while this one waited for the variant locks
+            -- (it also emptied the cart). The token check above ran before that, so check it again and return that order.
+            SELECT @OrderID = OrderID FROM dbo.Orders WHERE CheckoutToken = @CheckoutToken AND CustomerID = @CustomerID;
+            IF @OrderID IS NOT NULL
+            BEGIN
+                COMMIT TRANSACTION;
+                RETURN;
+            END;
             THROW 50012, N'Giỏ hàng đang trống.', 1;
+        END
         IF EXISTS (SELECT 1 FROM @Items WHERE ProductStatus <> 'Active' OR VariantActive = 0)
             THROW 50013, N'Có sản phẩm trong giỏ đã ngừng bán.', 1;
         IF EXISTS (SELECT 1 FROM @Items WHERE UnitPrice IS NULL)
