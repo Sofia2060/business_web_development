@@ -69,6 +69,14 @@ a.qt-o-so:hover { box-shadow: var(--bong-noi); }
 .qt-bieu-do text { font-size: 11px; fill: var(--chu-phu); font-family: var(--font-than); }
 .qt-bieu-do line { stroke: var(--vien); }
 
+/* Revenue by material: one row per material with a bar sized by its share */
+.qt-chat-lieu { display: grid; gap: 10px; list-style: none; margin: 0; padding: 0; }
+.qt-chat-lieu li { display: grid; grid-template-columns: 90px minmax(0, 1fr) 150px 52px; align-items: center; gap: 14px; font-size: 14px; }
+.qt-chat-lieu__thanh { height: 12px; background: var(--nen-chim); }
+.qt-chat-lieu__thanh i { display: block; height: 100%; background: var(--vang); }
+.qt-chat-lieu .so, .qt-chat-lieu small { text-align: right; font-variant-numeric: tabular-nums; }
+.qt-chat-lieu small { color: var(--chu-phu); }
+
 /* Việc cần làm */
 .qt-viec { display: grid; gap: 8px; list-style: none; margin: 0; padding: 0; }
 .qt-viec a { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--vien); font-size: 14px; transition: background-color var(--nhanh); }

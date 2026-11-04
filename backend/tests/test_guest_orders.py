@@ -304,6 +304,8 @@ def test_admin_sees_guest_orders_with_the_recipient_name(client):
     assert item["OrderCode"] == res.get_json()["OrderCode"]
     assert item["IsGuest"] is True and item["CustomerName"] == "Phạm Khách Lẻ" and item["CustomerPhone"] == phone
     assert item["CustomerEmail"] is None and item["PaymentMethod"] == "COD"
+    # The dashboard sums revenue per material, so every item of the admin list carries its material
+    assert item["items"] and all(line["MaterialSnap"] for line in item["items"])
 
 
 # ---------------- registering with the phone of a guest ----------------

@@ -51,7 +51,7 @@ def list_orders():
     if orders:
         marks = ", ".join("?" * len(orders))      # the ids come from the query above, never from the request
         for item in query(
-                "SELECT oi.OrderID, oi.ProductNameSnap, oi.SKUSnap, oi.GoldColor, oi.RingSize, oi.Quantity, oi.UnitPrice, "
+                "SELECT oi.OrderID, oi.ProductNameSnap, oi.SKUSnap, oi.MaterialSnap, oi.GoldColor, oi.RingSize, oi.Quantity, oi.UnitPrice, "
                 "p.SKU AS ProductSKU FROM dbo.OrderItems oi JOIN dbo.Products p ON p.ProductID = oi.ProductID "
                 f"WHERE oi.OrderID IN ({marks}) ORDER BY oi.OrderID, oi.OrderItemID", tuple(o["OrderID"] for o in orders)):
             items.setdefault(item.pop("OrderID"), []).append(item)

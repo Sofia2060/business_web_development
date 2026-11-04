@@ -78,7 +78,7 @@ Chỉ có **một ô đăng nhập** (trang Tài khoản). Hệ thống phân qu
 
 | Trang | Chức năng |
 |---|---|
-| Tổng quan | Doanh thu đã thu, đơn mới, đơn chờ xử lý, điểm đánh giá, biểu đồ doanh thu 14 ngày, việc cần xử lý, đơn mới, sản phẩm bán chạy. Số phản ánh mở là dữ liệu mô phỏng |
+| Tổng quan | Doanh thu đã thu, đơn mới, đơn chờ xử lý, điểm đánh giá, biểu đồ doanh thu 14 ngày, doanh thu theo chất liệu (10K đến 24K và bạc 925, tính trên đơn đã thanh toán), việc cần xử lý, đơn mới, sản phẩm bán chạy. Số phản ánh mở là dữ liệu mô phỏng |
 | Đơn hàng | Lọc theo trạng thái và thanh toán, tìm theo mã, tên, số điện thoại. Xác nhận đã nhận tiền chuyển khoản, xác nhận đơn, bắt đầu chế tác, bàn giao vận chuyển, giao thành công (kích hoạt thẻ bảo hành), hủy đơn, nhật ký. Chưa có hoàn tiền hai bước và ghi chú nội bộ (database không có) |
 | Phản ánh (dữ liệu mô phỏng) | Xem mô tả, ảnh minh chứng. Chuyển Đã tiếp nhận, Đang xử lý, Đã giải quyết kèm nội dung gửi khách |
 | Bảo hành và lịch hẹn | Xác nhận lịch khách chọn, đề xuất giờ khác, hoàn tất (database trừ lượt và quyết định miễn phí hay tính phí), hủy lịch. Danh sách thẻ bảo hành kèm lượt đã dùng |
