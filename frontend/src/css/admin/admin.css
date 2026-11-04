@@ -151,6 +151,18 @@ dialog.ngan-keo.qt-ct { width: min(720px, 100vw); }
 .qt-thanh-sao i { display: block; height: 8px; background: var(--nen-chim); }
 .qt-thanh-sao i span { display: block; height: 100%; background: var(--vang); }
 .qt-ds-dg { display: grid; gap: 12px; }
+/* Sentiment: one bar split into positive / negative, then two lists of the topics customers ticked */
+.qt-cam-xuc__thanh { display: flex; height: 14px; background: var(--nen-chim); }
+.qt-cam-xuc__thanh i { display: block; height: 100%; }
+.qt-cam-xuc__thanh .duong { background: var(--ngoc); }
+.qt-cam-xuc__thanh .am { background: var(--hong-ngoc); }
+.qt-cam-xuc__chu { display: flex; justify-content: space-between; gap: 12px; margin: 8px 0 20px; font-size: 13.5px; }
+.qt-cam-xuc__yeu-to { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+.qt-cam-xuc__yeu-to h3 { margin: 0 0 8px; font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--chu-phu); }
+.qt-cam-xuc__yeu-to ul { display: grid; gap: 6px; list-style: none; margin: 0; padding: 0; }
+.qt-cam-xuc__yeu-to li { display: flex; justify-content: space-between; gap: 12px; padding: 8px 12px; border: 1px solid var(--vien); font-size: 14px; }
+.qt-cam-xuc__yeu-to b { font-variant-numeric: tabular-nums; }
+
 .qt-dg { display: grid; gap: 8px; padding: 16px 18px; background: var(--nen-noi); border: 1px solid var(--vien); }
 .qt-dg__dau { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; font-size: 13px; color: var(--chu-phu); }
 .qt-dg blockquote { margin: 0; font-family: var(--font-tieu-de); font-size: 18px; line-height: 1.45; }
@@ -176,7 +188,7 @@ dialog.ngan-keo.qt-ct { width: min(720px, 100vw); }
   .qt-tren { position: static; padding: 16px; }
   .qt-tren__td { font-size: 24px; }
   .qt-noi-dung { padding: 18px 16px 40px; }
-  .qt-dg-tong { grid-template-columns: minmax(0, 1fr); }
+  .qt-dg-tong, .qt-cam-xuc__yeu-to { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 600px) {
   .qt-khoi { padding: 18px 16px; }
