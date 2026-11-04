@@ -59,6 +59,16 @@ def list_feedbacks():
     return jsonify(rows)
 
 
+# ---------------- retention popup ----------------
+
+@bp.get("/retention-stats")
+@admin_required
+def retention_stats():
+    """How well the "cancel order" popup keeps orders (vw_RetentionStats, one row). Only cancel requests made on the web
+    count. KeepRatePercent is null until the first request."""
+    return jsonify(query("SELECT * FROM dbo.vw_RetentionStats")[0])
+
+
 # ---------------- warranty cards and appointments ----------------
 
 _WHO = ("COALESCE(u.FullName, o.ShipRecipientName) AS CustomerName, c.Phone AS CustomerPhone")

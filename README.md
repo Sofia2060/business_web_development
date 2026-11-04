@@ -233,6 +233,7 @@ Các API này cần đăng nhập bằng tài khoản khách (`Customer`). Tài 
 | `POST /api/admin/orders/<mã đơn>/start-production` | Admin đánh dấu đã bắt đầu chế tác đơn (`sp_StartOrderProduction`). Từ lúc này không ai hủy được đơn. Chỉ đơn đã xác nhận |
 | `GET /api/admin/customers` | Mọi khách (có tài khoản và khách vãng lai): số đơn `OrderCount`, đã trả `TotalPaid` (chỉ thanh toán thành công), đơn gần nhất, số thẻ bảo hành |
 | `GET /api/admin/feedbacks` | Mọi đánh giá, mới nhất trước, kèm nhãn `SentimentLabel` (chỉ cửa hàng thấy) và các yếu tố `aspects` |
+| `GET /api/admin/retention-stats` | Hiệu quả popup giữ chân đơn hủy (`vw_RetentionStats`): `OrdersWithCancelRequest`, `OrdersKeptByPopup`, `OrdersKeptAndDelivered`, `OrdersCancelled`, `KeepRatePercent` (null khi chưa có yêu cầu hủy) |
 | `GET /api/admin/warranties` | Mọi thẻ bảo hành kèm chủ thẻ, lượt đánh bóng còn lại, số lần làm sạch và chỉnh size |
 | `GET /api/admin/services` | Mọi lịch hẹn hậu mãi, mới nhất trước |
 | `POST /api/admin/services/<id>/schedule` | Xác nhận lịch hẹn (`sp_ScheduleAfterSalesService`). Không gửi gì: xác nhận giờ khách chọn (`Confirmed`). Gửi `appointmentDate` (giờ tương lai): đề xuất giờ khác (`Rescheduled`) |
