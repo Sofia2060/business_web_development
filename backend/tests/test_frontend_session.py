@@ -115,3 +115,13 @@ def test_a_review_is_sent_as_the_api_wants_it_and_comes_back_in_the_page_shape(o
     assert out["review"]["sent"] == {"rating": 4, "text": "Đẹp", "topics": ["Đúng size"]}      # a customer sends no phone
     assert out["review"]["result"] == {"ma": 7, "donHang": "VN123", "soSao": 4, "noiDung": "Đẹp",
                                        "luc": "2030-01-01T09:00:00", "chuDe": ["Đúng size"]}
+
+
+def test_an_unticked_cart_line_stays_unticked_after_undo_and_after_changing_its_choices(out):
+    # removing and restoring: each line keeps the tick it had, although the cart page forgot the ticks of removed lines
+    assert out["undoKeepsTicks"] == {"plainTicked": False, "abTicked": True, "stored": 2}
+    assert out["changedKeepsUntick"] == {"newKey": True, "xyTicked": False, "plainTicked": True}
+
+
+def test_a_line_merged_into_another_keeps_the_tick_of_that_other_line(out):
+    assert out["mergedKeepsTargetTick"] == {"abTicked": True, "lines": 1, "quantity": 2}

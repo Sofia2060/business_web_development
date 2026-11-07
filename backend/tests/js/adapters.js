@@ -8,7 +8,9 @@ const [, , apiFile, samplesFile] = process.argv;
 const samples = JSON.parse(fs.readFileSync(samplesFile, 'utf8'));
 
 // The little of common.js that api.js touches while it loads
-const VN = { tien: (n) => Math.round(Number(n) || 0).toLocaleString('vi-VN') + ' ₫', phatSuKien() {}, danhGia: { theoDon: () => null }, duongDan: {} };
+const VN = { tien: (n) => Math.round(Number(n) || 0).toLocaleString('vi-VN') + ' ₫', phatSuKien() {},
+  // dd/mm/yyyy, as in common.js (the warranty card adapter writes the end date of the workmanship warranty)
+  ngay: (d) => { d = new Date(d); const h = (n) => String(n).padStart(2, '0'); return `${h(d.getDate())}/${h(d.getMonth() + 1)}/${d.getFullYear()}`; }, danhGia: { theoDon: () => null }, duongDan: {} };
 const answer = (body) => ({ ok: true, status: 200, json: async () => body });
 const fakeFetch = async (url) => {
   const failure = /^\/api\/error\/(\d+)$/.exec(url);

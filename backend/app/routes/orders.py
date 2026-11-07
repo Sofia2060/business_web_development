@@ -12,7 +12,7 @@ from ..auth import customer_or_guest, customer_required
 from ..db import ProcError, call, named_lock, query, transaction
 from ..validation import INT_MAX, body, is_int, normalize_phone, text, utf16_len
 from .addresses import LIMITS, full_address_error, read_fields
-from .cart import add_line, cart_subtotal, read_line, shipping_fee
+from .cart import add_line, cart_subtotal, read_item_ids, read_line, shipping_fee
 from .feedback import feedbacks_where
 
 bp = Blueprint("orders", __name__, url_prefix="/api/orders")
@@ -61,21 +61,23 @@ def _token_of_another_customer(token: str, customer_id: int) -> bool:
     return bool(query("SELECT 1 AS x FROM dbo.Orders WHERE CheckoutToken = ? AND CustomerID <> ?", (token, customer_id)))
 
 
-def _place(customer_id: int, actor, address_id: int, checkout: dict):
+def _place(customer_id: int, actor, address_id: int, checkout: dict, item_ids: list[int] | None = None):
     """Turn the customer's cart into an order (sp_PlaceOrder). Returns (response body, HTTP status).
+    item_ids = the cart lines to order (the ticked ones); None = the whole cart. The other lines stay in the cart.
     Sending the same checkout token again returns the same order."""
     earlier = _order_by_token(checkout["token"], customer_id)
     if earlier:
         return earlier, 200
-    # The shipping fee is worked out here from the real cart, never taken from the client.
-    fee = shipping_fee(cart_subtotal(customer_id))
+    # The shipping fee is worked out here from the real cart lines being ordered, never taken from the client.
+    fee = shipping_fee(cart_subtotal(customer_id, item_ids))
     try:
         rows = call(
             "DECLARE @OrderID INT; "
             "EXEC dbo.sp_PlaceOrder @CustomerID = ?, @AddressID = ?, @PaymentMethod = ?, @CheckoutToken = ?, "
-            "@ShippingFee = ?, @VoucherCode = ?, @Note = ?, @OrderID = @OrderID OUTPUT; "
+            "@ShippingFee = ?, @VoucherCode = ?, @Note = ?, @CartItemIDs = ?, @OrderID = @OrderID OUTPUT; "
             "SELECT OrderCode, TotalAmount, ShippingFee FROM dbo.Orders WHERE OrderID = @OrderID;",
-            (customer_id, address_id, checkout["method"], checkout["token"], fee, checkout["voucher"], checkout["note"]),
+            (customer_id, address_id, checkout["method"], checkout["token"], fee, checkout["voucher"], checkout["note"],
+             ",".join(map(str, item_ids)) if item_ids is not None else None),
             actor=actor)
     except (pyodbc.IntegrityError, ProcError):
         # Two identical requests ran at the same moment and the other one won. Return its order if it exists.
@@ -89,17 +91,21 @@ def _place(customer_id: int, actor, address_id: int, checkout: dict):
 @bp.post("")
 @customer_required
 def place_order():
-    """Turn the cart into an order (sp_PlaceOrder). Sending the same checkoutToken again returns the same order."""
+    """Turn the cart into an order (sp_PlaceOrder). Sending the same checkoutToken again returns the same order.
+    Optional cartItemIds: only these cart lines are ordered, the other lines stay in the cart (default: the whole cart)."""
     data = body()
     checkout, error = _read_checkout(data)
     address_id = data.get("addressId")
     if not error and not is_int(address_id, 1, INT_MAX):
         error = "addressId is required"
+    item_ids = None
+    if not error:
+        item_ids, error = read_item_ids(data)
     if error:
         return jsonify(error=error), 400
     if _token_of_another_customer(checkout["token"], g.customer_id):
         return jsonify(error="Invalid checkoutToken"), 409
-    payload, status = _place(g.customer_id, _actor(), address_id, checkout)
+    payload, status = _place(g.customer_id, _actor(), address_id, checkout, item_ids)
     return jsonify(payload), status
 
 
@@ -225,7 +231,7 @@ def list_orders():
     online order fails."""
     orders = query(
         "SELECT OrderID, OrderCode, CreatedAt, OrderStatus, Subtotal, DiscountAmount, ShippingFee, TotalAmount, "
-        "PaymentMethod, PaymentStatus, PaymentDeadline, HasEngraving, CancelChannel "
+        "PaymentMethod, PaymentStatus, PaymentDeadline, HasEngraving, CancelChannel, ShippedAt "
         "FROM dbo.vw_CustomerOrderHistory WHERE CustomerID = ? ORDER BY OrderID DESC", (g.customer_id,))
     items: dict[int, list] = {}
     for item in query(
@@ -339,8 +345,11 @@ def confirm_received(code: str):
     order = _own_order(code)
     if not order:
         return jsonify(error="Order not found"), 404
-    call("EXEC dbo.sp_ConfirmOrderReceived @OrderID = ?, @CustomerID = ?", (order["OrderID"], g.customer_id),
-         actor=_actor())
+    # Already received: the system may have confirmed it a moment ago (7 days passed), or the button was pressed twice.
+    # Answer with the order as it is instead of an error, the customer got what they wanted.
+    if order["OrderStatus"] != "Delivered":
+        call("EXEC dbo.sp_ConfirmOrderReceived @OrderID = ?, @CustomerID = ?", (order["OrderID"], g.customer_id),
+             actor=_actor())
     return jsonify(query("SELECT OrderCode, OrderStatus, DeliveredAt FROM dbo.Orders WHERE OrderID = ?",
                          (order["OrderID"],))[0])
 

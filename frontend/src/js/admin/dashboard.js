@@ -1,5 +1,5 @@
 /* =====================================================================
-   QUẢN TRỊ – TỔNG QUAN: chỉ số chính, doanh thu 14 ngày (SVG), doanh thu theo chất liệu, hiệu quả giữ chân đơn hủy, việc cần xử lý,
+   QUẢN TRỊ – TỔNG QUAN: chỉ số chính, doanh thu 14 ngày (SVG), việc cần xử lý,
    đơn mới nhất, sản phẩm bán chạy
    ===================================================================== */
 (function () {
@@ -24,32 +24,6 @@
     </svg>`;
   };
 
-  const CHAT_LIEU = [['24K', 'Vàng 24K'], ['22K', 'Vàng 22K'], ['18K', 'Vàng 18K'], ['14K', 'Vàng 14K'], ['10K', 'Vàng 10K'], ['BAC925', 'Bạc 925']];
-
-  /** Revenue per material: sum of quantity x unit price of the items in paid orders, with each material's share */
-  const veChatLieu = (dsDon) => {
-    const tien = {};
-    dsDon.filter(daThu).forEach((d) => d.sanPham.forEach((s) => { tien[s.chatLieu] = (tien[s.chatLieu] || 0) + s.soLuong * s.donGia; }));
-    const tong = CHAT_LIEU.reduce((t, [ma]) => t + (tien[ma] || 0), 0);
-    VN.$('#qt-chat-lieu').innerHTML = `<ul class="qt-chat-lieu">${CHAT_LIEU.map(([ma, ten]) => {
-      const t = tien[ma] || 0; const tyLe = tong ? t / tong * 100 : 0;
-      return `<li><span>${ten}</span><span class="qt-chat-lieu__thanh"><i style="width:${tyLe.toFixed(1)}%"></i></span><b class="so">${VN.tien(t)}</b><small>${Math.round(tyLe)}%</small></li>`;
-    }).join('')}</ul>`;
-  };
-
-  /** Retention widget: how many orders the cancel popup kept (GET /api/admin/retention-stats, from vw_RetentionStats) */
-  const veGiuChan = (s) => {
-    const tyLe = s.KeepRatePercent === null ? '—' : s.KeepRatePercent.toLocaleString('vi-VN', { maximumFractionDigits: 1 }) + '%';
-    const o = [
-      ['ngoc', 'Tỷ lệ giữ chân', tyLe, 'đơn giữ lại trên đơn bấm hủy'],
-      ['', 'Đơn bấm hủy trên web', s.OrdersWithCancelRequest, 'đã qua popup nhắc nhở'],
-      ['xanh', 'Giữ lại nhờ popup', s.OrdersKeptByPopup, 'khách đổi ý, đơn không đổi'],
-      ['xanh', 'Giữ lại và đã nhận hàng', s.OrdersKeptAndDelivered, 'đơn giữ lại giao thành công'],
-      ['do', 'Vẫn hủy sau popup', s.OrdersCancelled, 'đơn có yêu cầu hủy và đã hủy'],
-    ];
-    VN.$('#qt-giu-chan').innerHTML = o.map(([lop, ten, so, phu]) => `<div class="qt-o-so${lop ? ' qt-o-so--' + lop : ''}"><span>${ten}</span><strong>${so}</strong><small>${phu}</small></div>`).join('');
-  };
-
   const ve = async () => {
     const don = qt.don; const pa = VN.hoTro.tatCa(); const lich = qt.lich; const dg = danhGia;
     VN.$('#qt-hom-nay').textContent = `${VN.thu(new Date())}, ${VN.ngay(new Date())}`;
@@ -66,7 +40,6 @@
     ];
     VN.$('#qt-so-lieu').innerHTML = o.map(([lop, ten, so, phu, url]) => `<a class="qt-o-so${lop ? ' qt-o-so--' + lop : ''}" href="${url}"><span>${ten}</span><strong>${so}</strong><small>${phu}</small></a>`).join('');
     veBieuDo(don);
-    veChatLieu(don);
 
     const viec = [
       ['qr', 'Đơn chuyển khoản chờ xác nhận tiền', choXuLy.filter((d) => d.thanhToan.phuongThuc === 'BANK' && d.thanhToan.trangThai !== 'Success').length, VN.url('qtDonHang', { tt: 'Pending' })],
@@ -99,5 +72,4 @@
   ['vinora:don-hang', 'vinora:ho-tro', 'vinora:lich-hen'].forEach((ten) => window.addEventListener(ten, VN.chongDoi(ve, 80)));
   window.addEventListener('storage', VN.chongDoi((e) => { if (/^vinora\./.test(e.key || '')) ve(); }, 120));
   qt.sanSang.then(() => VN.api.get('/api/admin/feedbacks')).then((ds) => { danhGia = ds; ve(); }).catch(qt.baoLoiTai);
-  qt.sanSang.then(() => VN.api.get('/api/admin/retention-stats')).then(veGiuChan).catch(qt.baoLoiTai);
 })();

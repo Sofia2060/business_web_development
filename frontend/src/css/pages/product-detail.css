@@ -142,11 +142,10 @@
 .khac-chu__chen button + button { border-left: 1px solid var(--vien); }
 .khac-chu__chen button:hover { background: var(--vang-nhat); }
 .truong.co-loi .khac-chu__chen { border-color: var(--hong-ngoc); }
-.khac-chu__xem-nho { display: none; }
-@media (max-width: 1024px) {
-  .khac-chu__xem-nho { display: block; padding: 6px 10px 2px; background: radial-gradient(120% 90% at 50% 38%, #FFFDF9, var(--nen-chim) 75%); border: 1px solid var(--vien); }
-  .khac-chu__xem-nho svg { width: 100%; max-width: 420px; height: auto; margin-inline: auto; }
-}
+/* Xem trước chữ khắc ngay dưới ô nhập (mọi kích thước màn hình): chữ thay đổi theo từng ký tự gõ vào */
+.khac-chu__xem-nho { display: block; margin-top: 10px; padding: 6px 10px 8px; background: radial-gradient(120% 90% at 50% 38%, #FFFDF9, var(--nen-chim) 75%); border: 1px solid var(--vien); }
+.khac-chu__xem-nho svg { display: block; width: 100%; max-width: 300px; height: auto; margin-inline: auto; }
+.khac-chu__xem-nho-chu { margin: 0; text-align: center; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--chu-phu); max-width: none; }
 .loi-truong .lien-ket { color: inherit; text-decoration-color: currentColor; font-weight: 500; }
 .kieu-co-dien { font-family: var(--font-tieu-de); font-size: 16px; }
 .kieu-hien-dai { font-size: 11px; font-weight: 500; letter-spacing: .18em; text-transform: uppercase; }

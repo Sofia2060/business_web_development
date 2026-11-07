@@ -116,9 +116,10 @@ Backend **gọi thủ tục**, không tự viết lại logic (giá, tồn kho, 
 
 | Thủ tục | Tham số (OUTPUT in đậm) | Dùng cho |
 |---|---|---|
-| `sp_PlaceOrder` | `@CustomerID, @AddressID, @PaymentMethod ('COD'/'BankTransfer'/'VNPay'/'MoMo'), @CheckoutToken UNIQUEIDENTIFIER, @ShippingFee=0, @VoucherCode=NULL, @Note=NULL,` **`@OrderID`** | Đặt hàng từ giỏ. Tạo `CheckoutToken = uuid4()` khi mở trang thanh toán; bấm lặp cùng token sẽ trả về cùng đơn, kể cả khi hai yêu cầu chạy sát nhau (yêu cầu đến sau thấy giỏ đã rỗng thì tra lại token và trả về đơn vừa tạo) |
+| `sp_PlaceOrder` | `@CustomerID, @AddressID, @PaymentMethod ('COD'/'BankTransfer'/'VNPay'/'MoMo'), @CheckoutToken UNIQUEIDENTIFIER, @ShippingFee=0, @VoucherCode=NULL, @Note=NULL, @CartItemIDs=NULL (id dòng giỏ cách nhau bằng dấu phẩy, NULL = cả giỏ; chỉ dòng được đặt bị xóa khỏi giỏ),` **`@OrderID`** | Đặt hàng từ giỏ. Tạo `CheckoutToken = uuid4()` khi mở trang thanh toán; bấm lặp cùng token sẽ trả về cùng đơn, kể cả khi hai yêu cầu chạy sát nhau (yêu cầu đến sau thấy giỏ đã rỗng thì tra lại token và trả về đơn vừa tạo) |
 | `sp_RecordPaymentResult` | `@PaymentID, @IsSuccess BIT, @TransactionID, @ResponseCode=NULL, @Amount=NULL` (nếu truyền thì phải khớp số tiền đơn) | Ghi kết quả thanh toán. Hiện backend gọi khi thanh toán mô phỏng thành công. Đơn đã hủy hoặc quá hạn báo lỗi 50050 |
 | `sp_ExpireUnpaidOrders` | `@Expired INT OUTPUT` (không bắt buộc) | Hủy đơn trả trực tuyến quá 15 phút chưa thanh toán. Backend gọi trước mỗi yêu cầu API |
+| `sp_AutoConfirmReceivedOrders` | `@Confirmed INT OUTPUT` (không bắt buộc) | Đơn `Shipping` quá 7 ngày (`fn_AutoConfirmReceivedDays()`) kể từ `ShippedAt` mà khách chưa bấm nhận thì chuyển `Delivered` như khi khách xác nhận: trigger cấp thẻ bảo hành, đơn COD ghi đã thu tiền, nhật ký `OrderAutoReceived`. Backend gọi cùng chỗ với `sp_ExpireUnpaidOrders` |
 | `sp_RequestCancelOrder` | `@OrderID, @CustomerID, @Reason=NULL,` **`@RequestID, @VoucherCode, @VoucherDiscount`** | Khách bấm "Hủy đơn" (đơn ≤ 5 triệu). Dùng `@VoucherCode`, `@VoucherDiscount` để hiện popup nhắc nhở |
 | `sp_RespondCancelPopup` | `@RequestID, @CustomerID, @KeepOrder BIT` | Khách chọn trong popup: giữ đơn (1) hoặc xác nhận hủy (0) |
 | `sp_UpdateOrderStatus` | `@OrderID, @NewStatus, @AdminUserID, @Reason=NULL` | Admin xác nhận / giao / hủy đơn |
@@ -142,6 +143,7 @@ Thủ tục và API tương ứng của backend (xem code trong `backend/app/rou
 | `sp_TrackProductView` | `POST /api/recently-viewed` |
 | `sp_RecordPaymentResult` | `POST /api/orders/<mã đơn>/pay` (mô phỏng VNPay, MoMo), `POST /api/admin/orders/<mã đơn>/confirm-payment` (chuyển khoản) |
 | `sp_ExpireUnpaidOrders` | Tự gọi trước mỗi yêu cầu `/api/` |
+| `sp_AutoConfirmReceivedOrders` | Tự gọi trước mỗi yêu cầu `/api/` (cùng lệnh với `sp_ExpireUnpaidOrders`) |
 | `sp_StartOrderProduction` | `POST /api/admin/orders/<mã đơn>/start-production` |
 | 4 thủ tục hậu mãi | Chưa có API |
 

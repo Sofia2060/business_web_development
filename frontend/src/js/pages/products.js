@@ -50,6 +50,7 @@
     if (tt.soTrang > 1) q.set('trang', tt.soTrang);
     const chuoi = q.toString();
     history.replaceState(null, '', location.pathname + (chuoi ? '?' + chuoi : ''));
+    if (VN.danhDauMenu) VN.danhDauMenu();
   };
 
   let DL = null; // dữ liệu: sp, dm, bst

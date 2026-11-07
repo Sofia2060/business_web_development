@@ -433,17 +433,27 @@ def test_two_units_make_two_warranty_cards(client):
     c, addr = new_customer()
     code = place(c, addr, MID, quantity=2)["OrderCode"]
     admin = new_admin()
-    for status in ("Confirmed", "Shipping", "Delivered"):
+    for status in ("Confirmed", "Shipping"):
         assert admin.post(f"/api/admin/orders/{code}/status", json={"status": status}).status_code == 200
+    assert c.post(f"/api/orders/{code}/confirm-received").status_code == 200
     assert query("SELECT COUNT(*) AS n FROM dbo.WarrantyRecords w JOIN dbo.Orders o ON o.OrderID = w.OrderID "
                  "WHERE o.OrderCode = ?", (code,))[0]["n"] == 2
+
+
+def test_admin_cannot_mark_an_order_delivered(client):
+    """Only the customer (or the system after 7 days) confirms receipt, so an admin cannot issue warranty cards."""
+    c, code = shipped_order()
+    admin = new_admin()
+    res = admin.post(f"/api/admin/orders/{code}/status", json={"status": "Delivered"})
+    assert res.status_code == 400 and "Delivered" not in res.get_json()["error"].split("one of")[-1]
+    assert order_status(code) == "Shipping" and c.get("/api/warranties").get_json() == []
 
 
 def test_admin_cannot_skip_steps_or_change_finished_orders(client):
     c, addr = new_customer()
     code = place(c, addr, MID)["OrderCode"]
     admin = new_admin()
-    assert admin.post(f"/api/admin/orders/{code}/status", json={"status": "Delivered"}).status_code == 409
+    assert admin.post(f"/api/admin/orders/{code}/status", json={"status": "Shipping"}).status_code == 409
     assert order_status(code) == "Pending"
     admin.post(f"/api/admin/orders/{code}/status", json={"status": "Cancelled", "reason": "Hết hàng"})
     assert order_status(code) == "Cancelled"
@@ -652,3 +662,157 @@ def test_order_list_carries_the_items_of_each_order(client):
     assert {"ProductNameSnap", "MaterialSnap", "GoldColor", "RingSize", "EngravingText", "EngravingStyle",
             "UnitPrice"} <= one.keys()
     assert c.get(f"/api/orders/{second}").get_json()["items"][0]["ProductNameSnap"] == one["ProductNameSnap"]
+
+
+# ---------- ticked cart lines: only the lines in cartItemIds are ordered, the others stay in the cart ----------
+
+def cart_line_ids(client):
+    """CartItemID of each line of the cart, by variant SKU."""
+    return {i["VariantSKU"]: i["CartItemID"] for i in client.get("/api/cart").get_json()["items"]}
+
+
+def test_order_with_cart_item_ids_orders_only_the_ticked_lines(client):
+    c, addr = new_customer()
+    add_to_cart(c, MID)
+    add_to_cart(c, SMALL)
+    ids = cart_line_ids(c)
+    mid_stock, small_stock = stock(MID), stock(SMALL)
+    res = checkout(c, addr, cartItemIds=[ids[SMALL]])
+    assert res.status_code == 201
+    order = res.get_json()
+    # 139,000 of goods is under the free-shipping line, although the whole cart (2,500,000) is over it
+    assert order["ShippingFee"] == 30000 and order["TotalAmount"] == 139000 + 30000
+    assert (stock(SMALL), stock(MID)) == (small_stock - 1, mid_stock)
+    assert list(cart_line_ids(c)) == [MID]                                  # the line that was not ticked is still there
+    items = c.get(f"/api/orders/{order['OrderCode']}").get_json()["items"]
+    assert [i["SKUSnap"] for i in items] == [SMALL]
+
+
+def test_order_without_cart_item_ids_still_orders_the_whole_cart(client):
+    c, addr = new_customer()
+    add_to_cart(c, MID)
+    add_to_cart(c, SMALL)
+    assert checkout(c, addr).status_code == 201
+    assert c.get("/api/cart").get_json()["items"] == []
+
+
+def test_same_token_with_cart_item_ids_returns_the_same_order(client):
+    c, addr = new_customer()
+    add_to_cart(c, MID)
+    add_to_cart(c, SMALL)
+    ids = cart_line_ids(c)
+    token = str(uuid.uuid4())
+    first = checkout(c, addr, token=token, cartItemIds=[ids[SMALL]])
+    again = checkout(c, addr, token=token, cartItemIds=[ids[SMALL]])
+    assert (first.status_code, again.status_code) == (201, 200)
+    assert again.get_json()["OrderCode"] == first.get_json()["OrderCode"]
+    assert list(cart_line_ids(c)) == [MID]
+
+
+@pytest.mark.parametrize("bad", [[], "5", [0], [-1], ["a"], [True], [1.5], list(range(1, 102))])
+def test_cart_item_ids_must_be_a_list_of_cart_line_ids(client, bad):
+    c, addr = new_customer()
+    add_to_cart(c, MID)
+    assert checkout(c, addr, cartItemIds=bad).status_code == 400
+    assert c.post("/api/vouchers/check", json={"code": "WELCOME5", "cartItemIds": bad}).status_code == 400
+    assert len(c.get("/api/cart").get_json()["items"]) == 1                 # nothing was ordered
+
+
+def test_cart_item_ids_of_another_customer_order_nothing(client):
+    a, _ = new_customer()
+    add_to_cart(a, MID)
+    other_line = cart_line_ids(a)[MID]
+    b, addr_b = new_customer()
+    add_to_cart(b, SMALL)
+    res = checkout(b, addr_b, cartItemIds=[other_line])
+    assert res.status_code == 400                                           # "the cart is empty": the line is not b's
+    assert list(cart_line_ids(a)) == [MID] and list(cart_line_ids(b)) == [SMALL]
+
+
+def test_voucher_check_counts_only_the_ticked_lines(client):
+    c, _ = new_customer()
+    add_to_cart(c, MID)        # 2,361,000
+    add_to_cart(c, SMALL)      # 139,000
+    ids = cart_line_ids(c)
+    whole = c.post("/api/vouchers/check", json={"code": "WELCOME5"}).get_json()
+    assert whole["subtotal"] == 2500000 and whole["discount"] == 125000
+    mid_only = c.post("/api/vouchers/check", json={"code": "WELCOME5", "cartItemIds": [ids[MID]]}).get_json()
+    assert mid_only["subtotal"] == 2361000 and mid_only["discount"] == 118000
+    # WELCOME5 needs 2,000,000: the small line alone is not enough
+    small_only = c.post("/api/vouchers/check", json={"code": "WELCOME5", "cartItemIds": [ids[SMALL]]})
+    assert small_only.status_code == 409 and small_only.get_json()["reason"] == "min_order"
+
+
+# ---------- automatic receipt: a shipped order the customer never confirmed is received after 7 days ----------
+
+def shipped_order(sku=SMALL):
+    """A cash order handed to the carrier. Returns (customer client, order code)."""
+    c, addr = new_customer()
+    add_to_cart(c, sku)
+    code = checkout(c, addr).get_json()["OrderCode"]
+    admin = new_admin()
+    for status in ("Confirmed", "Shipping"):
+        assert admin.post(f"/api/admin/orders/{code}/status", json={"status": status}).status_code == 200
+    return c, code
+
+
+def shipped_days_ago(code, days):
+    with transaction() as cur:
+        cur.execute("UPDATE dbo.Orders SET ShippedAt = DATEADD(DAY, ?, ShippedAt) WHERE OrderCode = ?", (-days, code))
+
+
+def auto_receipts(code):
+    return query("SELECT COUNT(*) AS n FROM dbo.AuditLogs a JOIN dbo.Orders o ON o.OrderID = a.EntityID "
+                 "WHERE a.EntityName = 'Orders' AND a.Action = 'OrderAutoReceived' AND o.OrderCode = ?", (code,))[0]["n"]
+
+
+def test_a_shipped_order_is_received_automatically_after_7_days(client):
+    c, code = shipped_order()
+    shipped_days_ago(code, 8)
+    assert c.get("/api/categories").status_code == 200                       # any API call runs the check
+    assert order_status(code) == "Delivered"
+    row = query("SELECT o.DeliveredAt, p.Status AS PayStatus FROM dbo.Orders o JOIN dbo.Payments p ON p.OrderID = o.OrderID "
+                "WHERE o.OrderCode = ?", (code,))[0]
+    assert row["DeliveredAt"] is not None and row["PayStatus"] == "Success"   # cash is counted as collected
+    assert len(c.get("/api/warranties").get_json()) == 1                      # the warranty card was issued
+    assert auto_receipts(code) == 1
+    c.get("/api/categories")
+    assert auto_receipts(code) == 1                                           # a second check does nothing more
+
+
+def test_a_shipped_order_under_7_days_old_stays_in_shipping(client):
+    c, code = shipped_order()
+    shipped_days_ago(code, 6)
+    assert c.get("/api/categories").status_code == 200
+    assert order_status(code) == "Shipping" and auto_receipts(code) == 0
+    assert c.get("/api/warranties").get_json() == []
+
+
+def test_only_shipping_orders_are_received_automatically(client):
+    c, addr = new_customer()
+    add_to_cart(c, SMALL)
+    code = checkout(c, addr).get_json()["OrderCode"]
+    new_admin().post(f"/api/admin/orders/{code}/status", json={"status": "Confirmed"})
+    with transaction() as cur:       # an old confirmed order that was never handed to the carrier
+        cur.execute("UPDATE dbo.Orders SET ConfirmedAt = DATEADD(DAY, -30, ConfirmedAt), CreatedAt = DATEADD(DAY, -30, CreatedAt) "
+                    "WHERE OrderCode = ?", (code,))
+    c.get("/api/categories")
+    assert order_status(code) == "Confirmed" and auto_receipts(code) == 0
+
+
+def test_order_list_tells_when_a_shipped_order_was_handed_over(client):
+    """The pages show 'the system confirms receipt on <ShippedAt + 7 days>' from the list, so the list must carry ShippedAt."""
+    c, code = shipped_order()
+    (row,) = [o for o in c.get("/api/orders").get_json() if o["OrderCode"] == code]
+    assert row["OrderStatus"] == "Shipping" and row["ShippedAt"]
+
+
+def test_pressing_received_after_the_system_confirmed_it_is_not_an_error(client):
+    """The customer's page is still open with the button when the 7 days pass: the check before the request confirms the
+    order first, and the customer's own confirmation must still answer 200 (and issue no second card)."""
+    c, code = shipped_order()
+    shipped_days_ago(code, 8)
+    res = c.post(f"/api/orders/{code}/confirm-received")
+    assert res.status_code == 200 and res.get_json()["OrderStatus"] == "Delivered"
+    assert c.post(f"/api/orders/{code}/confirm-received").status_code == 200       # pressed twice: same answer
+    assert len(c.get("/api/warranties").get_json()) == 1 and auto_receipts(code) == 1

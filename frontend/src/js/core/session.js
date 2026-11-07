@@ -4,7 +4,8 @@
    A page reads it with plain calls (VN.taiKhoan.hienTai(), VN.gioHang.ds(), VN.donHang.lay(ma)) once
    `await VN.sanSang` is done, and changes it with async calls that go to the API.
    1. VN.taiKhoan  - login, register, profile, address book
-   2. VN.gioHang   - the cart: in the database for a customer, in this browser for a visitor without an account
+   2. VN.gioHang   - the cart: in the database for a customer, in this browser for a visitor.
+                     Each line has a tick: only the ticked lines go to checkout, the others stay in the cart without an account
    3. VN.uuDai     - voucher check
    4. VN.donHang   - orders: place, look up, pay, cancel, confirm receipt
    5. VN.baoHanh, VN.lichHen - warranty cards and after-sales appointments
@@ -137,6 +138,9 @@
 
   /* ================= 2. CART ================= */
   const luuGioKhach = (ds) => VN.kho.ghi('gioHang', ds);
+  /** Lines the person un-ticked (by line key). A line is ticked unless it is in this list, so a new line starts ticked. */
+  const docBoChon = () => VN.kho.doc('gioBoChon', []);
+  const ghiBoChon = (ds) => VN.kho.ghi('gioBoChon', Array.from(new Set(ds)));
   const dongTrungKhoa = (ds, khoa, d) => ds.find((x) => khoa(x) === khoa(d));
 
   /** The variant (colour + size) of a product as the server knows it. Throws when there is no such variant. */
@@ -167,6 +171,36 @@
     },
     /** A line is told apart by code + colour + size + engraving text + style */
     khoa(d) { return [d.ma, d.mau || '', d.size || '', d.khacChu || '', d.kieuChu || ''].join('|'); },
+
+    /* ---- Ticked lines: what the person pays for now. Un-ticked lines simply wait in the cart. ---- */
+    daChon(dongHoacKhoa) {
+      const k = typeof dongHoacKhoa === 'string' ? dongHoacKhoa : this.khoa(dongHoacKhoa);
+      return !docBoChon().includes(k);
+    },
+    datChon(khoa, chon) {
+      const bo = docBoChon().filter((k) => k !== khoa);
+      if (!chon) bo.push(khoa);
+      ghiBoChon(bo);
+      if (!this.imLang) VN.phatSuKien('gio-chon', { khoa, chon });
+    },
+    /** Tick or un-tick every line of the cart */
+    chonTatCa(chon) {
+      ghiBoChon(chon ? [] : this.dong.map((d) => this.khoa(d)));
+      VN.phatSuKien('gio-chon', { tatCa: chon });
+    },
+    /** "Buy now": only this line is ticked, the rest of the cart waits */
+    chiChon(khoa) {
+      ghiBoChon(this.dong.map((d) => this.khoa(d)).filter((k) => k !== khoa));
+      VN.phatSuKien('gio-chon', { khoa, chon: true });
+    },
+    /** The ticked lines (raw, as in ds()) */
+    dongDaChon() { return this.dong.filter((d) => this.daChon(d)); },
+    /** Forget ticks of lines that are no longer in the cart, so the list stays small */
+    donBoChon() {
+      const co = new Set(this.dong.map((d) => this.khoa(d)));
+      const bo = docBoChon(); const con = bo.filter((k) => co.has(k));
+      if (con.length !== bo.length) ghiBoChon(con);
+    },
     tongSoLuong() { return this.dong.reduce((t, d) => t + (d.soLuong || 0), 0); },
     /** Load the cart: the account cart from the server, or the cart kept in this browser. nhay = make the cart badge blink. */
     async nap(nhay = false) {
@@ -219,12 +253,18 @@
     async xoa(khoa) {
       await this.canKetNoi();
       const d = this.dong.find((x) => this.khoa(x) === khoa); if (!d) return null;
+      const boChon = !this.daChon(khoa);       // remembered now: the page may forget the tick of a removed line before "undo"
       if (this.coMayChu()) await VN.api.del('/api/cart/' + d.id).catch((loi) => { if (loi.trangThai !== 404) throw loi; });
       else luuGioKhach(VN.kho.doc('gioHang', []).filter((x) => this.khoa(x) !== khoa));
       await this.nap();
-      return d;
+      return Object.assign({}, d, { boChon });
     },
-    async khoiPhuc(dong) { await this.them(dong); },
+    /** Put a removed line back (the line given by xoa). A line that was un-ticked stays un-ticked. */
+    async khoiPhuc(dong) {
+      const { boChon, ...dongGoc } = dong;
+      await this.them(dongGoc);
+      if (boChon) this.datChon(this.khoa(dongGoc), false);
+    },
     /** Remove several lines at once (lines of products the shop no longer sells online) */
     async goBo(dsKhoa) {
       for (const khoa of dsKhoa) await this.xoa(khoa);
@@ -239,6 +279,9 @@
       const khoaMoi = this.khoa(moi);
       if (khoaMoi === khoaCu) return khoaCu;
       await timBienThe(moi.ma, moi.mau, moi.size);                 // fails early when the new choice does not exist
+      // Read the ticks now, before the line is removed and the page tidies up the ticks of lines that left the cart
+      const daChonCu = this.daChon(khoaCu);
+      const gopVaoDongCo = this.dong.some((x) => this.khoa(x) === khoaMoi);     // the new choices equal another line: they merge
       this.imLang = true;
       try {
         await this.xoa(khoaCu);
@@ -248,6 +291,8 @@
         this.imLang = false;
         VN.phatSuKien('gio', { nhay: false, dong: this.dong });
       }
+      // The changed line keeps its tick; when it merged into another line, that line keeps its own tick
+      if (!gopVaoDongCo) this.datChon(khoaMoi, daChonCu);
       return khoaMoi;
     },
     async xoaHet() {
@@ -255,6 +300,14 @@
       if (this.coMayChu()) { for (const d of this.dong.slice()) await VN.api.del('/api/cart/' + d.id).catch(() => {}); }
       else VN.kho.xoa('gioHang');
       await this.nap();
+    },
+    /** After a visitor's order: remove the lines that were ordered (by key). Lines that were not ticked stay. */
+    async boDaDat(dsKhoa) {
+      const bo = new Set(dsKhoa);
+      if (this.coMayChu()) { await this.nap(); return; }      // a customer's ordered lines are removed by the server
+      luuGioKhach(VN.kho.doc('gioHang', []).filter((d) => !bo.has(this.khoa(d))));
+      await this.nap();
+      this.donBoChon();
     },
     /** After login: the lines kept in this browser join the account cart. A line is clamped to the 5 per line the pages allow,
      *  a line that cannot be added is dropped, and each line leaves this browser as soon as it is merged (a closed tab never doubles it). */
@@ -276,6 +329,8 @@
       const { sp } = await VN.duLieu.coBan();
       return this.dong.filter((d) => { const s = sp.theoMa[d.ma]; return !s || !s.coTheMua; });
     },
+    /** chiTiet() of the ticked lines only: what goes to checkout */
+    async chiTietDaChon() { return (await this.chiTiet()).filter((d) => this.daChon(d.khoa)); },
     /** Lines with their product, unit price and line total. Lines of products that are not sold online any more are left out. */
     async chiTiet() {
       const { sp } = await VN.duLieu.coBan();
@@ -286,12 +341,12 @@
         return Object.assign({}, d, { sp: s, donGia, thanhTien: donGia * d.soLuong, khoa: this.khoa(d) });
       }).filter(Boolean);
     },
-    /** The cart lines of a visitor in the form the API takes (guest order, voucher check) */
+    /** The ticked cart lines of a visitor in the form the API takes (guest order, voucher check) */
     async dongGuiLen() {
       const { sp } = await VN.duLieu.coBan();
       const ds = VN.kho.doc('gioHang', []); let doi = false;
       // A product that is not on sale any more would make the whole order or voucher check fail, so those lines are left out
-      const ban = ds.filter((d) => { const s = sp.theoMa[d.ma]; return s && s.coTheMua; });
+      const ban = ds.filter((d) => { const s = sp.theoMa[d.ma]; return s && s.coTheMua && this.daChon(d); });
       for (const d of ban) if (!d.bienThe) { d.bienThe = (await timBienThe(d.ma, d.mau, d.size)).ma; doi = true; }
       if (doi) luuGioKhach(ds);
       return ban.map((d) => ({ variantSku: d.bienThe, quantity: d.soLuong, engravingText: d.khacChu || '', engravingStyle: d.khacChu ? VN.kieuChuMayChu(d.kieuChu) : '' }));
@@ -304,6 +359,7 @@
     async kiemTra(ma) {
       const gui = { code: ma };
       if (!VN.taiKhoan.hienTai()) gui.items = await VN.gioHang.dongGuiLen();
+      else gui.cartItemIds = VN.gioHang.dongDaChon().map((d) => d.id).filter(Boolean);     // only the ticked lines count
       return VN.api.post('/api/vouchers/check', gui);
     },
   };
@@ -371,7 +427,7 @@
       }
     },
     /**
-     * Place an order. For a customer: d = { diaChiId, phuongThuc, maUuDai, ghiChu, token }.
+     * Place an order. For a customer: d = { diaChiId, dongId (ids of the ticked cart lines), phuongThuc, maUuDai, ghiChu, token }.
      * For a visitor: d also has hoTen, sdt (the buyer), sdtNguoiNhan, diaChi, phuongXa, tinh, dong (lines of the browser cart).
      * Resolves to { ma, tongTien, phiGiao }.
      */
@@ -379,7 +435,8 @@
       await VN.gioHang.canKetNoi();
       const chung = { paymentMethod: VN.PT_THANH_TOAN[d.phuongThuc], checkoutToken: d.token, voucherCode: d.maUuDai || '', note: d.ghiChu || '' };
       let r;
-      if (VN.taiKhoan.hienTai()) r = await VN.api.post('/api/orders', Object.assign({ addressId: d.diaChiId }, chung));
+      // Only the ticked lines become the order; the server keeps the other lines in the cart
+      if (VN.taiKhoan.hienTai()) r = await VN.api.post('/api/orders', Object.assign({ addressId: d.diaChiId, cartItemIds: d.dongId }, chung));
       else {
         r = await VN.api.post('/api/orders/guest', Object.assign({
           fullName: d.hoTen, phone: d.sdt, recipientPhone: d.sdtNguoiNhan && d.sdtNguoiNhan !== d.sdt ? d.sdtNguoiNhan : '',

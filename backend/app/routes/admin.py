@@ -11,8 +11,10 @@ from .orders import order_detail
 bp = Blueprint("admin", __name__, url_prefix="/api/admin")
 
 ORDER_STATUSES = ("Pending", "Confirmed", "Shipping", "Delivered", "Cancelled")
-# Statuses an admin can move an order to. Pending is the starting state only.
-CAN_SET_STATUS = ("Confirmed", "Shipping", "Delivered", "Cancelled")
+# Statuses an admin can move an order to. Pending is the starting state only. Delivered is missing on purpose:
+# only the customer confirms receipt (POST /api/orders/<code>/confirm-received), or the system does after 7 days
+# (sp_AutoConfirmReceivedOrders), so the shop cannot issue warranty cards by itself.
+CAN_SET_STATUS = ("Confirmed", "Shipping", "Cancelled")
 
 
 @bp.get("/users")

@@ -275,12 +275,17 @@
   const xemNho = document.createElement('div');
   xemNho.className = 'khac-chu__xem-nho';
   xemNho.setAttribute('aria-hidden', 'true');
+  const xemNhoVe = document.createElement('div');
+  const xemNhoChu = document.createElement('p');
+  xemNhoChu.className = 'khac-chu__xem-nho-chu';
+  xemNho.append(xemNhoVe, xemNhoChu);
 
   const veKhac = () => {
     if (!tt.sp) return;
     const chu = layChuKhac(); const kieu = kieuChu(); const mau = mauKhac();
     VN.veKhacChu(VN.$('.thu-vien__khac-ve', el.khac), chu, kieu, mau);
-    VN.veKhacChu(xemNho, chu, kieu, mau);
+    VN.veKhacChu(xemNhoVe, chu, kieu, mau);
+    xemNhoChu.textContent = `Xem trước · ${TEN_KIEU[kieu]} · ${mau}`;
     VN.$('.thu-vien__khac-chu', el.khac).innerHTML = `${VN.bt('but', 'bt--nho')}<span>Mặt trong đai nhẫn · <strong>${TEN_KIEU[kieu]}</strong> · ${VN.thoat(mau)}</span>`;
   };
   const datCheDoKhac = (bat) => {
@@ -430,7 +435,8 @@
       VN.$('#nhom-khac').hidden = false;
       el.oKhac.maxLength = tt.toiDaKhac;
       VN.$('#dem-khac').textContent = `0/${tt.toiDaKhac}`;
-      VN.$('#khac-noi-dung').prepend(xemNho);
+      // Bản xem trước nằm ngay dưới ô nhập: gõ tới đâu thấy chữ khắc tới đó, không phải cuộn lên ảnh sản phẩm
+      VN.$('.khac-chu__o').after(xemNho);
     }
     el.soLuong.max = tt.toiDa;
     datSoLuong(1);
@@ -468,7 +474,13 @@
     try { kq = await VN.gioHang.them(dong, tt.toiDa); }
     catch (loi) { VN.thongBao({ tieuDe: 'Chưa thêm được vào giỏ', noiDung: VN.thoat(loi.message), loai: 'loi' }); return; }
     finally { tt.dangThem = false; }
-    if (muaNgay) { location.href = VN.url('thanhToan'); return; }
+    if (muaNgay) {
+      // Mua ngay: chỉ thanh toán sản phẩm vừa chọn, các sản phẩm khác vẫn ở lại giỏ (bỏ tick)
+      const khoa = VN.gioHang.khoa(dong);
+      const co = kq.ds.find((d) => VN.gioHang.khoa(d) === khoa) || kq.ds.find((d) => d.ma === dong.ma);
+      VN.gioHang.chiChon(co ? VN.gioHang.khoa(co) : khoa);
+      location.href = VN.url('thanhToan'); return;
+    }
     const nut = VN.$('#nut-them-gio');
     nut.classList.add('da-them'); VN.$('span', nut).textContent = 'Đã thêm vào giỏ'; VN.$('use', nut).setAttribute('href', '#i-dau-tich');
     clearTimeout(henNut);
@@ -612,8 +624,9 @@
         </table></div>
         <ul class="cam-ket-bh__luu-y">
           <li>Thẻ bảo hành điện tử tự kích hoạt khi bạn bấm “Đã nhận được hàng”; mỗi sản phẩm có một mã thẻ riêng.</li>
+          <li>Hiệu lực: bảo hành lỗi chế tác ${bh.baoHanhLoiThang || 12} tháng kể từ ngày nhận hàng; dịch vụ hậu mãi (làm sạch, chỉnh size…) trọn đời sản phẩm, không có ngày hết hạn.</li>
           <li>Lượt dịch vụ chỉ được trừ khi dịch vụ hoàn tất; lịch hẹn đã hủy không bị tính lượt.</li>
-          <li>Đặt lịch trước tối đa ${bh.datTruocToiDaNgay} ngày, chọn showroom và khung giờ phù hợp.</li>
+          <li>Đặt lịch bất cứ lúc nào sau khi nhận hàng, chọn showroom và khung giờ phù hợp.</li>
         </ul>
       </div>`;
   };

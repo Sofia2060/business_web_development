@@ -4,7 +4,7 @@ from flask import Blueprint, jsonify
 from ..auth import current_user
 from ..db import query
 from ..validation import body, text
-from .cart import cart_subtotal, read_line
+from .cart import cart_subtotal, read_item_ids, read_line
 from .orders import MAX_GUEST_LINES
 
 bp = Blueprint("vouchers", __name__, url_prefix="/api/vouchers")
@@ -70,7 +70,10 @@ def check_voucher():
     user = current_user()
     customer = query("SELECT CustomerID FROM dbo.Customers WHERE UserID = ?", (user["UserID"],)) if user is not None else []
     if customer:
-        subtotal = cart_subtotal(customer[0]["CustomerID"])
+        item_ids, error = read_item_ids(data)    # optional: only the ticked cart lines count
+        if error:
+            return jsonify(error=error), 400
+        subtotal = cart_subtotal(customer[0]["CustomerID"], item_ids)
         if not subtotal:
             return jsonify(error="The cart is empty"), 400
     elif "items" not in data:

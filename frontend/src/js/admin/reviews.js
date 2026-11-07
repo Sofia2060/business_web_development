@@ -2,7 +2,6 @@
    QUẢN TRỊ – ĐÁNH GIÁ (nối API /api/admin/feedbacks)
    - Điểm trung bình, phân bố số sao, tỷ lệ tích cực / tiêu cực (nhãn do hệ thống phân tích mô phỏng,
      chỉ hiển thị cho quản trị – khách hàng không thấy nhãn này)
-   - Khối phân tích cảm xúc: thanh tích cực / tiêu cực và bảng yếu tố khách quan tâm (đếm theo từng yếu tố)
    - Chưa có phản hồi của cửa hàng: database không có chỗ lưu, nên trang chỉ để xem
    ===================================================================== */
 (function () {
@@ -21,26 +20,8 @@
     chuDe: f.aspects.map((a) => ({ ten: a.AspectName, am: a.Polarity === 'Negative' })),
   });
 
-  /** Sentiment block: positive / negative bar, then how often each topic was ticked (praise on the left, complaints on the right) */
-  const veCamXuc = (tat) => {
-    if (!tat.length) { VN.$('#qt-cam-xuc').innerHTML = qt.trong('Chưa có đánh giá nào.'); return; }
-    const am = tat.filter((x) => x.camXuc === 'Negative').length; const duong = tat.length - am;
-    const phanTram = (n) => Math.round(n * 100 / tat.length);
-    const dem = { tot: {}, chua: {} };
-    tat.forEach((x) => x.chuDe.forEach((c) => { const nhom = dem[c.am ? 'chua' : 'tot']; nhom[c.ten] = (nhom[c.ten] || 0) + 1; }));
-    const ds = (nhom) => {
-      const hang = Object.entries(nhom).sort((a, b) => b[1] - a[1]);
-      return hang.length ? `<ul>${hang.map(([ten, n]) => `<li><span>${VN.thoat(ten)}</span><b>${n}</b></li>`).join('')}</ul>` : '<p class="chu-nho chu-phu">Chưa có yếu tố nào được chọn.</p>';
-    };
-    VN.$('#qt-cam-xuc').innerHTML = `<div class="qt-cam-xuc__thanh" role="img" aria-label="${duong} đánh giá tích cực, ${am} đánh giá tiêu cực">
-        <i class="duong" style="width:${duong * 100 / tat.length}%"></i><i class="am" style="width:${am * 100 / tat.length}%"></i></div>
-      <div class="qt-cam-xuc__chu"><span><strong>${duong}</strong> tích cực (${phanTram(duong)}%)</span><span><strong class="chu-do">${am}</strong> tiêu cực (${phanTram(am)}%)</span></div>
-      <div class="qt-cam-xuc__yeu-to"><div><h3>Mặt tích cực</h3>${ds(dem.tot)}</div><div><h3>Mặt tiêu cực</h3>${ds(dem.chua)}</div></div>`;
-  };
-
   const ve = () => {
     const tat = tt.ds;
-    veCamXuc(tat);
     const tb = tat.length ? tat.reduce((t, x) => t + x.soSao, 0) / tat.length : 0;
     const am = tat.filter((x) => x.camXuc === 'Negative').length;
     VN.$('#qt-dg-tong').innerHTML = `<div class="qt-dg-tong__diem"><strong>${tat.length ? tb.toLocaleString('vi-VN', { maximumFractionDigits: 1 }) : '—'}</strong>${sao(Math.round(tb))}<span class="chu-nho chu-phu">${tat.length} đánh giá</span></div>

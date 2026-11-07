@@ -3,7 +3,8 @@
    - Không bắt buộc đăng nhập: khách mua bằng số điện thoại (mã khách hàng), có tài khoản thì chọn địa chỉ trong sổ
    - Nhập địa chỉ mới theo 34 tỉnh, thành; mua tặng thì ghi thêm số điện thoại người đặt
    - Giao tiêu chuẩn có bảo hiểm (miễn phí từ mức quy định); máy chủ tính lại phí và tổng tiền khi đặt hàng
-   - COD, chuyển khoản VietQR, VNPay & MoMo (mô phỏng); mã ưu đãi do máy chủ kiểm tra
+   - COD, chuyển khoản VietQR, VNPay & MoMo (mô phỏng); mã ưu đãi do máy chủ kiểm tra, có danh sách mã gợi ý bấm để dùng
+   - Chỉ thanh toán các dòng đã tick ở giỏ hàng (Mua ngay = chỉ sản phẩm vừa chọn); dòng không tick vẫn ở lại giỏ
    - Đơn thanh toán trực tuyến phải trả trong 15 phút, quá hạn máy chủ tự hủy đơn
    ===================================================================== */
 (function () {
@@ -26,12 +27,13 @@
     if (VN.matKetNoi()) return;       // thông báo mất kết nối đang hiện; giỏ chưa đọc được không phải giỏ trống
     tt.ch = ch;
     await boDongKhongBan();
-    tt.dong = await VN.gioHang.chiTiet();
+    tt.dong = await VN.gioHang.chiTietDaChon();
     if (!tt.dong.length) { location.replace(VN.url('gioHang')); return; }
     await khoiTaoDiaChi();
     vePhuongThuc();
     khoiTaoQuaTang();
     VN.$('#tt-ma').value = tt.tc.maUuDai || '';
+    veMaGoiY();
     await kiemTraMa(tt.tc.maUuDai);
     vePhuongThucGiao();
     veTomTat();
@@ -166,6 +168,7 @@
       : tt.uuDai ? `<span class="chu-ngoc">${VN.bt('dau-tich', 'bt--nho')} ${VN.thoat(tt.uuDai.name)} · <button type="button" class="lien-ket" id="tt-bo-ma">Bỏ mã</button></span>` : '';
     VN.$('#tt-ma').closest('.truong').classList.toggle('co-loi', !!(tt.tc.maUuDai && tt.loiMa));
     VN.$('#nut-dat-hang').textContent = `Đặt hàng · ${VN.tien(t.tong)}`;
+    capNhatMaGoiY(t);
     return t;
   };
   VN.$('#tt-ap-ma').addEventListener('click', async () => {
@@ -181,6 +184,27 @@
   VN.$('#tt-loi-ma').addEventListener('click', (e) => {
     if (e.target.id !== 'tt-bo-ma') return;
     tt.tc = VN.tuyChonGio.ghi({ maUuDai: '' }); tt.uuDai = null; tt.loiMa = ''; VN.$('#tt-ma').value = ''; vePhuongThucGiao(); veTomTat();
+  });
+
+  /* ================= MÃ ƯU ĐÃI GỢI Ý (cả khi "Mua ngay" đi thẳng tới đây) ================= */
+  const veMaGoiY = () => {
+    VN.$('#tt-ds-ma').innerHTML = '<p class="chu-rat-nho chu-phu">Mã dành cho bạn</p>' + tt.ch.maUuDai.map((m) => `
+      <button type="button" class="the-ma" data-ma="${VN.thoat(m.ma)}" aria-pressed="false"><strong>${VN.thoat(m.ma)}</strong><small>${VN.thoat(m.moTa)}</small></button>`).join('');
+  };
+  /** Đánh dấu mã đang dùng và mã chưa đủ điều kiện (theo tạm tính các sản phẩm đang thanh toán) */
+  const capNhatMaGoiY = (t) => {
+    VN.$$('#tt-ds-ma [data-ma]').forEach((b) => {
+      const m = tt.ch.maUuDai.find((x) => x.ma === b.dataset.ma);
+      const du = t.tamTinh >= (m.donToiThieu || 0);
+      b.classList.toggle('chua-du', !du);
+      b.setAttribute('aria-pressed', String(!!tt.uuDai && tt.uuDai.code === m.ma));
+      VN.$('small', b).textContent = du ? m.moTa : `Mua thêm ${VN.tien(m.donToiThieu - t.tamTinh)} để dùng mã`;
+    });
+  };
+  VN.$('#tt-ds-ma').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-ma]'); if (!b || !tt.ch) return;
+    VN.$('#tt-ma').value = b.dataset.ma;
+    VN.$('#tt-ap-ma').click();
   });
 
   /* ================= KIỂM TRA & ĐẶT HÀNG ================= */
@@ -234,11 +258,11 @@
       VN.duLieu.lamMoi();                // danh mục trong trình duyệt có thể cũ đến 5 phút: đọc lại giá và hàng đang bán
       await VN.gioHang.nap();
       const daBo = await boDongKhongBan();
-      const dongMoi = await VN.gioHang.chiTiet();
+      const dongMoi = await VN.gioHang.chiTietDaChon();
       // Giỏ rỗng sau một lần gửi không có câu trả lời: có thể đơn đã được tạo và đã làm rỗng giỏ, hãy gửi lại để nhận đơn đó
       const coTheDaCoDon = tt.chuaRo && !dongMoi.length;
       if (!dongMoi.length && !coTheDaCoDon) { location.replace(VN.url('gioHang')); return; }
-      const doiGia = !coTheDaCoDon && (dongMoi.length !== tt.dong.length || dongMoi.some((d, i) => !tt.dong[i] || d.donGia !== tt.dong[i].donGia || d.soLuong !== tt.dong[i].soLuong));
+      const doiGia = !coTheDaCoDon && (dongMoi.length !== tt.dong.length || dongMoi.some((d, i) => !tt.dong[i] || d.donGia !== tt.dong[i].donGia || d.soLuong !== tt.dong[i].soLuong || d.id !== tt.dong[i].id));    // a line re-created in another tab has a new id
       if (doiGia) {
         tt.dong = dongMoi; await kiemTraMa(tt.tc.maUuDai);
         thongBaoChung(daBo ? 'Một số sản phẩm vừa ngừng bán nên đã được bỏ khỏi giỏ. Vui lòng kiểm tra lại tổng tiền trước khi đặt hàng.'
@@ -258,7 +282,7 @@
         }
         nut.textContent = 'Đang tạo đơn hàng';
         daGui = true;
-        don = await VN.donHang.tao(Object.assign({ diaChiId }, chung));
+        don = await VN.donHang.tao(Object.assign({ diaChiId, dongId: dongMoi.map((d) => d.id) }, chung));
         if (form.luuDiaChi.checked) diaChiTam = null;       // the order exists: an address the customer wants to keep stays
       } else {
         const nn = layDiaChiMoi();
@@ -269,7 +293,7 @@
           hoTen: nn.hoTen, sdt: form.tangNguoiKhac.checked ? VN.chuanSdt(form.sdtNguoiDat.value) : nn.sdt, sdtNguoiNhan: nn.sdt,
           diaChi: nn.diaChi, phuongXa: nn.phuongXa, tinh: nn.tinh, dong: await VN.gioHang.dongGuiLen(),
         }, chung));
-        await VN.gioHang.xoaHet();
+        await VN.gioHang.boDaDat(tt.dong.map((d) => d.khoa));    // chỉ bỏ các dòng vừa đặt, dòng không chọn vẫn ở lại giỏ
       }
       if (diaChiTam) await VN.taiKhoan.xoaDiaChi(diaChiTam).catch(() => {});   // chờ xong rồi mới chuyển trang, không thì yêu cầu xóa bị hủy
       VN.tuyChonGio.xoa();

@@ -78,8 +78,8 @@ Chỉ có **một ô đăng nhập** (trang Tài khoản). Hệ thống phân qu
 
 | Trang | Chức năng |
 |---|---|
-| Tổng quan | Doanh thu đã thu, đơn mới, đơn chờ xử lý, điểm đánh giá, biểu đồ doanh thu 14 ngày, doanh thu theo chất liệu (10K đến 24K và bạc 925, tính trên đơn đã thanh toán), hiệu quả giữ chân đơn hủy (popup nhắc nhở), việc cần xử lý, đơn mới, sản phẩm bán chạy. Số phản ánh mở là dữ liệu mô phỏng |
-| Đơn hàng | Lọc theo trạng thái và thanh toán, tìm theo mã, tên, số điện thoại. Xác nhận đã nhận tiền chuyển khoản, xác nhận đơn, bắt đầu chế tác, bàn giao vận chuyển, giao thành công (kích hoạt thẻ bảo hành), hủy đơn, nhật ký. Chưa có hoàn tiền hai bước và ghi chú nội bộ (database không có) |
+| Tổng quan | Doanh thu đã thu, đơn mới, đơn chờ xử lý, điểm đánh giá, biểu đồ doanh thu 14 ngày, việc cần xử lý, đơn mới, sản phẩm bán chạy. Số phản ánh mở là dữ liệu mô phỏng |
+| Đơn hàng | Lọc theo trạng thái và thanh toán, tìm theo mã, tên, số điện thoại. Xác nhận đã nhận tiền chuyển khoản, xác nhận đơn, bắt đầu chế tác, bàn giao vận chuyển, hủy đơn, nhật ký. Đơn đang giao chỉ theo dõi: khách bấm "Đã nhận được hàng" (kích hoạt thẻ bảo hành), khách không bấm thì hệ thống tự xác nhận sau 7 ngày. Chưa có hoàn tiền hai bước và ghi chú nội bộ (database không có) |
 | Phản ánh (dữ liệu mô phỏng) | Xem mô tả, ảnh minh chứng. Chuyển Đã tiếp nhận, Đang xử lý, Đã giải quyết kèm nội dung gửi khách |
 | Bảo hành và lịch hẹn | Xác nhận lịch khách chọn, đề xuất giờ khác, hoàn tất (database trừ lượt và quyết định miễn phí hay tính phí), hủy lịch. Danh sách thẻ bảo hành kèm lượt đã dùng |
 | Sản phẩm | 443 mẫu, lọc, tìm, phân trang. Sửa giá bán, giá trước giảm, trạng thái đang bán, đã ẩn, ngừng bán (lưu vào database, sản phẩm giá theo vàng chỉ đổi được trạng thái) |
@@ -93,7 +93,7 @@ Các nút "Mô phỏng: ..." trước đây ở giao diện khách (cửa hàng 
 |---|---|
 | Menu Nhẫn, Trang sức, BST, Quà tặng rối | Gộp còn **Trang sức** (rê vào *Nhẫn* hiện các loại nhẫn, rê vào *Quà tặng* hiện theo ngân sách), Bộ sưu tập, Ưu đãi, Bảo hành điện tử, **Về Vinora** |
 | Hover đồng hồ, avatar, giỏ | Rê chuột hiện hộp xem nhanh: 5 sản phẩm đã xem, 5 sản phẩm yêu thích, menu tài khoản, các món trong giỏ |
-| Giấy chứng nhận | Huy hiệu "Đã kiểm định chất lượng" ở trang sản phẩm mở giấy chứng nhận (trình bày như phiếu bảo hành). Mỗi thẻ bảo hành có giấy chứng nhận riêng |
+| Giấy chứng nhận | Huy hiệu "Kiểm định bởi đơn vị độc lập" ở trang sản phẩm mở giấy chứng nhận (trình bày như phiếu bảo hành). Đơn vị kiểm định là bên thứ ba (`config.json`, `baoHanh.kiemDinh`), không phải phòng kiểm tra của Vinora. Mỗi thẻ bảo hành có giấy chứng nhận riêng |
 | Thêm, bỏ yêu thích | Nút trái tim trên mọi thẻ sản phẩm và trang chi tiết, trang `wishlist.html`. Bản demo: lưu trong trình duyệt |
 | Bắt đăng nhập khi thanh toán | Đặt hàng không cần tài khoản, **số điện thoại là mã khách hàng**. Tra cứu đơn bằng mã đơn và số điện thoại. Tạo tài khoản bằng số đó và xác minh OTP thì đơn và thẻ bảo hành tự liên kết |
 | 4 ô tổng quan ở Hồ sơ | Đã bỏ, trang chỉ còn thông tin cá nhân |
@@ -104,6 +104,14 @@ Các nút "Mô phỏng: ..." trước đây ở giao diện khách (cửa hàng 
 | Chân trang | Chỉ còn thương hiệu, bảo hành và hậu mãi, hỗ trợ khách hàng |
 | Chính sách | Bỏ dòng kỹ thuật ở trang bảo hành, bỏ 2 chính sách phản business ở trang giao hàng, thêm mục **Phản ánh và đổi trả** |
 | Phản ánh khi đơn hoặc sản phẩm có vấn đề | Nút "Phản ánh vấn đề" trong đơn hàng: chọn loại vấn đề, mô tả, tối đa 3 ảnh, theo dõi trạng thái ngay trong đơn |
+| Xóa sản phẩm khỏi giỏ chỉ để mua một phần | Ô tick từng dòng và "Chọn tất cả": chỉ dòng được tick mới tính tiền và đi tới thanh toán, dòng bỏ tick vẫn ở lại giỏ. Giỏ nhỏ ở đầu trang cũng chỉ cộng các dòng đã tick; hoàn tác xóa và đổi màu, size, chữ khắc giữ nguyên trạng thái tick |
+| Mua ngay chưa có gợi ý mã giảm giá | Trang thanh toán có danh sách mã gợi ý (bấm để áp dụng, báo mã chưa đủ điều kiện) |
+| Xem trước khắc laser phải cuộn lên ảnh | Bản xem trước nằm ngay dưới ô nhập chữ, đổi theo từng ký tự, kiểu chữ và màu vàng |
+| Nút "Đã nhận được hàng" / admin bấm giao thành công | Chỉ khách xác nhận đã nhận (trang Đơn hàng và đầu Cổng bảo hành), admin chỉ theo dõi; khách quên bấm thì hệ thống tự xác nhận sau 7 ngày |
+| Hiệu lực thẻ "vô hạn" | Thẻ ghi rõ: bảo hành lỗi chế tác 12 tháng (có ngày hết hạn), dịch vụ hậu mãi trọn đời sản phẩm; trang chính sách giải thích |
+| Đặt lịch chỉ trong 1 tháng | Đặt lịch được bất cứ lúc nào sau ngày nhận hàng (ngày hẹn trong vòng 1 năm, giới hạn của database) |
+| Hết 5 lượt đánh bóng & xi mới thì mất ô dịch vụ | Ô vẫn còn, chuyển sang tính phí 50.000 ₫/lần (thanh toán tại showroom) |
+| Menu "Ưu đãi" lúc nào cũng đỏ | Chỉ mục menu của trang đang xem mới đỏ |
 
 ## Lưu ý
 - Đầu trang và chân trang được lặp sẵn trong từng file HTML, nên khi sửa menu cần sửa ở tất cả các trang.

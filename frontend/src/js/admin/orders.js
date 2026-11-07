@@ -2,8 +2,9 @@
    QUẢN TRỊ – ĐƠN HÀNG (nối API /api/admin/orders)
    - Lọc theo trạng thái / phương thức thanh toán, tìm theo mã đơn, tên, số điện thoại
    - Ngăn chi tiết (?ma=): khách, sản phẩm, tiền, thanh toán, nhật ký (lấy từ GET /api/admin/orders/<mã>)
-   - Thao tác: xác nhận đã nhận tiền chuyển khoản · xác nhận đơn · bắt đầu chế tác · bàn giao vận chuyển
-     · giao thành công (kích hoạt bảo hành) · hủy đơn
+   - Thao tác: xác nhận đã nhận tiền chuyển khoản · xác nhận đơn · bắt đầu chế tác · bàn giao vận chuyển · hủy đơn
+   - Đơn đang giao: cửa hàng chỉ theo dõi. Khách bấm "Đã nhận được hàng" (kích hoạt bảo hành); khách không bấm thì
+     hệ thống tự xác nhận sau VN.TU_XAC_NHAN_NGAY ngày kể từ lúc bàn giao vận chuyển
    ===================================================================== */
 (function () {
   'use strict';
@@ -51,7 +52,10 @@
     if (d.trangThai === 'Pending' && !qt.chuaTra(d)) nut('xac-nhan', 'xac-nhan', 'Xác nhận đơn');
     if (d.trangThai === 'Confirmed' && !d.daBatDauCheTac) nut('che-tac', 'thuoc', 'Bắt đầu chế tác');
     if (d.trangThai === 'Confirmed') nut('giao', 'xe-giao', 'Bàn giao vận chuyển');
-    if (d.trangThai === 'Shipping') nut('da-giao', 'xac-nhan', 'Giao thành công');
+    if (d.trangThai === 'Shipping') {
+      const tuDong = VN.ngayTuXacNhan(d);
+      n.push(`<p class="hop-bao hop-bao--ngoc">${VN.bt('dong-ho')}<span>Đang chờ khách bấm <strong>“Đã nhận được hàng”</strong>. Thẻ bảo hành kích hoạt khi khách xác nhận${tuDong ? `; nếu khách không bấm, hệ thống tự xác nhận vào <strong>${VN.ngay(tuDong)}</strong>` : ''}.</span></p>`);
+    }
     const huyDuoc = d.trangThai === 'Pending' || (d.trangThai === 'Confirmed' && !d.daBatDauCheTac);
     if (huyDuoc) nut('huy', '', 'Hủy đơn', 'nut--vien nut-huy-don');
     const huy = huyDuoc ? `<form class="qt-form" data-form-huy hidden>
@@ -130,11 +134,8 @@
       const ok = await VN.xacNhan({ nhan: `Đơn ${ma}`, tieuDe: 'Bắt đầu chế tác đơn này?', noiDung: 'Sau bước này không ai hủy được đơn, kể cả qua hotline.', chuDongY: 'Bắt đầu chế tác' });
       if (ok) { lam = () => goi('start-production'); thanhCong = 'Đã ghi nhận bắt đầu chế tác'; }
     } else if (tac === 'giao') {
-      const ok = await VN.xacNhan({ nhan: `Đơn ${ma}`, tieuDe: 'Bàn giao cho đơn vị vận chuyển?', noiDung: 'Sau bước này khách không thể tự hủy đơn trên website.', chuDongY: 'Bàn giao' });
+      const ok = await VN.xacNhan({ nhan: `Đơn ${ma}`, tieuDe: 'Bàn giao cho đơn vị vận chuyển?', noiDung: `Sau bước này khách không thể tự hủy đơn trên website. Khi nhận hàng, khách bấm “Đã nhận được hàng” để kích hoạt thẻ bảo hành; khách không bấm thì hệ thống tự xác nhận sau ${VN.TU_XAC_NHAN_NGAY} ngày.`, chuDongY: 'Bàn giao' });
       if (ok) { lam = () => goi('status', { status: 'Shipping', reason: '' }); thanhCong = 'Đơn đã chuyển sang Đang giao'; }
-    } else if (tac === 'da-giao') {
-      const ok = await VN.xacNhan({ nhan: `Đơn ${ma}`, tieuDe: 'Đơn vị vận chuyển đã giao thành công?', noiDung: `Đơn chuyển sang Đã nhận${d.thanhToan.phuongThuc === 'COD' ? ', ghi nhận đã thu tiền COD' : ''} và kích hoạt thẻ bảo hành cho từng sản phẩm.`, chuDongY: 'Giao thành công' });
-      if (ok) { lam = () => goi('status', { status: 'Delivered', reason: '' }); thanhCong = 'Đã giao thành công, thẻ bảo hành đã kích hoạt'; }
     } else if (tac === 'huy') {
       const f = VN.$('.qt-ct [data-form-huy]'); if (f) { f.hidden = false; f.lyDo.focus(); }
       return;
