@@ -703,6 +703,15 @@ BEGIN
 END
 GO
 
+-- Đơn đang giao mà khách chưa bấm "Đã nhận được hàng": sau số ngày này kể từ lúc bàn giao vận chuyển, hệ thống tự xác nhận đã nhận
+CREATE OR ALTER FUNCTION dbo.fn_AutoConfirmReceivedDays ()
+RETURNS INT
+AS
+BEGIN
+    RETURN 7;
+END
+GO
+
 /* ---------- TRIGGER ---------- */
 
 -- 3.3. Biến thể nhẫn bắt buộc có size; sản phẩm không phải nhẫn không được có size (FR7)
@@ -835,6 +844,8 @@ GO
 /* ---------- THỦ TỤC NGHIỆP VỤ ---------- */
 
 -- 3.7. Đặt hàng từ giỏ hàng (FR10): kiểm tra lại giá, tồn kho; chống tạo trùng đơn (NFR5)
+-- @CartItemIDs: danh sách CartItemID cách nhau bằng dấu phẩy = các dòng khách đã tick. NULL = cả giỏ.
+-- Chỉ các dòng được đặt mới bị xóa khỏi giỏ, dòng không tick vẫn ở lại.
 CREATE OR ALTER PROCEDURE dbo.sp_PlaceOrder
     @CustomerID     INT,
     @AddressID      INT,
@@ -843,6 +854,7 @@ CREATE OR ALTER PROCEDURE dbo.sp_PlaceOrder
     @ShippingFee    DECIMAL(15,0) = 0,
     @VoucherCode    VARCHAR(30)   = NULL,
     @Note           NVARCHAR(500) = NULL,
+    @CartItemIDs    VARCHAR(2000) = NULL,
     @OrderID        INT OUTPUT
 AS
 BEGIN
@@ -889,7 +901,9 @@ BEGIN
         FROM dbo.CartItems ci
         JOIN dbo.ProductVariants v WITH (UPDLOCK, HOLDLOCK) ON v.VariantID = ci.VariantID
         JOIN dbo.Products p ON p.ProductID = v.ProductID
-        WHERE ci.CustomerID = @CustomerID;
+        WHERE ci.CustomerID = @CustomerID
+          AND (@CartItemIDs IS NULL
+               OR ci.CartItemID IN (SELECT TRY_CAST(LTRIM(RTRIM(value)) AS INT) FROM STRING_SPLIT(@CartItemIDs, ',')));
 
         IF NOT EXISTS (SELECT 1 FROM @Items)
         BEGIN
@@ -960,7 +974,7 @@ BEGIN
         SELECT @OrderID, @PaymentMethod, TotalAmount, 'Pending', CASE WHEN @PaymentMethod = 'COD' THEN 0 ELSE 1 END
         FROM dbo.Orders WHERE OrderID = @OrderID;
 
-        DELETE FROM dbo.CartItems WHERE CustomerID = @CustomerID;
+        DELETE FROM dbo.CartItems WHERE CartItemID IN (SELECT CartItemID FROM @Items);   -- chỉ các dòng vừa đặt
 
         INSERT INTO dbo.AuditLogs (EntityName, EntityID, Action, OldValue, NewValue, PerformedByUserID, PerformedBy)
         VALUES ('Orders', @OrderID, 'OrderCreated', NULL, 'Pending', dbo.fn_CurrentActorID(), N'Customer:' + CAST(@CustomerID AS NVARCHAR(10)));
@@ -1316,6 +1330,50 @@ BEGIN
 END
 GO
 
+-- 3.13a. Tự xác nhận đã nhận hàng: đơn Shipping quá fn_AutoConfirmReceivedDays() ngày kể từ lúc bàn giao mà khách chưa bấm
+--        thì chuyển sang Delivered như khi khách xác nhận (trigger kích hoạt thẻ bảo hành, đơn COD được ghi đã thu tiền).
+--        Cửa hàng không tự chuyển đơn sang Delivered. Backend gọi thủ tục này thường xuyên, cùng chỗ với sp_ExpireUnpaidOrders.
+CREATE OR ALTER PROCEDURE dbo.sp_AutoConfirmReceivedOrders
+    @Confirmed INT = NULL OUTPUT     -- số đơn vừa được tự xác nhận
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+    DECLARE @Cutoff DATETIME2(0) = DATEADD(DAY, -dbo.fn_AutoConfirmReceivedDays(), SYSDATETIME());
+    DECLARE @OrderID INT = 0;
+    SET @Confirmed = 0;
+
+    WHILE 1 = 1
+    BEGIN
+        SELECT @OrderID = MIN(OrderID)
+        FROM dbo.Orders
+        WHERE OrderID > @OrderID AND OrderStatus = 'Shipping' AND ShippedAt <= @Cutoff;
+        IF @OrderID IS NULL BREAK;
+
+        BEGIN TRY
+            BEGIN TRANSACTION;
+            -- Kiểm tra lại điều kiện trong câu UPDATE: khách có thể vừa bấm xác nhận
+            UPDATE dbo.Orders
+            SET OrderStatus = 'Delivered', DeliveredAt = SYSDATETIME(), UpdatedAt = SYSDATETIME()
+            WHERE OrderID = @OrderID AND OrderStatus = 'Shipping' AND ShippedAt <= @Cutoff;
+            IF @@ROWCOUNT = 1
+            BEGIN
+                UPDATE dbo.Payments SET Status = 'Success', PaidAt = SYSDATETIME()
+                WHERE OrderID = @OrderID AND PaymentMethod = 'COD' AND Status = 'Pending';
+                INSERT INTO dbo.AuditLogs (EntityName, EntityID, Action, OldValue, NewValue, PerformedByUserID, PerformedBy)
+                VALUES ('Orders', @OrderID, 'OrderAutoReceived', 'Shipping', 'Delivered', NULL, N'System:AutoConfirmReceived');
+                SET @Confirmed += 1;
+            END
+            COMMIT TRANSACTION;
+        END TRY
+        BEGIN CATCH
+            IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+            THROW;
+        END CATCH
+    END
+END
+GO
+
 -- 3.13b. Admin đánh dấu đơn đã bắt đầu chế tác (khắc chữ, chế tác theo yêu cầu). Từ lúc này đơn không hủy được
 --        (kể cả qua hotline). Chỉ đơn đã xác nhận (Confirmed) mới bắt đầu chế tác được.
 CREATE OR ALTER PROCEDURE dbo.sp_StartOrderProduction
@@ -1637,7 +1695,7 @@ SELECT o.OrderID, o.OrderCode, o.CustomerID, o.CreatedAt, o.OrderStatus,
        CASE WHEN o.OrderStatus = 'Pending' AND pay.PaymentMethod <> 'COD' AND pay.Status = 'Pending'
             THEN DATEADD(MINUTE, dbo.fn_PaymentTimeoutMinutes(), pay.CreatedAt) END AS PaymentDeadline,
        eng.HasEngraving,
-       o.ProductionStartedAt,
+       o.ProductionStartedAt, o.ShippedAt,
        -- Giao diện dùng để hiện nút "Hủy đơn" ('Web'), dòng "Gọi hotline để hủy" ('Hotline') hoặc không hiện gì (NULL):
        -- NULL khi đơn không còn hủy được (đã giao, đã hủy, hoặc đang chế tác)
        CASE WHEN o.OrderStatus NOT IN ('Pending', 'Confirmed') OR o.ProductionStartedAt IS NOT NULL THEN NULL

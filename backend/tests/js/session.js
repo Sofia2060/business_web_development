@@ -183,5 +183,29 @@ const gioKhach = () => VN.kho.doc('gioHang', []);
   // 10. A review goes to the server as the API wants it, and comes back in the shape the pages use
   const review = await attempt(() => VN.danhGia.tao({ donHang: 'VN123', soSao: 4, noiDung: 'Đẹp', chuDe: ['Đúng size'] }));
   out.review = { sent: server.reviews[0], ok: review.ok, result: review.value };
+
+  // 11. Ticks of a visitor's cart: an un-ticked line stays un-ticked after "undo", after a change of its choices, and a
+  //     line merged into another one does not change the tick of that line
+  VN.taiKhoan.nguoi = null; VN.taiKhoan.khongRo = false; VN.gioHang.khongTai = false;
+  VN.kho.ghi('gioHang', []); VN.kho.ghi('gioBoChon', []);
+  await VN.gioHang.them({ ma: 'SP1', mau: 'Vàng', soLuong: 1 });
+  await VN.gioHang.them({ ma: 'SP1', mau: 'Vàng', soLuong: 1, khacChu: 'AB', kieuChu: 'co-dien' });
+  const kPlain = VN.gioHang.khoa({ ma: 'SP1', mau: 'Vàng' });
+  const kAB = VN.gioHang.khoa({ ma: 'SP1', mau: 'Vàng', khacChu: 'AB', kieuChu: 'co-dien' });
+  VN.gioHang.datChon(kPlain, false);
+  const removedPlain = await VN.gioHang.xoa(kPlain);
+  VN.gioHang.donBoChon();                       // the cart page tidies the ticks of lines that left the cart
+  await VN.gioHang.khoiPhuc(removedPlain);
+  const removedAB = await VN.gioHang.xoa(kAB);
+  VN.gioHang.donBoChon();
+  await VN.gioHang.khoiPhuc(removedAB);
+  out.undoKeepsTicks = { plainTicked: VN.gioHang.daChon(kPlain), abTicked: VN.gioHang.daChon(kAB), stored: gioKhach().map((d) => d.ma).length };
+  const kXY = VN.gioHang.khoa({ ma: 'SP1', mau: 'Vàng', khacChu: 'XY', kieuChu: 'co-dien' });
+  const changed = await VN.gioHang.capNhatDong(kPlain, { khacChu: 'XY', kieuChu: 'co-dien' });
+  VN.gioHang.donBoChon();
+  out.changedKeepsUntick = { newKey: changed === kXY, xyTicked: VN.gioHang.daChon(kXY), plainTicked: VN.gioHang.daChon(kPlain) };
+  await VN.gioHang.capNhatDong(kXY, { khacChu: 'AB', kieuChu: 'co-dien' });      // the same choices as the ticked line: they merge
+  out.mergedKeepsTargetTick = { abTicked: VN.gioHang.daChon(kAB), lines: gioKhach().length, quantity: gioKhach()[0].soLuong };
+
   console.log(JSON.stringify(out));
 })().catch((e) => { console.error(e); process.exit(1); });

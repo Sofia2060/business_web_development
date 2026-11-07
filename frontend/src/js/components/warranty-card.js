@@ -23,7 +23,7 @@
             <div class="the-bh__duoi">
               <div><small>Chủ thẻ</small><strong>${VN.thoat(VN.vietHoaKhongDau(chuThe || ''))}</strong></div>
               <div><small>Kích hoạt</small><strong class="so-deu">${VN.ngay(the.ngayKichHoat)}</strong></div>
-              <div><small>Hiệu lực</small><strong>${VN.thoat(the.hieuLuc)}</strong></div>
+              <div><small>BH lỗi đến</small><strong class="so-deu">${the.hanLoi ? VN.ngay(the.hanLoi) : '—'}</strong></div>
             </div>
           </div>
           <div class="the-bh__sau">

@@ -174,7 +174,7 @@
         "ma": "Polishing",
         "ten": "Đánh bóng và xi mới",
         "luot": 5,
-        "hienThi": "05 lần",
+        "hienThi": "05 lần miễn phí, sau đó 50.000 ₫/lần",
         "datLich": true
       },
       {
@@ -240,7 +240,14 @@
       "17:00",
       "19:00"
     ],
-    "datTruocToiDaNgay": 30
+    "datTruocToiDaNgay": 365,
+    "baoHanhLoiThang": 12,
+    "phiSauHetLuot": { "Polishing": 50000 },
+    "kiemDinh": {
+      "ten": "Trung tâm Kiểm định Vàng bạc – Đá quý độc lập",
+      "chuan": "ISO/IEC 17025",
+      "moTa": "Đơn vị kiểm định độc lập, không thuộc Vinora: phân tích hàm lượng kim loại quý bằng máy quang phổ huỳnh quang tia X (XRF), cân điện tử độ chính xác 0,01 g, giám định đá dưới kính hiển vi. Kết quả do đơn vị kiểm định ký xác nhận, Vinora không tự cấp."
+    }
   },
   "hamLuongVang": {
     "10K": "41,7%",

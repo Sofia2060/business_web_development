@@ -11,8 +11,10 @@ from .orders import order_detail
 bp = Blueprint("admin", __name__, url_prefix="/api/admin")
 
 ORDER_STATUSES = ("Pending", "Confirmed", "Shipping", "Delivered", "Cancelled")
-# Statuses an admin can move an order to. Pending is the starting state only.
-CAN_SET_STATUS = ("Confirmed", "Shipping", "Delivered", "Cancelled")
+# Statuses an admin can move an order to. Pending is the starting state only. Delivered is missing on purpose:
+# only the customer confirms receipt (POST /api/orders/<code>/confirm-received), or the system does after 7 days
+# (sp_AutoConfirmReceivedOrders), so the shop cannot issue warranty cards by itself.
+CAN_SET_STATUS = ("Confirmed", "Shipping", "Cancelled")
 
 
 @bp.get("/users")
@@ -51,7 +53,7 @@ def list_orders():
     if orders:
         marks = ", ".join("?" * len(orders))      # the ids come from the query above, never from the request
         for item in query(
-                "SELECT oi.OrderID, oi.ProductNameSnap, oi.SKUSnap, oi.GoldColor, oi.RingSize, oi.Quantity, oi.UnitPrice, "
+                "SELECT oi.OrderID, oi.ProductNameSnap, oi.SKUSnap, oi.MaterialSnap, oi.GoldColor, oi.RingSize, oi.Quantity, oi.UnitPrice, "
                 "p.SKU AS ProductSKU FROM dbo.OrderItems oi JOIN dbo.Products p ON p.ProductID = oi.ProductID "
                 f"WHERE oi.OrderID IN ({marks}) ORDER BY oi.OrderID, oi.OrderItemID", tuple(o["OrderID"] for o in orders)):
             items.setdefault(item.pop("OrderID"), []).append(item)

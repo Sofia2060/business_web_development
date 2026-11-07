@@ -6,7 +6,7 @@ import pytest
 
 from app.db import query, transaction
 from test_guest_orders import guest_order
-from test_orders import MID, SMALL, add_to_cart, checkout, new_admin, new_customer
+from test_orders import MID, SMALL, add_to_cart, checkout, new_admin, new_customer, place
 from test_sql_rules import book, delivered_order_with_card
 
 SOON = lambda days=3: datetime.datetime.now() + datetime.timedelta(days=days)   # noqa: E731
@@ -36,6 +36,7 @@ def row_of(rows, key, value):
 
 @pytest.mark.parametrize("method,path", [
     ("get", "/api/admin/customers"), ("get", "/api/admin/feedbacks"), ("get", "/api/admin/warranties"),
+    ("get", "/api/admin/retention-stats"),
     ("get", "/api/admin/services"), ("get", "/api/admin/products"),
     ("post", "/api/admin/services/1/schedule"), ("post", "/api/admin/services/1/complete"),
     ("post", "/api/admin/services/1/cancel"), ("patch", "/api/admin/products/X"),
@@ -44,6 +45,24 @@ def test_only_admins_can_use_the_shop_admin_api(client, method, path):
     assert getattr(client, method)(path).status_code == 401
     customer, _ = new_customer()
     assert getattr(customer, method)(path).status_code == 403
+
+
+# ---------------- retention popup ----------------
+
+def test_retention_stats_count_kept_and_cancelled_orders(client):
+    admin = new_admin()
+    before = admin.get("/api/admin/retention-stats").get_json()
+    customer, address = new_customer()
+    for keep in (True, False):                                  # one order is kept by the popup, the other is cancelled
+        code = place(customer, address, SMALL)["OrderCode"]
+        assert customer.post(f"/api/orders/{code}/cancel", json={}).status_code == 200
+        assert customer.post(f"/api/orders/{code}/cancel/respond", json={"keepOrder": keep}).status_code == 200
+    after = admin.get("/api/admin/retention-stats").get_json()
+    assert after["OrdersWithCancelRequest"] == before["OrdersWithCancelRequest"] + 2
+    assert after["OrdersKeptByPopup"] == before["OrdersKeptByPopup"] + 1
+    assert after["OrdersCancelled"] == before["OrdersCancelled"] + 1
+    assert after["OrdersKeptAndDelivered"] == before["OrdersKeptAndDelivered"]
+    assert 0 < after["KeepRatePercent"] <= 100
 
 
 # ---------------- customers ----------------

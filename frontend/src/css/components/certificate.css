@@ -43,7 +43,7 @@
   color: rgba(155, 44, 38, .85); text-align: center; line-height: 1.15;
 }
 .gcn__dau-moc b { font-size: 9px; letter-spacing: .16em; font-weight: 700; }
-.gcn__dau-moc i { font-family: var(--font-tieu-de); font-style: normal; font-size: 24px; font-weight: 700; }
+.gcn__dau-moc i { font-family: var(--font-tieu-de); font-style: normal; font-size: 15px; font-weight: 700; letter-spacing: .04em; }
 /* Bản mẫu ở trang sản phẩm: chữ "MẪU" mờ phía sau */
 .gcn--mau::after {
   content: "MẪU"; position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none;

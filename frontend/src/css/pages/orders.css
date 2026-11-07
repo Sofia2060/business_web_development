@@ -120,3 +120,5 @@
 .dg-don__phan-hoi { display: grid; gap: 4px; margin-top: 6px; padding: 12px 14px; background: var(--nen-nhan); border-left: 2px solid var(--vang); font-size: 14px; }
 .dg-don__phan-hoi strong { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--vang-chu); }
 .dg-don__phan-hoi small { font-size: 12px; color: var(--chu-phu); }
+/* Gợi ý dưới nút "Đã nhận được hàng": kích hoạt bảo hành, ngày hệ thống tự xác nhận */
+.the-don__goi-y-nhan { flex-basis: 100%; order: 99; max-width: 60ch; line-height: 1.5; }

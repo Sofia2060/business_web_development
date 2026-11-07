@@ -296,7 +296,7 @@
           </div>
         </div>
       </li>
-      <li class="menu-chinh__muc"><a class="menu-chinh__lien-ket menu-chinh__lien-ket--do" href="products.html?uudai=1">Ưu đãi</a></li>
+      <li class="menu-chinh__muc"><a class="menu-chinh__lien-ket" href="products.html?uudai=1">Ưu đãi</a></li>
       <li class="menu-chinh__muc"><a class="menu-chinh__lien-ket" href="warranty-portal.html">Bảo hành điện tử</a></li>
       <li class="menu-chinh__muc"><a class="menu-chinh__lien-ket" href="about.html">Về Vinora</a></li>
     </ul>
@@ -464,9 +464,14 @@
 
     <div class="bang-gio" role="table" aria-label="Sản phẩm trong giỏ hàng">
       <div class="bang-gio__dau" role="row">
+        <span role="columnheader" class="bang-gio__chon-het"><label class="lua-chon" title="Chọn tất cả"><input type="checkbox" id="gh-chon-het" aria-label="Chọn tất cả sản phẩm để thanh toán" checked></label></span>
         <span role="columnheader">Sản phẩm</span>
         <span role="columnheader">Số lượng</span>
         <span role="columnheader">Thành tiền</span>
+      </div>
+      <div class="bang-gio__thanh-chon" id="gh-thanh-chon">
+        <label class="lua-chon"><input type="checkbox" id="gh-chon-het-nho" checked> <span>Chọn tất cả <span class="chu-phu" data-dem-chon></span></span></label>
+        <span class="chu-rat-nho chu-phu">Chỉ sản phẩm được chọn mới được tính tiền. Sản phẩm bỏ chọn vẫn nằm trong giỏ.</span>
       </div>
       <ul class="ds-dong-gio" id="ds-dong-gio"></ul>
     </div>
@@ -506,6 +511,7 @@
         <div><dt>Tạm tính</dt><dd class="so-deu">0 ₫</dd></div>
       </dl>
       <a class="nut nut--chinh nut--rong" id="nut-thanh-toan" href="checkout.html">Tiến hành thanh toán <svg class="bt bt--nho"><use href="#i-mui-ten"></use></svg></a>
+      <p class="loi-truong" id="gh-loi-chon" role="alert"></p>
       <p class="tom-tat__ghi-chu chu-rat-nho chu-phu" id="gh-ghi-chu-dn" hidden><svg class="bt bt--nho"><use href="#i-dien-thoai"></use></svg> Không cần tài khoản: số điện thoại đặt hàng dùng để tra cứu đơn và kích hoạt bảo hành.</p>
       <ul class="tom-tat__cam-ket">
         <li><svg class="bt bt--nho"><use href="#i-khoa"></use></svg> Thanh toán an toàn: COD, VietQR, VNPay, MoMo</li>

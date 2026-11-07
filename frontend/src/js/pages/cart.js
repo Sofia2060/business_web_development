@@ -1,6 +1,8 @@
 /* =====================================================================
    5.2.5 GIỎ HÀNG (FR9, FR10)
    - Mỗi dòng phân biệt theo mã + màu + size + chữ khắc; đổi size / màu / chữ khắc ngay trong giỏ
+   - Ô tick từng dòng + "Chọn tất cả": chỉ dòng được tick mới tính tiền và đi tới thanh toán,
+     dòng bỏ tick vẫn nằm trong giỏ (không phải xóa sản phẩm khỏi giỏ khi chỉ muốn mua một phần)
    - Tăng giảm số lượng (tối đa theo cấu hình), xóa có hoàn tác
    - Kiểm tra lại giá & khả năng bán trước khi thanh toán (FR10)
    - Mã ưu đãi (máy chủ kiểm tra và tính tiền giảm), tiến độ miễn phí giao hàng, gói quà & thiệp – tính tiền bằng VN.tinhTien (NFR5)
@@ -30,11 +32,14 @@
   });
 
   /* ================= HIỂN THỊ ================= */
+  /** Các dòng đang được tick (được tính tiền) */
+  const dongChon = () => tt.dong.filter((d) => VN.gioHang.daChon(d.khoa));
   /** Mã ưu đãi đang dùng: hỏi máy chủ khi mã hoặc tiền hàng đổi (máy chủ tính số tiền giảm và cho biết lý do nếu mã không dùng được) */
   const kiemTraMaDangDung = async () => {
     const ma = tt.tc.maUuDai;
-    const tamTinh = tt.dong.reduce((t, d) => t + d.donGia * d.soLuong, 0);
-    if (!ma || !tt.dong.length) { tt.uuDai = null; tt.loiMa = ''; tt.daKiemTra = ''; return; }
+    const chon = dongChon();
+    const tamTinh = chon.reduce((t, d) => t + d.donGia * d.soLuong, 0);
+    if (!ma || !chon.length) { tt.uuDai = null; tt.loiMa = ''; tt.daKiemTra = ''; return; }
     const dau = `${ma}|${tamTinh}`;
     if (dau === tt.daKiemTra) return;
     tt.daKiemTra = dau;
@@ -61,6 +66,7 @@
         hop.hidden = false;
         hop.innerHTML = `${VN.bt('canh-bao')}<span>${bo.length} sản phẩm (${bo.map((d) => VN.thoat(d.ma)).join(', ')}) không còn bán trực tuyến hoặc đổi sang giá theo ngày nên đã được gỡ khỏi giỏ.</span>`;
       }
+      VN.gioHang.donBoChon();
       // Màu, size còn lại và khả năng khắc chữ của từng sản phẩm nằm ở trang chi tiết của máy chủ
       await Promise.all(tt.dong.map((d) => VN.duLieu.chiTietSanPham(d.ma).then((ct) => { d.ct = ct; }).catch(() => {})));
       await kiemTraMaDangDung();
@@ -90,6 +96,7 @@
     const ct = d.ct;
     const coKhac = !!(ct && ct.khacDuoc);
     const k = VN.thoat(d.khoa);
+    const chon = VN.gioHang.daChon(d.khoa);
     let tuyChon = '';
     if (s.mau.length > 1) {
       tuyChon += `<label class="dong-gio__chon"><span>Màu</span><select class="o-chon" data-doi-mau data-vai-tro="mau" aria-label="Đổi màu vàng cho ${VN.thoat(s.ten)}">
@@ -112,7 +119,8 @@
       khac = `<button type="button" class="nut nut--chu dong-gio__them-khac" data-sua-khac data-vai-tro="sua-khac">${VN.bt('but', 'bt--nho')} Thêm chữ khắc miễn phí</button>`;
     }
     return `
-      <li class="dong-gio" data-khoa="${k}" role="row">
+      <li class="dong-gio${chon ? '' : ' bo-chon'}" data-khoa="${k}" role="row">
+        <label class="lua-chon dong-gio__chon-dong" role="cell"><input type="checkbox" data-chon-dong data-vai-tro="chon"${chon ? ' checked' : ''} aria-label="Chọn ${VN.thoat(s.ten)} để thanh toán"></label>
         <a class="dong-gio__anh" href="${VN.urlSanPham(s.ma)}" tabindex="-1" aria-hidden="true"><img src="${VN.anh(s.anh[0])}" alt="" width="160" height="160" loading="lazy"${VN.laAnhChup(s.anh[0]) ? ' class="la-anh-chup"' : ''}></a>
         <div class="dong-gio__thong-tin" role="cell">
           ${s.bst && s.bst.ten ? `<p class="nhan-tren">${VN.thoat(s.bst.ten)}</p>` : ''}
@@ -138,13 +146,15 @@
 
   /* Tóm tắt tiền – dùng chung công thức VN.tinhTien; số tiền giảm của mã do máy chủ tính */
   const veTien = () => {
-    const ch = tt.ch; const t = VN.tinhTien(tt.dong, ch, { giam: tt.uuDai ? tt.uuDai.discount : 0 });
-    const sl = tt.dong.reduce((a, d) => a + d.soLuong, 0);
+    const ch = tt.ch; const chon = dongChon();
+    const t = VN.tinhTien(chon, ch, { giam: tt.uuDai ? tt.uuDai.discount : 0 });
+    const sl = chon.reduce((a, d) => a + d.soLuong, 0);
+    veChon(chon);
     VN.$('#gh-tien').innerHTML = `
-      <div><dt>Tạm tính <span>(${sl} sản phẩm)</span></dt><dd class="so-deu">${VN.tien(t.tamTinh)}</dd></div>
+      <div><dt>Tạm tính <span>(${sl} sản phẩm đã chọn)</span></dt><dd class="so-deu">${VN.tien(t.tamTinh)}</dd></div>
       ${tt.uuDai && t.giam ? `<div class="dong-tien__giam"><dt>Ưu đãi <span class="nhan nhan--vang nhan--tron">${VN.thoat(tt.uuDai.code)}</span></dt><dd class="so-deu">−${VN.tien(t.giam)}</dd></div>` : ''}
-      <div><dt>Phí giao hàng <span>(tiêu chuẩn, ước tính)</span></dt><dd class="so-deu">${t.phiGiao ? VN.tien(t.phiGiao) : '<span class="chu-ngoc">Miễn phí</span>'}</dd></div>
-      <div class="dong-tien__tong"><dt>Tổng cộng</dt><dd class="so-deu">${VN.tien(t.tong)}</dd></div>`;
+      <div><dt>Phí giao hàng <span>(tiêu chuẩn, ước tính)</span></dt><dd class="so-deu">${!chon.length ? '—' : t.phiGiao ? VN.tien(t.phiGiao) : '<span class="chu-ngoc">Miễn phí</span>'}</dd></div>
+      <div class="dong-tien__tong"><dt>Tổng cộng</dt><dd class="so-deu">${VN.tien(chon.length ? t.tong : 0)}</dd></div>`;
     // Mã ưu đãi đang áp dụng
     const loi = VN.$('#loi-ma');
     if (tt.tc.maUuDai && tt.loiMa) { loi.innerHTML = `${VN.bt('canh-bao', 'bt--nho')}<span>${VN.thoat(tt.loiMa)}</span>`; }
@@ -153,10 +163,10 @@
     VN.$('#o-ma').closest('.truong').classList.toggle('co-loi', !!(tt.tc.maUuDai && tt.loiMa));
     VN.$$('#ds-ma [data-ma]').forEach((b) => {
       const u = ch.maUuDai.find((x) => x.ma === b.dataset.ma);
-      const du = t.tamTinh >= (u.donToiThieu || 0);
+      const du = chon.length > 0 && t.tamTinh >= (u.donToiThieu || 0);
       b.classList.toggle('chua-du', !du);
       b.setAttribute('aria-pressed', String(tt.tc.maUuDai === u.ma));
-      VN.$('small', b).textContent = du ? u.moTa : `Mua thêm ${VN.tien(u.donToiThieu - t.tamTinh)} để dùng mã`;
+      VN.$('small', b).textContent = du ? u.moTa : !chon.length ? 'Chọn sản phẩm để dùng mã' : `Mua thêm ${VN.tien(u.donToiThieu - t.tamTinh)} để dùng mã`;
     });
     // Tiến độ miễn phí giao hàng
     const pt = Math.min(100, Math.round(t.tamTinh * 100 / ch.giaoHang.mienPhiTu));
@@ -166,6 +176,42 @@
     // Không bắt buộc đăng nhập: khách chưa có tài khoản đặt hàng bằng số điện thoại
     VN.$('#gh-ghi-chu-dn').hidden = !!VN.taiKhoan.hienTai();
   };
+
+  /* ================= CHỌN DÒNG ĐỂ THANH TOÁN ================= */
+  /** Ô "Chọn tất cả" (đầu bảng và thanh trên điện thoại), số dòng đã chọn, nút thanh toán */
+  const veChon = (chon = dongChon()) => {
+    const tatCa = chon.length === tt.dong.length && tt.dong.length > 0; const motPhan = chon.length > 0 && !tatCa;
+    ['#gh-chon-het', '#gh-chon-het-nho'].forEach((id) => { const o = VN.$(id); o.checked = tatCa; o.indeterminate = motPhan; });
+    VN.$('[data-dem-chon]').textContent = `(${chon.length}/${tt.dong.length})`;
+    const nut = VN.$('#nut-thanh-toan');
+    nut.setAttribute('aria-disabled', String(!chon.length));
+    nut.firstChild.textContent = chon.length && chon.length < tt.dong.length ? `Thanh toán ${chon.length} sản phẩm đã chọn ` : 'Tiến hành thanh toán ';
+    if (chon.length) VN.$('#gh-loi-chon').textContent = '';
+  };
+  /** Đổi tick: vẽ lại tiền ngay, rồi hỏi máy chủ số tiền giảm của mã (tiền hàng đã đổi) */
+  const sauKhiDoiChon = async () => {
+    VN.$$('.dong-gio', dsDong).forEach((li) => {
+      const c = VN.gioHang.daChon(li.dataset.khoa);
+      li.classList.toggle('bo-chon', !c); VN.$('[data-chon-dong]', li).checked = c;
+    });
+    veTien();
+    await kiemTraMaDangDung();
+    veTien();
+  };
+  dsDong.addEventListener('change', (e) => {
+    if (!e.target.matches('[data-chon-dong]')) return;
+    VN.gioHang.datChon(khoaCua(e.target), e.target.checked);
+    sauKhiDoiChon();
+  });
+  ['#gh-chon-het', '#gh-chon-het-nho'].forEach((id) => VN.$(id).addEventListener('change', (e) => {
+    VN.gioHang.chonTatCa(e.target.checked);
+    sauKhiDoiChon();
+  }));
+  VN.$('#nut-thanh-toan').addEventListener('click', (e) => {
+    if (dongChon().length) return;
+    e.preventDefault();
+    VN.$('#gh-loi-chon').innerHTML = `${VN.bt('canh-bao', 'bt--nho')}<span>Vui lòng chọn ít nhất một sản phẩm để thanh toán.</span>`;
+  });
 
   /* ================= THAO TÁC TRÊN DÒNG ================= */
   const khoaCua = (el) => el.closest('.dong-gio').dataset.khoa;
@@ -197,7 +243,8 @@
     }
   });
   dsDong.addEventListener('change', (e) => {
-    const el = e.target; const k = khoaCua(el); const d = dongTheoKhoa(k); if (!d) return;
+    const el = e.target; if (el.matches('[data-chon-dong]')) return;
+    const k = khoaCua(el); const d = dongTheoKhoa(k); if (!d) return;
     if (el.matches('[data-o-sl]')) {
       const n = Math.max(1, Math.min(tt.ch.soLuongToiDaMoiDong, Math.round(Number(el.value) || 1)));
       if (Number(el.value) > tt.ch.soLuongToiDaMoiDong) VN.thongBao({ tieuDe: `Tối đa ${tt.ch.soLuongToiDaMoiDong} sản phẩm cho mỗi lựa chọn`, noiDung: 'Liên hệ hotline nếu bạn cần đặt số lượng lớn.' });
@@ -256,6 +303,7 @@
     ma = String(ma || '').trim().toUpperCase();
     VN.$('#o-ma').value = ma;
     if (!ma) { VN.baoLoiTruong(VN.$('#o-ma'), 'Vui lòng nhập mã ưu đãi.'); return; }
+    if (!dongChon().length) { VN.baoLoiTruong(VN.$('#o-ma'), 'Chọn ít nhất một sản phẩm trước khi áp dụng mã.'); return; }
     try {
       const kq = await VN.uuDai.kiemTra(ma);           // máy chủ kiểm tra mã và tính số tiền giảm
       tt.tc = VN.tuyChonGio.ghi({ maUuDai: kq.code });

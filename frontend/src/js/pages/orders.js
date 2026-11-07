@@ -36,7 +36,11 @@
   /* Nút thao tác theo trạng thái đơn */
   const nutThaoTac = (don, chiTiet = false) => {
     const n = [];
-    if (don.trangThai === 'Shipping') n.push(`<button type="button" class="nut nut--chinh nut--nho" data-tac="da-nhan" data-ma="${don.ma}">${VN.bt('xac-nhan')} Đã nhận được hàng</button>`);
+    if (don.trangThai === 'Shipping') {
+      n.push(`<button type="button" class="nut nut--chinh nut--nho" data-tac="da-nhan" data-ma="${don.ma}">${VN.bt('xac-nhan')} Đã nhận được hàng</button>`);
+      const tuDong = VN.ngayTuXacNhan(don);
+      n.push(`<span class="chu-rat-nho chu-phu the-don__goi-y-nhan">Bấm sau khi kiểm tra hàng để kích hoạt thẻ bảo hành.${tuDong ? ` Nếu bạn chưa bấm, hệ thống tự xác nhận vào ${VN.ngay(tuDong)}.` : ''}</span>`);
+    }
     if (chuaThanhToanOnline(don)) n.push(`<a class="nut nut--chinh nut--nho" href="${VN.url('ketQuaDatHang', { ma: don.ma })}">${VN.bt('the')} Thanh toán ngay</a>`);
     if (don.trangThai === 'Delivered') {
       n.push(don.daDanhGia

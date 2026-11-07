@@ -18,11 +18,29 @@ def shipping_fee(subtotal: int) -> int:
     return 0 if subtotal >= FREE_SHIPPING_FROM else STANDARD_SHIPPING_FEE
 
 
-def cart_subtotal(customer_id: int) -> int:
-    rows = query(
-        "SELECT ISNULL(SUM(ci.Quantity * dbo.fn_GetCurrentPrice(v.ProductID)), 0) AS s FROM dbo.CartItems ci "
-        "JOIN dbo.ProductVariants v ON v.VariantID = ci.VariantID WHERE ci.CustomerID = ?", (customer_id,))
-    return rows[0]["s"]
+MAX_SELECTED_LINES = 100   # keeps the id list sent to sp_PlaceOrder (VARCHAR(2000)) short enough
+
+
+def read_item_ids(data: dict) -> tuple[list[int] | None, str | None]:
+    """The cart lines the customer ticked: "cartItemIds" in the request. Returns (ids, error message).
+    ids is None when the field is missing (the whole cart is meant)."""
+    ids = data.get("cartItemIds")
+    if ids is None:
+        return None, None
+    if not isinstance(ids, list) or not 1 <= len(ids) <= MAX_SELECTED_LINES or not all(is_int(i, 1, INT_MAX) for i in ids):
+        return None, f"cartItemIds must be a list of 1 to {MAX_SELECTED_LINES} cart line ids"
+    return sorted(set(ids)), None
+
+
+def cart_subtotal(customer_id: int, item_ids: list[int] | None = None) -> int:
+    """Price of the cart of a customer. With item_ids, only those lines count (the lines ticked for checkout)."""
+    sql = ("SELECT ISNULL(SUM(ci.Quantity * dbo.fn_GetCurrentPrice(v.ProductID)), 0) AS s FROM dbo.CartItems ci "
+           "JOIN dbo.ProductVariants v ON v.VariantID = ci.VariantID WHERE ci.CustomerID = ?")
+    params: tuple = (customer_id,)
+    if item_ids is not None:
+        sql += f" AND ci.CartItemID IN ({','.join('?' * len(item_ids))})"
+        params += tuple(item_ids)
+    return query(sql, params)[0]["s"]
 
 
 @bp.get("")

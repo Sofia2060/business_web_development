@@ -204,6 +204,7 @@
       coKhacChu: !!r.HasEngraving,
       daDanhGia: !!r.feedback, danhGia: r.feedback ? VN.danhGiaTuApi(r.feedback, r.OrderCode) : null, lichSu: [],
     };
+    if (r.ShippedAt !== undefined) don.ngayGiao = r.ShippedAt || null;
     if (r.ShipRecipientName !== undefined) {   // the detail of one order
       don.nguoiNhan = { hoTen: r.ShipRecipientName, sdt: r.ShipPhone, tinh: '', phuongXa: '', diaChi: r.ShipAddress, ghiChu: r.Note || '', email: '' };
       don.ngayGiao = r.ShippedAt || null; don.ngayNhan = r.DeliveredAt || null; don.ngayXacNhan = r.ConfirmedAt || null;
@@ -226,7 +227,7 @@
     them(r.ConfirmedAt, 'Cửa hàng xác nhận đơn hàng.', 'Cửa hàng', 'Confirmed');
     them(r.ProductionStartedAt, 'Cửa hàng bắt đầu chế tác đơn hàng.', 'Cửa hàng', 'Confirmed');
     them(r.ShippedAt, 'Cửa hàng bàn giao đơn hàng cho đơn vị vận chuyển.', 'Cửa hàng', 'Shipping');
-    them(r.DeliveredAt, 'Đơn hàng đã được giao thành công.', 'Hệ thống', 'Delivered');     // the order does not record who confirmed it
+    them(r.DeliveredAt, 'Đã xác nhận nhận hàng, thẻ bảo hành được kích hoạt.', 'Khách hàng / hệ thống', 'Delivered');     // the customer, or the system after 7 days
     them(r.CancelledAt, `Đơn hàng đã hủy${r.CancelReason ? '. Lý do: ' + r.CancelReason : ''}.`, 'Hệ thống', 'Cancelled');
     return ls.sort((a, b) => new Date(a.luc) - new Date(b.luc));
   };
@@ -234,6 +235,18 @@
   /* ================= 3b. WARRANTY CARDS AND APPOINTMENTS ================= */
   const DICH_VU_TRANG = { Cleaning: 'Cleaning', Polishing: 'Polishing', Replating: 'Polishing', Resizing: 'Resizing' };   // plating is shown with polishing
   const LICH_DANG_MO = ['Pending', 'Confirmed', 'Rescheduled'];
+  /** Bảo hành lỗi chế tác: số tháng kể từ ngày nhận hàng (= ngày kích hoạt thẻ). Cùng số với mock-data/config.json baoHanh.baoHanhLoiThang. */
+  VN.BAO_HANH_LOI_THANG = 12;
+  const hieuLucThe = VN.hieuLucThe = (ngayKichHoat) => {
+    const han = new Date(ngayKichHoat); const ngayGoc = han.getDate();
+    han.setMonth(han.getMonth() + VN.BAO_HANH_LOI_THANG);
+    if (han.getDate() !== ngayGoc) han.setDate(0);      // 29/02 + 12 months: the last day of February, not 01/03
+    return {
+      hanLoi: han.toISOString(),
+      hieuLuc: `Lỗi chế tác đến ${VN.ngay(han)}`,
+      hieuLucDay: `Bảo hành lỗi chế tác ${VN.BAO_HANH_LOI_THANG} tháng (đến ${VN.ngay(han)}) · Dịch vụ hậu mãi trọn đời sản phẩm, không có ngày hết hạn`,
+    };
+  };
   /** A card of GET /api/warranties -> the card the pages use. hanMuc = the free turns of each service (null = no limit),
    *  daDung = how many are used. */
   VN.theBaoHanhTuApi = (r) => {
@@ -241,7 +254,10 @@
     return {
       ma: r.WarrantyCode, donHang: r.OrderCode, maSP: r.ProductSKU, tenSP: r.ProductName, anh: sp && sp[r.ProductSKU] ? sp[r.ProductSKU].anh[0] : '',
       chatLieu: r.Material, mau: r.GoldColor || '', size: r.RingSize || null, khacChu: r.EngravingText || '', laNhan: !!r.IsRing,
-      ngayKichHoat: r.IssueDate, hieuLuc: 'Trọn đời', conHieuLuc: r.Status === 'Active',
+      ngayKichHoat: r.IssueDate, conHieuLuc: r.Status === 'Active',
+      // Hiệu lực rõ ràng thay cho chữ "Trọn đời" chung chung: lỗi chế tác có hạn (12 tháng từ ngày nhận hàng),
+      // dịch vụ hậu mãi (làm sạch, chỉnh size…) không có ngày hết hạn, gắn với sản phẩm
+      ...hieuLucThe(r.IssueDate),
       daDung: { Cleaning: r.CleaningCount, Polishing: (r.PolishingQuota || 0) - r.PolishingCountLeft, Resizing: r.ResizingCount },
       hanMuc: { Cleaning: r.CleaningQuota, Polishing: r.PolishingQuota, Resizing: r.ResizingQuota },
       lichSuDichVu: [],

@@ -196,7 +196,11 @@ def test_a_guest_order_keeps_the_phone_it_was_looked_up_with(adapted):
 def test_a_warranty_card_in_page_shape(adapted):
     (card,) = adapted["cards"]
     assert card["ma"].startswith("VNW") and card["donHang"].startswith("VN") and card["maSP"] and card["tenSP"] and card["conHieuLuc"] is True
-    assert card["laNhan"] is True and card["size"] == 11 and card["chatLieu"] and card["hieuLuc"] == "Trọn đời"
+    assert card["laNhan"] is True and card["size"] == 11 and card["chatLieu"]
+    # Workmanship warranty ends 12 months after activation; after-sales services have no end date
+    assert card["hieuLuc"].startswith("Lỗi chế tác đến ") and "Dịch vụ hậu mãi trọn đời" in card["hieuLucDay"]
+    issued = datetime.date.fromisoformat(card["ngayKichHoat"][:10])
+    assert 363 <= (datetime.date.fromisoformat(card["hanLoi"][:10]) - issued).days <= 368
     assert card["hanMuc"] == {"Cleaning": None, "Polishing": 5, "Resizing": None}        # null = no limit
     assert card["daDung"] == {"Cleaning": 0, "Polishing": 0, "Resizing": 0} and card["lichSuDichVu"] == []
     assert card["anh"] and DATE.match(card["ngayKichHoat"][:10])

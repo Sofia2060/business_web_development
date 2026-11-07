@@ -88,7 +88,8 @@
 .menu-chinh__lien-ket:focus-visible::after,
 .menu-chinh__lien-ket[aria-current="page"]::after,
 .menu-chinh__muc.dang-mo > .menu-chinh__lien-ket::after { transform: scaleX(1); }
-.menu-chinh__lien-ket--do { color: var(--hong-ngoc); }
+/* Mục menu của trang đang xem: chữ đỏ + gạch chân (chỉ mục đó, không cố định ở “Ưu đãi”) */
+.menu-chinh__lien-ket[aria-current="page"] { color: var(--hong-ngoc); }
 .dau-trang.da-cuon .menu-chinh__lien-ket { padding: 11px 0 10px; }
 .dau-trang.da-cuon .menu-chinh__lien-ket::after { bottom: 5px; }
 

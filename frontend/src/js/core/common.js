@@ -199,6 +199,11 @@
   };
   /** Đơn thanh toán trực tuyến phải trả tiền trong 15 phút, quá hạn máy chủ tự hủy đơn (fn_PaymentTimeoutMinutes) */
   VN.HAN_THANH_TOAN_PHUT = 15;
+  /** Đơn đang giao mà khách chưa bấm "Đã nhận được hàng": hệ thống tự xác nhận sau số ngày này kể từ lúc bàn giao vận chuyển
+   *  (fn_AutoConfirmReceivedDays). Cửa hàng không tự chuyển đơn sang Đã nhận. */
+  VN.TU_XAC_NHAN_NGAY = 7;
+  /** Ngày hệ thống tự xác nhận đã nhận của một đơn đang giao (hoặc null khi chưa có ngày bàn giao) */
+  VN.ngayTuXacNhan = (don) => { if (!don || !don.ngayGiao) return null; const d = new Date(don.ngayGiao); d.setDate(d.getDate() + VN.TU_XAC_NHAN_NGAY); return d; };
   VN.TEN_THANH_TOAN = { COD: 'Thanh toán khi nhận hàng', BANK: 'Chuyển khoản VietQR', VNPAY: 'Cổng VNPay', MOMO: 'Ví MoMo' };
   VN.TEN_DICH_VU = { Cleaning: 'Làm sạch', Polishing: 'Đánh bóng & xi mới', Replating: 'Đánh bóng & xi mới', Resizing: 'Chỉnh size nhẫn' };
   VN.TRANG_THAI_LICH = {
@@ -542,12 +547,14 @@
         <a class="gio-mini__anh" href="${VN.urlSanPham(d.ma)}"><img src="${VN.anh(d.sp.anh[0])}" alt="" loading="lazy"></a>
         <div>
           <a class="gio-mini__ten" href="${VN.urlSanPham(d.ma)}">${VN.thoat(d.sp.ten)}</a>
-          <p class="gio-mini__phu">${[d.ma, d.mau, d.size ? 'Size ' + d.size : '', d.khacChu ? `Khắc “${VN.thoat(d.khacChu)}”` : ''].filter(Boolean).join(' · ')}</p>
+          <p class="gio-mini__phu">${[d.ma, d.mau, d.size ? 'Size ' + d.size : '', d.khacChu ? `Khắc “${VN.thoat(d.khacChu)}”` : '', VN.gioHang.daChon(d.khoa) ? '' : 'Chưa chọn thanh toán'].filter(Boolean).join(' · ')}</p>
           <div class="gio-mini__hang"><span class="so-deu">${d.soLuong} × ${VN.tien(d.donGia)}</span><button type="button" class="gio-mini__xoa" data-xoa-mini="${VN.thoat(d.khoa)}">Xóa</button></div>
         </div>
       </div>`).join('');
-    const tien = VN.tinhTien(dong, ch);
-    VN.$('[data-gio-mini-tong]').textContent = VN.tien(tien.tamTinh);
+    // Only the ticked lines go to checkout, so only they count in the total and the free-shipping bar
+    const chon = dong.filter((d) => VN.gioHang.daChon(d.khoa));
+    const tien = VN.tinhTien(chon, ch);
+    VN.$('[data-gio-mini-tong]').textContent = VN.tien(tien.tamTinh) + (chon.length < dong.length ? ` (${chon.length}/${dong.length} dòng đã chọn)` : '');
     const pt = Math.min(100, Math.round(tien.tamTinh * 100 / ch.giaoHang.mienPhiTu));
     VN.$('[data-gio-mini-mien-phi]').innerHTML = tien.duMienPhi
       ? `<span>${VN.bt('xe-giao', 'bt--nho')} Đơn hàng được <strong>miễn phí giao hàng có bảo hiểm</strong>.</span><div class="thanh-tien-do thanh-tien-do--ngoc"><span style="width:100%"></span></div>`
@@ -555,8 +562,28 @@
   };
   VN.moGioMini = () => { VN.veGioMini(); VN.moHopThoai(VN.$('#gio-mini')); };
 
+  /** Đánh dấu mục menu chính của trang đang xem (aria-current="page" -> chữ đỏ). Gọi lại khi trang đổi tham số URL. */
+  VN.danhDauMenu = () => {
+    const trang = location.pathname.split('/').pop() || 'index.html';
+    const ts = new URLSearchParams(location.search);
+    const nhom = (ten, q) => {
+      if (ten === 'products.html') return q.get('uudai') === '1' ? 'uu-dai' : q.get('bst') ? 'bst' : 'trang-suc';
+      if (ten === 'product-detail.html') return 'trang-suc';
+      if (/^warranty-/.test(ten)) return 'bao-hanh';
+      if (ten === 'about.html') return 've-vinora';
+      return '';
+    };
+    const hienTai = nhom(trang, ts);
+    VN.$$('#dau-trang .menu-chinh__muc > .menu-chinh__lien-ket').forEach((a) => {
+      const u = new URL(a.href, location.href);
+      if (hienTai && nhom(u.pathname.split('/').pop(), u.searchParams) === hienTai) a.setAttribute('aria-current', 'page');
+      else a.removeAttribute('aria-current');
+    });
+  };
+
   const khoiTaoMenu = () => {
     const dauTrang = VN.$('#dau-trang'); if (!dauTrang) return;
+    VN.danhDauMenu();
     // Bóng đổ khi cuộn
     const khiCuon = () => dauTrang.classList.toggle('da-cuon', window.scrollY > 40);
     window.addEventListener('scroll', khiCuon, { passive: true }); khiCuon();
@@ -684,14 +711,15 @@
       const [dong, { ch }] = await Promise.all([VN.gioHang.chiTiet(), VN.duLieu.coBan()]);
       if (!dong.length) return hopRong('tui', 'Giỏ hàng của bạn đang trống.', `<a class="nut nut--vien nut--nho" href="${VN.url('sanPham')}">Khám phá trang sức</a>`);
       const dem = dong.reduce((t, d) => t + d.soLuong, 0);
-      const tien = VN.tinhTien(dong, ch);
+      const chon = dong.filter((d) => VN.gioHang.daChon(d.khoa));      // only the ticked lines go to checkout
+      const tien = VN.tinhTien(chon, ch);
       const conLai = dong.length - 4;
       return `<div class="xn__dau"><strong>Giỏ hàng (${dem})</strong><a href="${VN.url('gioHang')}">Chỉnh sửa</a></div>
         <div class="xn__ds">${dong.slice(0, 4).map((d) => dongMuc(d.sp,
           [d.mau, d.size ? 'Size ' + d.size : '', d.khacChu ? `Khắc “${VN.thoat(d.khacChu)}”` : ''].filter(Boolean).join(' · ') || VN.thoat(d.ma),
           `<span class="xn__gia so-deu">${d.soLuong} × ${VN.tien(d.donGia)}</span>`)).join('')}</div>
         ${conLai > 0 ? `<p class="xn__them">và ${conLai} sản phẩm khác trong giỏ</p>` : ''}
-        <div class="xn__tong"><span>Tạm tính</span><strong class="so-deu">${VN.tien(tien.tamTinh)}</strong></div>
+        <div class="xn__tong"><span>Tạm tính${chon.length < dong.length ? ` (${chon.length}/${dong.length} dòng đã chọn)` : ''}</span><strong class="so-deu">${VN.tien(tien.tamTinh)}</strong></div>
         <div class="xn__nut-doi"><a class="nut nut--vien nut--nho" href="${VN.url('gioHang')}">Xem giỏ hàng</a><a class="nut nut--chinh nut--nho" href="${VN.url('thanhToan')}">Thanh toán</a></div>`;
     },
   };
@@ -722,7 +750,7 @@
       khung.addEventListener('keydown', (e) => { if (e.key === 'Escape') { dong(khung); VN.$('.nut-bt', khung).focus(); } });
     });
     // Dữ liệu đổi (thêm giỏ, bỏ yêu thích, đăng nhập…) khi hộp đang mở thì dựng lại
-    ['gio', 'yeu-thich', 'tai-khoan', 'don-hang'].forEach((ten) => window.addEventListener('vinora:' + ten, () => {
+    ['gio', 'gio-chon', 'yeu-thich', 'tai-khoan', 'don-hang'].forEach((ten) => window.addEventListener('vinora:' + ten, () => {
       dsHop.filter((k) => k.classList.contains('dang-mo')).forEach(async (k) => { VN.$('[data-xem-nhanh-hop]', k).innerHTML = await XEM_NHANH[k.dataset.xemNhanh](); });
     }));
   };

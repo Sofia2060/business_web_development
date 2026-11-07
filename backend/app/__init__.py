@@ -59,11 +59,15 @@ def create_app() -> Flask:
     def expire_unpaid_orders():
         # An online order that is not paid within 15 minutes has failed: cancel it and return the stock and the voucher.
         # Doing it before each API call means no timer is needed, and the check is cheap when nothing is overdue.
+        # Also here: a shipped order that the customer did not confirm within 7 days counts as received
+        # (its warranty cards are issued then). Two separate calls, so a failure of one does not stop the other.
         if request.path.startswith("/api/"):
-            try:
-                call("EXEC dbo.sp_ExpireUnpaidOrders")
-            except (pyodbc.Error, ProcError):    # a failed check must not stop everyone from using the shop
-                app.logger.exception("Could not cancel the overdue unpaid orders")
+            for procedure, what in (("sp_ExpireUnpaidOrders", "cancel the overdue unpaid orders"),
+                                    ("sp_AutoConfirmReceivedOrders", "confirm the receipt of the orders shipped 7 days ago")):
+                try:
+                    call(f"EXEC dbo.{procedure}")
+                except (pyodbc.Error, ProcError):    # a failed check must not stop everyone from using the shop
+                    app.logger.exception("Could not %s", what)
 
     @app.get("/")
     def home():
