@@ -15,6 +15,7 @@ business_web_development/
 ├── .gitignore
 ├── .editorconfig
 ├── .env.example               # mẫu biến môi trường (KHÔNG commit .env thật)
+├── requirements.txt           # thư viện chạy của back-end, dùng với pip (người dùng uv thì xem pyproject.toml)
 │
 ├── docs/                      # tài liệu đồ án
 │   ├── [Web] FinalProject.md  # khung báo cáo
@@ -60,7 +61,6 @@ business_web_development/
 │   │   └── utils/
 │   ├── migrations/
 │   ├── tests/
-│   ├── requirements.txt
 │   └── run.py
 │
 ├── database/
@@ -68,11 +68,7 @@ business_web_development/
 │   ├── 02_VinoraJewelry_FakeData.sql   # dữ liệu giả lập cho dev/demo
 │   └── README.md
 │
-├── scripts/                   # script tiện ích (import dữ liệu, build...)
-└── .github/
-    ├── workflows/             # CI (bổ sung sau)
-    ├── ISSUE_TEMPLATE/
-    └── PULL_REQUEST_TEMPLATE.md
+└── scripts/                   # script tiện ích (import dữ liệu, build...)
 ```
 
 > **Trạng thái:** giao diện (`frontend/`), API Flask (`backend/`) và database (`database/`) đã có mã. Luồng mua hàng chạy trọn từ
@@ -134,6 +130,22 @@ uv run pytest
 ```
 
 Thêm thư viện: `uv add <tên>`. Thư viện chỉ dùng cho test: `uv add --dev <tên>`.
+
+### Cài bằng pip (không dùng uv)
+
+Dành cho người chưa cài uv. Cần Python 3.11 trở lên. Mở terminal ở gốc repo, tạo môi trường ảo `.venv` (đã nằm trong `.gitignore`), rồi cài từ `requirements.txt`:
+
+```bash
+python -m venv .venv
+.venv\Scripts\activate            # Windows (PowerShell hoặc cmd)
+# source .venv/bin/activate       # macOS, Linux
+pip install -r requirements.txt
+pip install pytest                # chỉ cần khi chạy test
+```
+
+Sau đó chạy như bình thường, bỏ chữ `uv run`: `python backend/run.py`, `pytest`.
+`requirements.txt` chỉ gồm thư viện chạy thật, ghim đúng phiên bản trong `uv.lock`. Nguồn chính vẫn là `pyproject.toml`: ai dùng `uv add` thì sửa luôn file này.
+
 Kết nối SQL Server cần ODBC Driver 18 (máy hiện tại đã có). Sao chép `.env.example` thành `.env` rồi điền thông tin.
 Để trống `DB_USER` thì back-end đăng nhập bằng Windows Authentication.
 
