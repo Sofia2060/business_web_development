@@ -102,17 +102,29 @@
       return;
     }
     if (!ds.length) { khung.innerHTML = `<div class="trong-rong khoi-tk"><p>Không có đơn hàng phù hợp${tu ? ` với “${VN.thoat(tt.tim)}”` : ''}.</p></div>`; return; }
+    /** Price of each line after its share of the voucher discount. The share is proportional to the line's price;
+     *  the last line takes the rounding rest, so the lines always add up to (subtotal - discount). */
+    const giaSauGiam = (don) => {
+      const goc = don.sanPham.map((d) => d.donGia * d.soLuong);
+      let conLai = don.giamGia || 0;
+      return goc.map((g, i) => {
+        const phan = i === goc.length - 1 ? conLai : Math.round(g * (don.giamGia || 0) / (don.tamTinh || 1));
+        conLai -= phan;
+        return g - phan;
+      });
+    };
     khung.innerHTML = ds.map((don) => {
       const sl = don.sanPham.reduce((a, d) => a + d.soLuong, 0);
+      const giaDong = giaSauGiam(don);
       return `<article class="the-don the-don--${don.trangThai.toLowerCase()}">
         <header class="the-don__dau">
           <div><p class="the-don__ma">Đơn <a href="${VN.url('donHang', { ma: don.ma })}" data-xem="${don.ma}">${VN.thoat(don.ma)}</a></p><p class="chu-rat-nho chu-phu">Đặt ${VN.ngayGio(don.ngayDat)}</p></div>
           <div class="the-don__nhan">${nhanTT(don)}${nhanThanhToan(don)}</div>
         </header>
-        <ul class="the-don__sp">${don.sanPham.map((d) => `<li>
+        <ul class="the-don__sp">${don.sanPham.map((d, i) => `<li>
           <span class="the-don__anh"><img src="${VN.anh(d.anh)}" alt="" width="72" height="72" loading="lazy"${VN.laAnhChup(d.anh) ? ' class="la-anh-chup"' : ''}></span>
           <span class="the-don__chu"><a href="${VN.urlSanPham(d.ma)}">${VN.thoat(d.ten)}</a><small>${chiTietDong(d)} · SL ${d.soLuong}</small>${khacHtml(d)}</span>
-          <span class="the-don__gia so-deu">${VN.tien(d.donGia * d.soLuong)}</span></li>`).join('')}</ul>
+          <span class="the-don__gia so-deu">${VN.tien(giaDong[i])}</span></li>`).join('')}</ul>
         ${hanGon(don)}
         <footer class="the-don__chan">
           <p>${sl} sản phẩm · Tổng <strong class="so-deu">${VN.tien(don.tongTien)}</strong></p>

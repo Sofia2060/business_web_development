@@ -164,7 +164,7 @@
       <div><dt>${VN.thoat(t.pt.ten)}</dt><dd class="so-deu">${t.phiGiao ? VN.tien(t.phiGiao) : '<span class="chu-ngoc">Miễn phí</span>'}</dd></div>
       <div class="dong-tien__tong"><dt>Tổng thanh toán</dt><dd class="so-deu">${VN.tien(t.tong)}</dd></div>`;
     const loi = VN.$('#tt-loi-ma');
-    loi.innerHTML = tt.tc.maUuDai && tt.loiMa ? `${VN.bt('canh-bao', 'bt--nho')}<span>${VN.thoat(tt.loiMa)}</span>`
+    loi.innerHTML = tt.tc.maUuDai && tt.loiMa ? `${VN.bt('canh-bao', 'bt--nho')}<span>${VN.thoat(tt.loiMa)} <button type="button" class="lien-ket" id="tt-bo-ma">Bỏ mã</button></span>`
       : tt.uuDai ? `<span class="chu-ngoc">${VN.bt('dau-tich', 'bt--nho')} ${VN.thoat(tt.uuDai.name)} · <button type="button" class="lien-ket" id="tt-bo-ma">Bỏ mã</button></span>` : '';
     VN.$('#tt-ma').closest('.truong').classList.toggle('co-loi', !!(tt.tc.maUuDai && tt.loiMa));
     VN.$('#nut-dat-hang').textContent = `Đặt hàng · ${VN.tien(t.tong)}`;
@@ -203,6 +203,8 @@
   };
   VN.$('#tt-ds-ma').addEventListener('click', (e) => {
     const b = e.target.closest('[data-ma]'); if (!b || !tt.ch) return;
+    // The card already says how much more to buy. Applying a code the order cannot use would store it and block the order button.
+    if (b.classList.contains('chua-du')) return;
     VN.$('#tt-ma').value = b.dataset.ma;
     VN.$('#tt-ap-ma').click();
   });
